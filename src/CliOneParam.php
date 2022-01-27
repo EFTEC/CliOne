@@ -2,13 +2,23 @@
 
 namespace Eftec\CliOne;
 
+/**
+ * CliOne - A simple creator of command line argument program.
+ *
+ * @package   CliOne
+ * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
+ * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
+ *            Don't delete this comment, its part of the license.
+ * @version   0.3
+ * @link      https://github.com/EFTEC/CliOne
+ */
 class CliOneParam
 {
     /** @var CliOne */
     private $parent;
     public $key;
     public $subkey;
-    public $keyFriendly = '';
+    public $question = '';
     public $default=false;
     public $description = '';
     public $required = false;
@@ -20,6 +30,7 @@ class CliOneParam
     public $inputValue = [];
     public $value;
 
+    /** @noinspection PhpUnused */
     public function getWithoutParent(): CliOneParam
     {
         $this->parent=null;
@@ -40,7 +51,7 @@ class CliOneParam
         $this->key = $key;
 
         $this->subkey = $subkey;
-        $this->keyFriendly=$subkey?? $key;
+        $this->question=$subkey?? $key;
     }
 
 
@@ -56,12 +67,12 @@ class CliOneParam
 
     /**
      * @param mixed $description
-     * @param null  $keyFriendly
+     * @param null|string $question
      * @return CliOneParam
      */
-    public function setDescription($description, $keyFriendly = null): CliOneParam
+    public function setDescription($description, $question = null): CliOneParam
     {
-        $this->keyFriendly = $keyFriendly ?? $this->keyFriendly;
+        $this->question = $question ?? 'Select the value of '.($this->subkey??$this->key);
         $this->description = $description;
         return $this;
     }
@@ -110,7 +121,7 @@ class CliOneParam
                 }
                 break;
         }
-        $this->parent->parameters[] = clone $this;
+        $this->parent->parameters[] = $this;
         $this->parent = null;
     }
 
