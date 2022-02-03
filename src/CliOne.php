@@ -1,10 +1,13 @@
-<?php /** @noinspection PhpUnused */
-/** @noinspection PhpMissingFieldTypeInspection */
-/** @noinspection ReturnTypeCanBeDeclaredInspection */
-
-/** @noinspection AlterInForeachInspection */
+<?php /** @noinspection PhpUnused
+ * @noinspection PhpMissingFieldTypeInspection
+ * @noinspection ReturnTypeCanBeDeclaredInspection
+ * @noinspection AlterInForeachInspection
+ */
 
 namespace Eftec\CliOne;
+
+use Exception;
+use RuntimeException;
 
 /**
  * CliOne - A simple creator of command line argument program.
@@ -13,7 +16,7 @@ namespace Eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   0.3
+ * @version   0.5
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
@@ -42,53 +45,82 @@ class CliOne
      * $result=$t->evalParam('argument1'); // an object ClieOneParam where value is "hello"
      * </pre>
      * @param string $key    the key to read.<br>
-     *                       If $key='*' then it reads all the first keys (without subkeys) and returns the first key
+     *                       If $key='*' then it reads all the first keys and returns the first key
      *                       found if it has a value.
-     * @param null   $subkey (optional) the subkey.
      * @return CliOneParam|false Returns false if not value is found.
      */
-    public function evalParam($key = '*', $subkey = null)
+    public function evalParam($key = '*', $forceInput = false)
     {
         $valueK = null;
-        foreach ($this->parameters as $k => $v) {
-            if (($v->key === $key || $key === '*') && $v->subkey === $subkey) {
-                [$def, $v->value] = $this->readParameterCli($v->key, $v->subkey, $v->default);
+        $notfound = true;
+        foreach ($this->parameters as $k => $param) {
+            if ($param->key === $key || ($key === '*' && $param->isOperator === true)) {
+                $notfound = false;
+                if ($param->missing === false && !$forceInput) {
+                    // the parameter is already read, skipping.
+                    return $param;
+                }
+                [$def, $param->value] = $this->readParameterCli($param);
                 if ($key === '*' && $def === false) {
                     // value not found, not asking for input.
                     continue;
                 }
 
                 if ($def === false) {
-                    if ($v->input === true) {
+                    // the value is not defined as an argument
+                    if ($param->input === true) {
                         $def = true;
-                        $v->value = $this->readParameterInput($v->key, $v->subkey, $v->question, $v->default, $v->inputType, $v->inputValue);
+                        $param->value = $this->readParameterInput($param);
                     }
-                    if ($def === false || $v->value === false) {
-                        $v->value = $v->default;
-                        if ($v->required && $v->value === false) {
-                            $this->showLine("<e>Field $v->key is missing</e>");
-                            $v->value = false;
+                    if ($def === false || $param->value === false) {
+                        $param->value = $param->default;
+                        if ($param->required && $param->value === false) {
+                            $this->showLine("<e>Field $param->key is missing</e>");
+                            $param->value = false;
                         }
                     }
                 } else {
-                    $ok = $this->validate($v->key, $v->subkey, $v->description, $v->default, $v->inputType, $v->inputValue, false, $v->value);
+                    // the value is defined as an argument.
+                    $ok = $this->validate($param, false);
                     if (!$ok) {
-                        $v->value = false;
+                        $param->value = false;
                     }
                 }
                 $valueK = $k;
 
             }
-            if ($key === '*' && $v->value !== false) {
+            if ($key === '*' && $param->value !== false) {
                 // value found, exiting.
                 break;
             }
         }
+        if ($notfound) {
+            $this->showLine("<e>parameter $key not defined</e>");
+        }
         if ($valueK === false || $valueK === null) {
             return false;
         }
-
         return $this->parameters[$valueK];
+    }
+
+    /**
+     * It sets the value of a parameter manually.<br>
+     * Once the value its set, then the system skip to read the values from the command line or ask for an input.
+     *
+     * @param string $key
+     * @param mixed  $value
+     * @return bool
+     */
+    public function setParam($key, $value)
+    {
+        foreach ($this->parameters as $param) {
+            if ($param->key === $key) {
+                $param->value = $value;
+                $param->missing = false;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -96,42 +128,72 @@ class CliOne
      * <pre>
      * <e>error</e> (color red)
      * <w>warning</w> (color yellow)
-     * <i>information</i>
+     * <i>information</i> (blue)
      * <g>green</g> <s>success</s> (color green)
      * <italic>italic</italic>
+     * <bold>bold</body>
+     * <underline>underline</underline>
+     * <c>cyan</c> (color light cyan)
+     * <m>magenta</m> (color magenta)
      * </pre>
      *
      *
      * @param string $content
      * @return void
      */
-    public function showLine($content)
+    public function showLine($content='')
     {
         echo $this->replaceColor($content) . "\n";
     }
 
     /**
-     * It's similar to showLine but it keeps in the current line.
+     * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
+     * @param string $label
+     * @param string $color=['e','i','w','g','c'][$i]
+     * @param string $content
+     * @return void
+     */
+    public function showCheck($label,$color,$content)
+    {
+        echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
+    }
+
+    public function readline($content) {
+        echo $this->replaceColor($content);
+        // globals is used for phpunit.
+        if (array_key_exists('PHPUNIT_FAKE_READLINE',$GLOBALS)) {
+            $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
+            if($GLOBALS['PHPUNIT_FAKE_READLINE'][0]>=count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
+                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE '.json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
+            }
+            $this->showLine('<g><underline>['.$GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]].']</underline></g>');
+            return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
+        }
+        return readline("");
+    }
+
+    /**
+     * It's similar to showLine, but it keeps in the current line.
      *
      * @param string $content
      * @return void
      * @see \Eftec\CliOne\CliOne::showLine
      */
-    public function show($content) {
+    public function show($content)
+    {
         echo $this->replaceColor($content);
     }
 
     /**
-     * It gets the parameter by the key and or subkey, or false if not found.
+     * It gets the parameter by the key or false if not found.
      *
      * @param string $key
-     * @param string $subkey
      * @return CliOneParam|false
      */
-    public function getParameter($key, $subkey = null)
+    public function getParameter($key)
     {
         foreach ($this->parameters as $v) {
-            if ($v->key === $key || $v->subkey === $subkey) {
+            if ($v->key === $key) {
                 return $v;
             }
         }
@@ -140,28 +202,10 @@ class CliOne
 
     public function showparams()
     {
-        foreach ($this->parameters as $k => $v) {
-            if ($this->parameters[$k]->subkey === null) {
-                $value = $this->parameters[$k]->value;
-                $this->show("  - $v->key = [$v->default] ");
-                if ($v->required && !$value) {
-                    $this->showLine("<e>(value is required)</e>");
-                } else {
-                    $this->showLine("<i>$value</i>");
-                }
-                $this->showLine("    <italic>$v->description</italic>");
-                foreach ($this->parameters as $k2 => $v2) {
-                    $value = $this->parameters[$k2]->value;
-                    if ($this->parameters[$k2]->key === $this->parameters[$k]->key && $this->parameters[$k2]->subkey !== null) {
-                        $this->show("  - $v2->key = [$v2->default] ");
-                        if ($v2->required && !$value) {
-                            $this->showLine("<e>(value is required)</e>");
-                        } else {
-                            $this->showLine("<e>$value</e>");
-                        }
-                        $this->showLine("    <italic>$v2->description</italic>");
-                    }
-                }
+        foreach ($this->parameters as $v) {
+            try {
+                $this->showLine("  - $v->key = [" . json_encode($v->default) . "] ");
+            } catch (Exception $e) {
             }
         }
     }
@@ -181,64 +225,63 @@ class CliOne
     }
 
     /**
-     * @param        $key
-     * @param        $subkey
-     * @param        $description
-     * @param        $default
-     * @param string $inputtype =['number','range','string','options','optionshort'][$i]
-     * @param array  $inputvalue
+     * @param CliOneParam $parameter
      * @return mixed|string
-     * @noinspection JsonEncodingApiUsageInspection
      */
-    public function readParameterInput($key, $subkey, $description, $default, $inputtype, $inputvalue)
+    public function readParameterInput($parameter)
     {
         $alternatives = null;
         $result = '';
         $input = null;
-        if ($inputtype === 'options') {
+        if ($parameter->inputType === 'options') {
             $multiple = true;
             $result = [];
-
-            foreach ($inputvalue as $k => $v) {
-                $result[$k] = true;
+            foreach ($parameter->inputValue as $k => $v) {
+                $result[$k] = is_array($parameter->default) && isset($parameter->default[$k]);
             }
+            // default is used to set the current selection
+            $parameter->default='';
         } else {
             $multiple = false;
         }
         do {
-            if ($inputtype === 'options') {
-
-                foreach ($inputvalue as $k => $v) {
-                    if(is_object($v) || is_array($v)) {
-                        echo ($result[$k] ? "[*]" : "[ ]") . "[" . ($k + 1) . "] ".json_encode($v)."\n";
+            if ($parameter->inputType === 'options') {
+                foreach ($parameter->inputValue as $k => $v) {
+                    if (is_object($v) || is_array($v)) {
+                        $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> " . json_encode($v));
                     } else {
-                        echo ($result[$k] ? "[*]" : "[ ]") . "[" . ($k + 1) . "] $v\n";
+                        $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> $v");
                     }
 
                 }
-                echo "   [a] Select All, [n] Select none, [e] End selection, [*] (is marked as selected)\n";
+                $this->showLine("\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)");
             }
-            if ($inputtype === 'option') {
-                foreach ($inputvalue as $k => $v) {
-                    echo "[" . ($k + 1) . "] $v\n";
+            if ($parameter->inputType === 'option') {
+                foreach ($parameter->inputValue as $k => $v) {
+                    $this->showLine("<c>[" . ($k + 1) . "]</c> $v");
                 }
             }
+
             if ($alternatives !== null) {
                 $opts = implode(',', $alternatives);
                 $fail = true;
                 while ($fail) {
-                    $input = readline("$description ($opts): [$default] ");
-                    $input = (!$input) ? $default : $input;
+                    $desc = $parameter->question ?: $parameter->description;
+                    $input = $this->readline("$desc ($opts): <c>[$parameter->default]</c> ");
+                    $parameter->missing = false;
+                    $input = (!$input) ? $parameter->default : $input;
                     if (in_array($input, $alternatives, true)) {
                         $fail = false;
                     } else {
-                        $this->showLine("<w>The value $key/$subkey is not correct</w>");
+                        $this->showLine("<w>The value $parameter->key is not correct</w>");
                     }
                 }
             } else {
-                $this->validate($key, $subkey, $description, $default, $inputtype, $inputvalue, true, $input);
+                $this->validate($parameter);
+                $input = $parameter->value;
+
             }
-            if ($inputtype === 'options') {
+            if ($parameter->inputType === 'options') {
                 switch ($input) {
                     case '___input_a':
                         foreach ($result as &$item) {
@@ -250,93 +293,100 @@ class CliOne
                             $item = false;
                         }
                         break;
-                    case '___input_e':
+                    case '___input_':
                         $multiple = false;
                         $resultOld = $result;
                         $result = [];
                         foreach ($resultOld as $k => $item) {
 
                             if ($item) {
-                                $result[] = $inputvalue[$k];
+                                $result[] = $parameter->inputValue[$k];
                             }
                         }
                         break;
                     default:
-                        $pos = array_search($input, $inputvalue, true);
+                        $pos = array_search($input, $parameter->inputValue, true);
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
                         } else {
-                            echo "unknow selection $input\n";
+                            $this->showLine("<e>unknow selection $input</e>");
                         }
                 }
             } else {
                 $result = $input;
             }
-
         } while ($multiple);
-
         return $result;
     }
 
-    public function validate($key, $subkey, $description, $default, $inputtype, $inputvalue, $askInput = true, &$input = null)
+    /**
+     * @param CliOneParam $parameter
+     * @param bool        $askInput
+     * @return bool
+     */
+    public function validate($parameter, $askInput = true)
     {
         $ok = false;
-        $cause='no cause found';
+        $cause = 'no cause found';
         while (!$ok) {
-            switch ($inputtype) {
+            switch ($parameter->inputType) {
                 case 'range':
-                    $prefix = @$inputvalue[0] . '-' . @$inputvalue[1];
+                    $prefix = @$parameter->inputValue[0] . '-' . @$parameter->inputValue[1];
                     break;
                 case 'optionshort':
-                    $prefix = implode('/', $inputvalue);
+                    $prefix = implode('/', $parameter->inputValue);
                     break;
                 default:
                     $prefix = '';
             }
             if ($askInput) {
-                $input = readline("$description [" . (is_array($default) ? implode(',', $default) : $default) . "] $prefix:");
-                $input = (!$input) ? $default : $input;
-                switch ($inputtype) {
+                $desc = $parameter->question ?: $parameter->description;
+                $parameter->value = $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
+                $parameter->missing = false;
+                if($parameter->value!=='' || !$parameter->allowEmpty) {
+                    $parameter->value = (!$parameter->value) ? $parameter->default : $parameter->value;
+                }
+                switch ($parameter->inputType) {
                     case 'options':
                     case 'option':
-                        if ($input === 'a' || $input === 'n' || $input === 'e') {
-                            $input = '___input_' . $input;
-                        } else if ($input <= count($inputvalue)) {
-                            $input = $inputvalue[$input - 1] ?? null;
+                        if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
+                            $parameter->value = '___input_' . ($parameter->value ?? '');
+                        } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
+                            $parameter->value = $parameter->inputValue[$parameter->value - 1] ?? null;
                         } else {
-                            $input = null;
+                            $parameter->value = null;
                         }
                         break;
                 }
             }
-            switch ($inputtype) {
+            switch ($parameter->inputType) {
                 case 'number':
-                    $ok = is_numeric($input);
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || is_numeric($parameter->value);
                     $cause = 'it must be a number';
                     break;
                 case 'range':
-                    $ok = is_numeric($input) && ($input >= @$inputvalue[0] && $input <= @$inputvalue[1]);
-                    $cause = 'it must be a number between the range ' . $inputvalue[0] . ' and ' . $inputvalue[1];
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || (is_numeric($parameter->value) && $parameter->value >= @$parameter->inputValue[0] && $parameter->value <= @$parameter->inputValue[1]);
+                    $cause = 'it must be a number between the range ' . $parameter->inputValue[0] . ' and ' . $parameter->inputValue[1];
                     break;
                 case 'string':
-                    $ok = is_string($input);
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || is_string($parameter->value);
                     $cause = 'it must be a string';
                     break;
                 case 'options':
-                    if (strpos($input, ',') === false) {
-                        $validateValues = [$input];
+                    if (strpos($parameter->value, ',') === false) {
+                        $validateValues = [$parameter->value];
                     } else {
-                        $validateValues = explode(',', $input);
-                        $validateValues[] = 'e'; // to exit
+                        $validateValues = explode(',', $parameter->value);
+                        $validateValues[] = ''; // to exit
                     }
-                    foreach ($validateValues as $inputTmp) {
-                        if ($inputTmp === '___input_a' || $inputTmp === '___input_n' || $inputTmp === '___input_e') {
+                    foreach ($validateValues as $valueTmp) {
+                        if ($valueTmp === '___input_a' || $valueTmp === '___input_n' || $valueTmp === '___input_') {
                             $ok = true;
                             break;
                         }
 
-                        $ok = in_array($inputTmp, $inputvalue, true);
-                        $cause = "it must be a valid value [$inputTmp]";
+                        $ok = $parameter->value === '' || in_array($valueTmp, $parameter->inputValue, true);
+                        $cause = "it must be a valid value [$valueTmp]";
                         if (!$ok) {
                             break;
                         }
@@ -344,17 +394,19 @@ class CliOne
                     break;
                 case 'option':
                 case 'optionshort':
-                    $ok = in_array($input, $inputvalue, true);
-                    $cause = "the option does not exist [$input]";
+                    if($parameter->value === '___input_') {
+                        $parameter->value='';
+                    }
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
+                    $cause = "the option does not exist [$parameter->value]";
                     break;
                 default:
                     $ok = false;
-                    $cause = 'unknown $inputtype inputtype';
+                    $cause = 'unknown $parameter->inputType inputtype';
 
             }
             if (!$ok) {
-                $key = $subkey ?? $key;
-                $this->showLine("<w>The value $key is not correct, $cause</w>");
+                $this->showLine("<w>The value $parameter->key is not correct, $cause</w>");
             }
             if ($askInput === false) {
                 break;
@@ -363,35 +415,45 @@ class CliOne
         return $ok;
     }
 
+    /**
+     * It sets the color of the cli<br>
+     * <pre>
+     * e = error (red)
+     * </pre>
+     *
+     * @param $content
+     * @return array|string|string[]
+     */
     public function replaceColor($content)
     {
-        return str_replace(['<e>', '</e>', '<w>', '</w>', '<g>', '</g>', '<s>'
-                , '</s>', '<i>', '</i>', '<italic>', '</italic>']
-            , array("\033[31m", "\033[0m", "\033[33m", "\033[0m", "\033[32m", "\033[0m", "\033[32m",
-                "\033[0m", "\036[32m", "\033[0m", "\e[3m", "\e[0m"), $content);
+        return str_replace(['<e>', '</e>', '<w>', '</w>', '<g>', '</g>'
+                , '<s>', '</s>', '<i>', '</i>'
+                , '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>'
+                , '<c>', '</c>', '<m>', '</m>']
+            , ["\033[31m", "\033[0m", "\033[33m", "\033[0m", "\033[32m", "\033[0m"
+                , "\033[32m", "\033[0m", "\036[34m", "\033[0m"
+                , "\e[3m", "\e[0m", "\e[1m", "\e[0m", "\e[4m", "\e[0m"
+                , "\033[96m", "\033[0m", "\033[95m", "\033[0m"]
+            , $content);
     }
 
 
-
     /**
-     * @param           $key
-     * @param           $subkey
-     * @param bool      $default  is the defalut value is the parameter is set
-     *                            without value.
-     *
+     * @param CliOneParam $parameter
      * @return array it returns the value if the field is assigned<br>
      *                      the default value if the field exists, but it doesn't have value<br>
      *                      or false if the field is not defined
      */
-    public function readParameterCli($key, $subkey, $default = false)
+    public function readParameterCli($parameter)
     {
         global $argv;
-        $key = $subkey ?? $key;
-        $p = array_search('-' . $key, $argv, true);
+        $p = array_search('-' . $parameter->key, $argv, true);
         if ($p === false) {
+            // the parameter is not found there.
+            $parameter->missing = true;
             return [false, false];
         }
-
+        $parameter->missing = false;
         if (count($argv) > $p + 1) {
             $next = self::removeTrailSlash($argv[$p + 1]);
             if (strpos($next, '-', true) === 0) {
@@ -400,16 +462,16 @@ class CliOne
             }
             return [true, $next];
         }
-        if ($default !== '') {
-            return [true, $default];
+        if ($parameter->default !== '') {
+            return [true, $parameter->default];
         }
         return [true, ''];
     }
 
 
-    public function createParam($key, $subkey = null)
+    public function createParam($key, $isOperator = true)
     {
-        return new CliOneParam($this, $key, $subkey);
+        return new CliOneParam($this, $key, $isOperator);
     }
 
     protected static function removeTrailSlash($txt)

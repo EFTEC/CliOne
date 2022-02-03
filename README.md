@@ -11,6 +11,11 @@
 
 
 ## Changelog
+* 0.5 (2022-02-03) 
+  * [unittest] Better unit test.
+  * [CliOneParam] You can set if you allow empty values or not.
+  * [CliOne] You can set if you allow empty values or not.
+* 0.4 (2022-01-27) Now test coverage is over the 75%
 * 0.3 (2022-01-26) new corrections to the reading of values
 * 0.2 some updates
 * 0.1 first version
