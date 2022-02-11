@@ -16,7 +16,7 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   0.6
+ * @version   1.0
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
@@ -27,7 +27,7 @@ class CliOne
     protected $colSize = 80;
 
 
-    public function __construct($origin)
+    public function __construct($origin=null)
     {
         $this->origin = $origin;
         $this->colSize = $this->calculateColSize();
@@ -229,7 +229,7 @@ class CliOne
             // phpunit is running
             return false;
         }
-        if (isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) !== $this->origin) {
+        if ($this->origin!==null && isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) !== $this->origin) {
             // it is not running the right file.
             return false;
         }
@@ -573,7 +573,7 @@ class CliOne
                 // -argument1 -argument2 (-argument1 is equals to "" and not -argument2)
                 return [true, ''];
             }
-            return [true, $next];
+            return [true, trim($next," \t\n\r\0\x0B\"'")];
         }
         if ($parameter->default !== '') {
             return [true, $parameter->default];

@@ -92,7 +92,7 @@ class CliOneParam
     }
 
     /**
-     * @param mixed       $description
+     * @param string      $description
      * @param null|string $question
      * @return CliOneParam
      */

@@ -1,6 +1,7 @@
 {
     "name": "eftec/clione",
     "type": "library",
+    "description": "A generator of command line (CLI) for Windows and Linux using PHP",
     "require": {
         "php": ">=7.2.5",
         "ext-readline": "*",

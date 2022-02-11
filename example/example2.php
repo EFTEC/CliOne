@@ -8,6 +8,7 @@ $cli=new CliOne();
 if($cli->isCli()) {
     $cli->createParam('param1')
         ->setDescription('This field is called param1 and it is required')
+        ->setInput(true,'string')
         ->setRequired(true)
         ->setDefault('param1')
         ->add();

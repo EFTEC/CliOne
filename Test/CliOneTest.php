@@ -26,9 +26,9 @@ class CliOneTest extends TestCase
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->add();
         $t->createParam('test2')->add();
-        $argv = ['-test1', 'hello', '-test2', 'world'];
+        $argv = ['-test1', 'hello', '-test2', '"hello world"'];
         $p = $t->evalParam('test2');
-        $this->assertEquals('world', $p->value);
+        $this->assertEquals('hello world', $p->value);
 
         // test 2.
         $t = new CliOne('CliOneTest.php');
