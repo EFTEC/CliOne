@@ -37,7 +37,7 @@ class CliOneParam
     public $missing = true;
 
     /**
-     * @var string=['number','range','string','options','option','option2','option3','optionshort'][$i]
+     * @var string=['number','range','string','options','option','option2','option3','option4','optionshort'][$i]
      */
     public $inputType = 'string';
     public $inputValue = [];
@@ -117,7 +117,7 @@ class CliOneParam
 
     /**
      * @param bool   $input
-     * @param string $inputType =['number','range','string','options','option','option2','option3','optionsimple'][$i]
+     * @param string $inputType =['number','range','string','options','option','option2','option3','option4','optionsimple'][$i]
      * @param mixed  $inputValue
      * @return CliOneParam
      */
@@ -143,7 +143,7 @@ class CliOneParam
             $fail = true;
 
         }*/
-        //'number','range','string','options','option','option2','option3','optionshort
+        //'number','range','string','options','option','option2','option3','option4','optionshort
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
@@ -155,6 +155,7 @@ class CliOneParam
             case 'option':
             case 'option2':
             case 'option3':
+            case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
                     $this->parent->showLine("<e>error in creation of input $this->key inputType for $this->inputType must be an array</e>");

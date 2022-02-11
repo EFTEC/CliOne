@@ -11,8 +11,12 @@
 
 
 ## Changelog
+* 0.7 (2022-02-11)
+  * Added option4.
+  * optionshorts allows to specify the first letter, only if the first letter is unique, examples: yes/no allows to use y/n
 * 0.6 (2022-02-11)
   * Added option2 and option3 
+  * allowNulls() now doesn't work with default values.
 * 0.5 (2022-02-03) 
   * [unittest] Better unit test.
   * [CliOneParam] You can set if you allow empty values or not.

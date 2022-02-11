@@ -96,11 +96,12 @@ class CliOneTest extends TestCase
 
     public function testInputOption()
     {
+        $values=['op1aaaaaaaa','op2','op3','op4','op5','op6','op7'];
         global $argv;
         $argv = [];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
-        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', ['op1', 'op2', 'op3'])->add();
+        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
@@ -108,7 +109,7 @@ class CliOneTest extends TestCase
         $argv = [];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '10', '', '3'];         // we use this line to simulate the user input
-        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', ['op1', 'op2', 'op3'])->add();
+        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
@@ -120,11 +121,35 @@ class CliOneTest extends TestCase
             ->setDescription('it is a test')
             ->setDefault('')
             ->setAllowEmpty()
-            ->setInput(true, 'option', ['op1', 'op2', 'op3'])
+            ->setInput(true, 'option', $values)
             ->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('', $p->value);
+
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
+        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option2', $values)->add();
+        $t->showparams();
+        $p = $t->evalParam('test1');
+        $this->assertEquals('op3', $p->value);
+
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
+        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option3', $values)->add();
+        $t->showparams();
+        $p = $t->evalParam('test1');
+        $this->assertEquals('op3', $p->value);
+
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
+        $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option4', $values)->add();
+        $t->showparams();
+        $p = $t->evalParam('test1');
+        $this->assertEquals('op3', $p->value);
     }
 
     public function testInputEmpty()
@@ -185,12 +210,19 @@ class CliOneTest extends TestCase
         $argv = [];
         $t = new CliOne('CliOneTest.php');
         // select "a"ll, de-select 1, end
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','op1'];         // we use this line to simulate the user input
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','o','op1'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
             ->setInput(true, 'optionshort', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('op1', $p->value);
+
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','y'];         // we use this line to simulate the user input
+        $t->createParam('test1s')->setDescription('it is a test')
+            ->setInput(true, 'optionshort', ['yes', 'no'])->add();
+        $t->showparams();
+        $p = $t->evalParam('test1s', true);
+        $this->assertEquals('yes', $p->value);
 
         $argv = [];
         $t = new CliOne('CliOneTest.php');
@@ -215,6 +247,7 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('op1', $p->value);
+
     }
 
     public function testInputOptions2()

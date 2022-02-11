@@ -24,12 +24,23 @@ class CliOne
     public $origin;
     /** @var CliOneParam[] */
     public $parameters = [];
+    protected $colSize = 80;
 
 
     public function __construct($origin)
     {
         $this->origin = $origin;
+        $this->colSize = $this->calculateColSize();
     }
+
+    /**
+     * @return int
+     */
+    public function getColSize()
+    {
+        return $this->colSize;
+    }
+
 
     /**
      * It evaluates the parameters obtained from the syntax of the command.<br>
@@ -142,7 +153,7 @@ class CliOne
      * @param string $content
      * @return void
      */
-    public function showLine($content='')
+    public function showLine($content = '')
     {
         echo $this->replaceColor($content) . "\n";
     }
@@ -150,24 +161,25 @@ class CliOne
     /**
      * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
      * @param string $label
-     * @param string $color=['e','i','w','g','c'][$i]
+     * @param string $color =['e','i','w','g','c'][$i]
      * @param string $content
      * @return void
      */
-    public function showCheck($label,$color,$content)
+    public function showCheck($label, $color, $content)
     {
         echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
     }
 
-    public function readline($content) {
+    public function readline($content)
+    {
         echo $this->replaceColor($content);
         // globals is used for phpunit.
-        if (array_key_exists('PHPUNIT_FAKE_READLINE',$GLOBALS)) {
+        if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
             $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
-            if($GLOBALS['PHPUNIT_FAKE_READLINE'][0]>=count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
-                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE '.json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
+            if ($GLOBALS['PHPUNIT_FAKE_READLINE'][0] >= count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
+                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE ' . json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
             }
-            $this->showLine('<g><underline>['.$GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]].']</underline></g>');
+            $this->showLine('<g><underline>[' . $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]] . ']</underline></g>');
             return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
         }
         return readline("");
@@ -228,12 +240,11 @@ class CliOne
     /**
      * @param CliOneParam $parameter
      * @return mixed|string
+     * @noinspection DuplicatedCode
      */
     public function readParameterInput($parameter)
     {
-        $alternatives = null;
         $result = '';
-        $input = null;
         if ($parameter->inputType === 'options') {
             $multiple = true;
             $result = [];
@@ -241,7 +252,7 @@ class CliOne
                 $result[$k] = is_array($parameter->default) && isset($parameter->default[$k]);
             }
             // default is used to set the current selection
-            $parameter->default='';
+            $parameter->default = '';
         } else {
             $multiple = false;
         }
@@ -264,29 +275,51 @@ class CliOne
                     }
                     break;
                 case 'option2':
-                    $chalf=ceil(count($parameter->inputValue)/2);
-                    for($i=0;$i<$chalf;$i++) {
-                        $this->show("<c>[" . ($i + 1) . "]</c> ".$this->ellipsis($parameter->inputValue[$i],35));
-                        if(isset($parameter->inputValue[$i+$chalf])) {
-                            // \e[40G = 40th column
-                            $this->show("\e[40G<c>[" . ($i + 1+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf],35));
+                    $chalf = ceil(count($parameter->inputValue) / 2);
+                    $colW = floor($this->colSize / 2);
+
+                    for ($i = 0; $i < $chalf; $i++) {
+                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
+                        $shift = $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
                         }
                         $this->show("\n");
                     }
                     break;
                 case 'option3':
-                    $chalf=ceil(count($parameter->inputValue)/3);
-                    for($i=0;$i<$chalf;$i++) {
-                        $this->show("<c>[" . ($i + 1) . "]</c> ".$this->ellipsis($parameter->inputValue[$i],21));
-                        if(isset($parameter->inputValue[$i+$chalf])) {
-                            // \e[40G = 40th column
-                            $this->show("\e[26G<c>[" . ($i + 1+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf],21));
+                    $chalf = ceil(count($parameter->inputValue) / 3);
+                    $colW = floor($this->colSize / 3);
+                    for ($i = 0; $i < $chalf; $i++) {
+                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
+                        $shift = $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
                         }
-                        if(isset($parameter->inputValue[$i+$chalf+$chalf])) {
-                            // \e[40G = 40th column
-                            $this->show("\e[52G<c>[" . ($i + 1+$chalf+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf+$chalf],21));
+                        $shift = $chalf + $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . ($colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
                         }
-
+                        $this->show("\n");
+                    }
+                    break;
+                case 'option4':
+                    $chalf = ceil(count($parameter->inputValue) / 4);
+                    $colW = floor($this->colSize / 4);
+                    for ($i = 0; $i < $chalf; $i++) {
+                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
+                        $shift = $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
+                        }
+                        $shift = $chalf + $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . ($colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
+                        }
+                        $shift = $chalf + $chalf + $chalf;
+                        if (isset($parameter->inputValue[$i + $shift])) {
+                            $this->show("\e[" . ($colW + $colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
+                        }
                         $this->show("\n");
                     }
                     break;
@@ -332,13 +365,14 @@ class CliOne
         } while ($multiple);
         return $result;
     }
-    protected function ellipsis($text,$lenght) {
-        $l=strlen($text);
-        if($l<=$lenght) {
+
+    protected function ellipsis($text, $lenght)
+    {
+        $l = strlen($text);
+        if ($l <= $lenght) {
             return $text;
         }
-        $text=substr($text,0,$lenght-3).'...';
-        return $text;
+        return substr($text, 0, $lenght - 3) . '...';
     }
 
     /**
@@ -356,15 +390,26 @@ class CliOne
                     $prefix = @$parameter->inputValue[0] . '-' . @$parameter->inputValue[1];
                     break;
                 case 'optionshort':
-                    $prefix = implode('/', $parameter->inputValue);
+                    $uniques = array_map(static function ($v) {
+                        return substr($v, 0, 1);
+                    }, $parameter->inputValue);
+                    if (count(array_unique($uniques)) !== count($uniques)) {
+                        // there is some  repeated valued
+                        $prefix = implode('/', $parameter->inputValue);
+                    } else {
+                        $values2 = array_map(static function ($v) {
+                            return "<underline>" . substr($v, 0, 1) . "</underline>" . substr($v, 1);
+                        }, $parameter->inputValue);
+                        $prefix = implode('/', $values2);
+                    }
                     break;
                 default:
                     $prefix = '';
             }
             if ($askInput) {
                 $desc = $parameter->question ?: $parameter->description;
-                $origInput= $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
-                $parameter->value =$origInput;
+                $origInput = $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
+                $parameter->value = $origInput;
                 $parameter->missing = false;
                 //if($parameter->value==='' && $parameter->allowEmpty===true) {
 
@@ -373,8 +418,8 @@ class CliOne
                 /*if($parameter->value!=='' || !$parameter->allowEmpty) {
                     $parameter->value = (!$parameter->value) ? $parameter->default : $parameter->value;
                 }*/
-                if($parameter->value==='') {
-                    if($parameter->allowEmpty===true) {
+                if ($parameter->value === '') {
+                    if ($parameter->allowEmpty === true) {
                         $parameter->value = $parameter->default === false ? '' : $parameter->default;
                     } else {
                         $parameter->value = $parameter->default;
@@ -385,6 +430,7 @@ class CliOne
                     case 'option':
                     case 'option2':
                     case 'option3':
+                    case 'option4':
                         if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->value = '___input_' . ($parameter->value ?? '');
                         } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
@@ -405,12 +451,12 @@ class CliOne
                     $cause = 'it must be a number between the range ' . $parameter->inputValue[0] . ' and ' . $parameter->inputValue[1];
                     break;
                 case 'string':
-                    if($parameter->allowEmpty) {
-                        $ok=true;
-                    } else if ($parameter->value === '' || $parameter->value===null || $parameter->value===false) {
-                        $ok=false;
+                    if ($parameter->allowEmpty) {
+                        $ok = true;
+                    } else if ($parameter->value === '' || $parameter->value === null || $parameter->value === false) {
+                        $ok = false;
                     } else {
-                        $ok=true;
+                        $ok = true;
                     }
                     //$ok = ($parameter->value === '' && $parameter->allowEmpty) || is_string($parameter->value);
                     $cause = 'it must be a string';
@@ -438,11 +484,33 @@ class CliOne
                 case 'option':
                 case 'option2':
                 case 'option3':
-                case 'optionshort':
-                    if($parameter->value === '___input_') {
-                        $parameter->value='';
+                case 'option4':
+                    if ($parameter->value === '___input_') {
+                        $parameter->value = '';
                     }
                     $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
+                    $cause = "the option does not exist [$parameter->value]";
+                    break;
+                case 'optionshort':
+                    if ($parameter->value === '___input_') {
+                        $parameter->value = '';
+                    }
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
+                    if ($ok === false) {
+                        $uniques = array_map(static function ($v) {
+                            return substr($v, 0, 1);
+                        }, $parameter->inputValue);
+                        if (count(array_unique($uniques)) === count($uniques)) {
+                            // we find a short option but only if short option is available (if the first letter is unique)
+                            foreach ($uniques as $k => $shortName) {
+                                if ($parameter->value === $shortName) {
+                                    $parameter->value = $parameter->inputValue[$k];
+                                    $ok = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     $cause = "the option does not exist [$parameter->value]";
                     break;
                 default:
@@ -522,5 +590,35 @@ class CliOne
     protected static function removeTrailSlash($txt)
     {
         return rtrim($txt, '/\\');
+    }
+
+    /** @noinspection GrazieInspection */
+    protected function calculateColSize($min = 80)
+    {
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $a1 = shell_exec('mode con');
+                /*
+                 * Estado para dispositivo CON:
+                 * ----------------------------
+                 * Líneas:              9001
+                 * Columnas:            85
+                 * Ritmo del teclado:   31
+                 * Retardo del teclado: 1
+                 * Página de códigos:    65001
+                 */
+                $arr = explode("\n", $a1);
+                $col = trim(explode(':', $arr[4])[1]);
+
+            } else {
+                $col = exec('tput cols');
+                /*
+                 * 184
+                 */
+            }
+        } catch (Exception $ex) {
+            $col = 80;
+        }
+        return $col < $min ? $min : $col;
     }
 }
