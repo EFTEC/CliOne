@@ -45,6 +45,15 @@ class CliOneTest extends TestCase
         $p = $t->evalParam('test1');
         $this->assertEquals('not found', $p->value);
 
+        // test 3b
+        $GLOBALS['PHPUNIT_FAKE_READLINE']=[0,''];
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('test1b')->setDescription('','desc:')->setInput()->setDefault('not found')->setAllowEmpty()->add();
+        $argv = [];
+        $p = $t->evalParam('test1b',true);
+        $this->assertEquals('not found', $p->value);
+        unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+
         // test 4
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->setRequired()->add();
@@ -107,7 +116,12 @@ class CliOneTest extends TestCase
         $argv = [];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '10', '', '3'];         // we use this line to simulate the user input
-        $t->createParam('test1')->setDescription('it is a test')->setAllowEmpty()->setInput(true, 'option', ['op1', 'op2', 'op3'])->add();
+        $t->createParam('test1')
+            ->setDescription('it is a test')
+            ->setDefault('')
+            ->setAllowEmpty()
+            ->setInput(true, 'option', ['op1', 'op2', 'op3'])
+            ->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('', $p->value);
@@ -196,11 +210,11 @@ class CliOneTest extends TestCase
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
             ->setDefault('op1')
-            ->setAllowEmpty()
+            ->setAllowEmpty() // even when it allows empty, it uses the default value.
             ->setInput(true, 'optionshort', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
-        $this->assertEquals('', $p->value);
+        $this->assertEquals('op1', $p->value);
     }
 
     public function testInputOptions2()

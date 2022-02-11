@@ -11,6 +11,8 @@
 
 
 ## Changelog
+* 0.6 (2022-02-11)
+  * Added option2 and option3 
 * 0.5 (2022-02-03) 
   * [unittest] Better unit test.
   * [CliOneParam] You can set if you allow empty values or not.

@@ -16,7 +16,7 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   0.5
+ * @version   0.6
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
@@ -74,6 +74,7 @@ class CliOne
                     }
                     if ($def === false || $param->value === false) {
                         $param->value = $param->default;
+
                         if ($param->required && $param->value === false) {
                             $this->showLine("<e>Field $param->key is missing</e>");
                             $param->value = false;
@@ -245,42 +246,55 @@ class CliOne
             $multiple = false;
         }
         do {
-            if ($parameter->inputType === 'options') {
-                foreach ($parameter->inputValue as $k => $v) {
-                    if (is_object($v) || is_array($v)) {
-                        $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> " . json_encode($v));
-                    } else {
-                        $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> $v");
+            switch ($parameter->inputType) {
+                case 'options':
+                    foreach ($parameter->inputValue as $k => $v) {
+                        if (is_object($v) || is_array($v)) {
+                            $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> " . json_encode($v));
+                        } else {
+                            $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> $v");
+                        }
+
                     }
-
-                }
-                $this->showLine("\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)");
-            }
-            if ($parameter->inputType === 'option') {
-                foreach ($parameter->inputValue as $k => $v) {
-                    $this->showLine("<c>[" . ($k + 1) . "]</c> $v");
-                }
-            }
-
-            if ($alternatives !== null) {
-                $opts = implode(',', $alternatives);
-                $fail = true;
-                while ($fail) {
-                    $desc = $parameter->question ?: $parameter->description;
-                    $input = $this->readline("$desc ($opts): <c>[$parameter->default]</c> ");
-                    $parameter->missing = false;
-                    $input = (!$input) ? $parameter->default : $input;
-                    if (in_array($input, $alternatives, true)) {
-                        $fail = false;
-                    } else {
-                        $this->showLine("<w>The value $parameter->key is not correct</w>");
+                    $this->showLine("\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)");
+                    break;
+                case 'option':
+                    foreach ($parameter->inputValue as $k => $v) {
+                        $this->showLine("<c>[" . ($k + 1) . "]</c> $v");
                     }
-                }
-            } else {
-                $this->validate($parameter);
-                $input = $parameter->value;
+                    break;
+                case 'option2':
+                    $chalf=ceil(count($parameter->inputValue)/2);
+                    for($i=0;$i<$chalf;$i++) {
+                        $this->show("<c>[" . ($i + 1) . "]</c> ".$this->ellipsis($parameter->inputValue[$i],35));
+                        if(isset($parameter->inputValue[$i+$chalf])) {
+                            // \e[40G = 40th column
+                            $this->show("\e[40G<c>[" . ($i + 1+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf],35));
+                        }
+                        $this->show("\n");
+                    }
+                    break;
+                case 'option3':
+                    $chalf=ceil(count($parameter->inputValue)/3);
+                    for($i=0;$i<$chalf;$i++) {
+                        $this->show("<c>[" . ($i + 1) . "]</c> ".$this->ellipsis($parameter->inputValue[$i],21));
+                        if(isset($parameter->inputValue[$i+$chalf])) {
+                            // \e[40G = 40th column
+                            $this->show("\e[26G<c>[" . ($i + 1+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf],21));
+                        }
+                        if(isset($parameter->inputValue[$i+$chalf+$chalf])) {
+                            // \e[40G = 40th column
+                            $this->show("\e[52G<c>[" . ($i + 1+$chalf+$chalf) . "]</c> ".$this->ellipsis($parameter->inputValue[$i+$chalf+$chalf],21));
+                        }
 
+                        $this->show("\n");
+                    }
+                    break;
             }
+
+
+            $this->validate($parameter);
+            $input = $parameter->value;
             if ($parameter->inputType === 'options') {
                 switch ($input) {
                     case '___input_a':
@@ -318,6 +332,14 @@ class CliOne
         } while ($multiple);
         return $result;
     }
+    protected function ellipsis($text,$lenght) {
+        $l=strlen($text);
+        if($l<=$lenght) {
+            return $text;
+        }
+        $text=substr($text,0,$lenght-3).'...';
+        return $text;
+    }
 
     /**
      * @param CliOneParam $parameter
@@ -341,14 +363,28 @@ class CliOne
             }
             if ($askInput) {
                 $desc = $parameter->question ?: $parameter->description;
-                $parameter->value = $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
+                $origInput= $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
+                $parameter->value =$origInput;
                 $parameter->missing = false;
-                if($parameter->value!=='' || !$parameter->allowEmpty) {
+                //if($parameter->value==='' && $parameter->allowEmpty===true) {
+
+                //}
+                //$parameter->value = (!$parameter->value) ? $parameter->default : $parameter->value;
+                /*if($parameter->value!=='' || !$parameter->allowEmpty) {
                     $parameter->value = (!$parameter->value) ? $parameter->default : $parameter->value;
+                }*/
+                if($parameter->value==='') {
+                    if($parameter->allowEmpty===true) {
+                        $parameter->value = $parameter->default === false ? '' : $parameter->default;
+                    } else {
+                        $parameter->value = $parameter->default;
+                    }
                 }
                 switch ($parameter->inputType) {
                     case 'options':
                     case 'option':
+                    case 'option2':
+                    case 'option3':
                         if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->value = '___input_' . ($parameter->value ?? '');
                         } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
@@ -369,7 +405,14 @@ class CliOne
                     $cause = 'it must be a number between the range ' . $parameter->inputValue[0] . ' and ' . $parameter->inputValue[1];
                     break;
                 case 'string':
-                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || is_string($parameter->value);
+                    if($parameter->allowEmpty) {
+                        $ok=true;
+                    } else if ($parameter->value === '' || $parameter->value===null || $parameter->value===false) {
+                        $ok=false;
+                    } else {
+                        $ok=true;
+                    }
+                    //$ok = ($parameter->value === '' && $parameter->allowEmpty) || is_string($parameter->value);
                     $cause = 'it must be a string';
                     break;
                 case 'options':
@@ -393,6 +436,8 @@ class CliOne
                     }
                     break;
                 case 'option':
+                case 'option2':
+                case 'option3':
                 case 'optionshort':
                     if($parameter->value === '___input_') {
                         $parameter->value='';

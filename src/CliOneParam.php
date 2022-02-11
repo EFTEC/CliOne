@@ -37,7 +37,7 @@ class CliOneParam
     public $missing = true;
 
     /**
-     * @var string=['number','range','string','options','option','optionshort'][$i]
+     * @var string=['number','range','string','options','option','option2','option3','optionshort'][$i]
      */
     public $inputType = 'string';
     public $inputValue = [];
@@ -79,8 +79,9 @@ class CliOneParam
 
     /**
      * It sets to allow empty values.<br>
-     * If true, and the user inputs nothing, then the default value is never used, and it returns an empty "".<br>
+     * If true, and the user inputs nothing, then the default value is never used (unless it is an option), and it returns an empty "".<br>
      * If false, and the user inputs nothing, then the default value is used.<br>
+     * <b>Note</b>: If you are using an option, you are set a default value, and you enter nothing, then the default value is still used.
      * @param bool $allowEmpty
      * @return $this
      */
@@ -116,7 +117,7 @@ class CliOneParam
 
     /**
      * @param bool   $input
-     * @param string $inputType =['number','range','string','options'][$i]
+     * @param string $inputType =['number','range','string','options','option','option2','option3','optionsimple'][$i]
      * @param mixed  $inputValue
      * @return CliOneParam
      */
@@ -137,7 +138,12 @@ class CliOneParam
     public function add($override = false): void
     {
         $fail = false;
-        //'number','range','string','options','option','optionshort
+        /*if($this->allowEmpty===true && $this->default===false) {
+            $this->parent->showLine("<e>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</e>");
+            $fail = true;
+
+        }*/
+        //'number','range','string','options','option','option2','option3','optionshort
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
@@ -147,6 +153,8 @@ class CliOneParam
                 break;
             case 'options':
             case 'option':
+            case 'option2':
+            case 'option3':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
                     $this->parent->showLine("<e>error in creation of input $this->key inputType for $this->inputType must be an array</e>");
