@@ -3,7 +3,7 @@
 
 /** @noinspection PhpMissingFieldTypeInspection */
 
-namespace Eftec\CliOne;
+namespace eftec\CliOne;
 
 /**
  * CliOne - A simple creator of command line argument program.

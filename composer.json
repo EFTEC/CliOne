@@ -13,7 +13,7 @@
     "license": "mit",
     "autoload": {
         "psr-4": {
-            "Eftec\\CliOne\\": "src/"
+            "eftec\\CliOne\\": "src/"
         }
     },
     "authors": [

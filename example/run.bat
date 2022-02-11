@@ -1,1 +1,1 @@
-php ./examplecomplete.php -param1 hola
+@php ./examplecomplete.php -param1 hola

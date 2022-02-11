@@ -1,6 +1,6 @@
 <?php
 
-use Eftec\CliOne\CliOne;
+use eftec\CliOne\CliOne;
 
 include __DIR__.'/../src/CliOne.php';
 include __DIR__.'/../src/CliOneParam.php';

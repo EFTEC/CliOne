@@ -4,7 +4,7 @@
  * @noinspection AlterInForeachInspection
  */
 
-namespace Eftec\CliOne;
+namespace eftec\CliOne;
 
 use Exception;
 use RuntimeException;
@@ -16,7 +16,7 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.0
+ * @version   1.0.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
@@ -190,7 +190,7 @@ class CliOne
      *
      * @param string $content
      * @return void
-     * @see \Eftec\CliOne\CliOne::showLine
+     * @see \eftec\CliOne\CliOne::showLine
      */
     public function show($content)
     {
@@ -544,7 +544,7 @@ class CliOne
                 , '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>'
                 , '<c>', '</c>', '<m>', '</m>']
             , ["\033[31m", "\033[0m", "\033[33m", "\033[0m", "\033[32m", "\033[0m"
-                , "\033[32m", "\033[0m", "\036[34m", "\033[0m"
+                , "\033[32m", "\033[0m", "\033[34m", "\033[0m"
                 , "\e[3m", "\e[0m", "\e[1m", "\e[0m", "\e[4m", "\e[0m"
                 , "\033[96m", "\033[0m", "\033[95m", "\033[0m"]
             , $content);
@@ -579,6 +579,26 @@ class CliOne
             return [true, $parameter->default];
         }
         return [true, ''];
+    }
+
+    /**
+     * It finds the vendor path starting from a route. The route must be inside the application path.
+     * @param string $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then __DIR__
+     * @return string It returns the relative path to where is the vendor path. If not found then it returns the initial path
+     */
+    public static function findVendorPath($initPath=null) : string {
+        $initPath=$initPath?:__DIR__;
+        $prefix='';
+        $defaultvendor=$initPath;
+        // finding vendor
+        for($i=0;$i<6;$i++) {
+            if(@file_exists("$initPath/{$prefix}vendor/autoload.php")) {
+                $defaultvendor="{$prefix}vendor";
+                break;
+            }
+            $prefix.='../';
+        }
+        return $defaultvendor;
     }
 
 

@@ -2,7 +2,7 @@
 
 /** @noinspection DuplicatedCode */
 
-namespace Eftec\CliOne;
+namespace eftec\CliOne;
 
 use PHPUnit\Framework\TestCase;
 

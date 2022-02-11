@@ -24,7 +24,7 @@ $cli=new CliOne(); // instance of the library
 
 ## Example using arguments
 
-[examples/example1.php](examples/example1.php)
+[example/example1.php](example/example1.php)
 
 And create the next code
 
@@ -55,7 +55,7 @@ So you can run as:
 
 You can ask for user input of the user.
 
-[examples/example2.php](examples/example2.php)
+[example/example2.php](example/example2.php)
 
 ```php
 $cli=new CliOne();
@@ -82,6 +82,10 @@ Select the value of param1 [param1] :hello
 
 
 ## Changelog
+* 1.0.1 (2022-02-11)
+  * **[Fixed]** namespace.
+  * **[Fixed]** replaceColor() fixed a color
+  * **[Added]** CliOne::indVendorPath()
 * 1.0 (2022-02-11)
   * End of beta, first release. 
 * 0.7 (2022-02-11)
