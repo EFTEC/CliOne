@@ -16,21 +16,72 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.0.1
+ * @version   1.2
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
+    public const VERSION='1.2';
     public $origin;
     /** @var CliOneParam[] */
     public $parameters = [];
     protected $colSize = 80;
 
 
-    public function __construct($origin=null)
+    public function __construct($origin = null)
     {
         $this->origin = $origin;
         $this->colSize = $this->calculateColSize();
+    }
+
+    protected function calculateColSize($min = 80)
+    {
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $a1 = shell_exec('mode con');
+                /*
+                 * Estado para dispositivo CON:
+                 * ----------------------------
+                 * Líneas:              9001
+                 * Columnas:            85
+                 * Ritmo del teclado:   31
+                 * Retardo del teclado: 1
+                 * Página de códigos:    65001
+                 */
+                $arr = explode("\n", $a1);
+                $col = trim(explode(':', $arr[4])[1]);
+            } else {
+                $col = exec('tput cols');
+                /*
+                 * 184
+                 */
+            }
+        } catch (Exception $ex) {
+            $col = 80;
+        }
+        return $col < $min ? $min : $col;
+    }
+
+    /**
+     * It finds the vendor path starting from a route. The route must be inside the application path.
+     * @param string $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then __DIR__
+     * @return string It returns the relative path to where is the vendor path. If not found then it returns the
+     *                         initial path
+     */
+    public static function findVendorPath($initPath = null): string
+    {
+        $initPath = $initPath ?: __DIR__;
+        $prefix = '';
+        $defaultvendor = $initPath;
+        // finding vendor
+        for ($i = 0; $i < 6; $i++) {
+            if (@file_exists("$initPath/{$prefix}vendor/autoload.php")) {
+                $defaultvendor = "{$prefix}vendor";
+                break;
+            }
+            $prefix .= '../';
+        }
+        return $defaultvendor;
     }
 
     /**
@@ -40,7 +91,6 @@ class CliOne
     {
         return $this->colSize;
     }
-
 
     /**
      * It evaluates the parameters obtained from the syntax of the command.<br>
@@ -58,9 +108,9 @@ class CliOne
      * @param string $key    the key to read.<br>
      *                       If $key='*' then it reads all the first keys and returns the first key
      *                       found if it has a value.
-     * @return CliOneParam|false Returns false if not value is found.
+     * @return mixed Returns false if not value is found.
      */
-    public function evalParam($key = '*', $forceInput = false)
+    public function evalParam($key = '*', $forceInput = false, $returnValue = false)
     {
         $valueK = null;
         $notfound = true;
@@ -69,14 +119,18 @@ class CliOne
                 $notfound = false;
                 if ($param->missing === false && !$forceInput) {
                     // the parameter is already read, skipping.
-                    return $param;
+                    return $returnValue === true ? $param->value : $param;
+                }
+                if ($param->currentAsDefault && $param->value !== null && $param->missing === true) {
+                    $param->value = $param->currentAsDefault;
+                    $this->assignParamValueKey($param);
+                    return $returnValue === true ? $param->value : $param;
                 }
                 [$def, $param->value] = $this->readParameterCli($param);
                 if ($key === '*' && $def === false) {
                     // value not found, not asking for input.
                     continue;
                 }
-
                 if ($def === false) {
                     // the value is not defined as an argument
                     if ($param->input === true) {
@@ -85,7 +139,6 @@ class CliOne
                     }
                     if ($def === false || $param->value === false) {
                         $param->value = $param->default;
-
                         if ($param->required && $param->value === false) {
                             $this->showLine("<e>Field $param->key is missing</e>");
                             $param->value = false;
@@ -99,7 +152,6 @@ class CliOne
                     }
                 }
                 $valueK = $k;
-
             }
             if ($key === '*' && $param->value !== false) {
                 // value found, exiting.
@@ -112,129 +164,59 @@ class CliOne
         if ($valueK === false || $valueK === null) {
             return false;
         }
-        return $this->parameters[$valueK];
+        return $returnValue === true ? $this->parameters[$valueK]->value : $this->parameters[$valueK];
     }
 
     /**
-     * It sets the value of a parameter manually.<br>
-     * Once the value its set, then the system skip to read the values from the command line or ask for an input.
-     *
-     * @param string $key
-     * @param mixed  $value
-     * @return bool
-     */
-    public function setParam($key, $value)
-    {
-        foreach ($this->parameters as $param) {
-            if ($param->key === $key) {
-                $param->value = $value;
-                $param->missing = false;
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br>
-     * <pre>
-     * <e>error</e> (color red)
-     * <w>warning</w> (color yellow)
-     * <i>information</i> (blue)
-     * <g>green</g> <s>success</s> (color green)
-     * <italic>italic</italic>
-     * <bold>bold</body>
-     * <underline>underline</underline>
-     * <c>cyan</c> (color light cyan)
-     * <m>magenta</m> (color magenta)
-     * </pre>
-     *
-     *
-     * @param string $content
+     * @param CliOneParam $param
      * @return void
      */
-    public function showLine($content = '')
+    protected function assignParamValueKey($param)
     {
-        echo $this->replaceColor($content) . "\n";
+        if (!is_array($param->inputValue)) {
+            return;
+        }
+        if (strpos($param->value, '___input_') === 0) {
+            $param->valueKey = str_replace('___input_', '', $param->value);
+            return;
+        }
+        $k = array_search($param->value, $param->inputValue, true);
+        $param->valueKey = $k === false ? null : $k;
     }
 
     /**
-     * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
-     * @param string $label
-     * @param string $color =['e','i','w','g','c'][$i]
-     * @param string $content
-     * @return void
+     * @param CliOneParam $parameter
+     * @return array it returns the value if the field is assigned<br>
+     *                      the default value if the field exists, but it doesn't have value<br>
+     *                      or false if the field is not defined
      */
-    public function showCheck($label, $color, $content)
+    public function readParameterCli($parameter)
     {
-        echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
-    }
-
-    public function readline($content)
-    {
-        echo $this->replaceColor($content);
-        // globals is used for phpunit.
-        if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
-            $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
-            if ($GLOBALS['PHPUNIT_FAKE_READLINE'][0] >= count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
-                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE ' . json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
+        global $argv;
+        $p = array_search('-' . $parameter->key, $argv, true);
+        if ($p === false) {
+            // the parameter is not found there.
+            $parameter->missing = true;
+            return [false, false];
+        }
+        $parameter->missing = false;
+        if (count($argv) > $p + 1) {
+            $next = self::removeTrailSlash($argv[$p + 1]);
+            if (strpos($next, '-', true) === 0) {
+                // -argument1 -argument2 (-argument1 is equals to "" and not -argument2)
+                return [true, ''];
             }
-            $this->showLine('<g><underline>[' . $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]] . ']</underline></g>');
-            return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
+            return [true, trim($next, " \t\n\r\0\x0B\"'")];
         }
-        return readline("");
+        if ($parameter->default !== '') {
+            return [true, $parameter->default];
+        }
+        return [true, ''];
     }
 
-    /**
-     * It's similar to showLine, but it keeps in the current line.
-     *
-     * @param string $content
-     * @return void
-     * @see \eftec\CliOne\CliOne::showLine
-     */
-    public function show($content)
+    protected static function removeTrailSlash($txt)
     {
-        echo $this->replaceColor($content);
-    }
-
-    /**
-     * It gets the parameter by the key or false if not found.
-     *
-     * @param string $key
-     * @return CliOneParam|false
-     */
-    public function getParameter($key)
-    {
-        foreach ($this->parameters as $v) {
-            if ($v->key === $key) {
-                return $v;
-            }
-        }
-        return false;
-    }
-
-    public function showparams()
-    {
-        foreach ($this->parameters as $v) {
-            try {
-                $this->showLine("  - $v->key = [" . json_encode($v->default) . "] ");
-            } catch (Exception $e) {
-            }
-        }
-    }
-
-    public function isCli()
-    {
-        if (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__')) {
-            // phpunit is running
-            return false;
-        }
-        if ($this->origin!==null && isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) !== $this->origin) {
-            // it is not running the right file.
-            return false;
-        }
-        // false if it is running a web.
-        return !http_response_code();
+        return rtrim($txt, '/\\');
     }
 
     /**
@@ -245,7 +227,7 @@ class CliOne
     public function readParameterInput($parameter)
     {
         $result = '';
-        if ($parameter->inputType === 'options') {
+        if (strpos($parameter->inputType, 'multiple') === 0) {
             $multiple = true;
             $result = [];
             foreach ($parameter->inputValue as $k => $v) {
@@ -257,99 +239,30 @@ class CliOne
             $multiple = false;
         }
         do {
-            switch ($parameter->inputType) {
-                case 'options':
-                    foreach ($parameter->inputValue as $k => $v) {
-                        if (is_object($v) || is_array($v)) {
-                            $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> " . json_encode($v));
-                        } else {
-                            $this->showLine(($result[$k] ? "[*]" : "[ ]") . "<c>[" . ($k + 1) . "]</c> $v");
-                        }
-
-                    }
-                    $this->showLine("\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)");
-                    break;
-                case 'option':
-                    foreach ($parameter->inputValue as $k => $v) {
-                        $this->showLine("<c>[" . ($k + 1) . "]</c> $v");
-                    }
-                    break;
-                case 'option2':
-                    $chalf = ceil(count($parameter->inputValue) / 2);
-                    $colW = floor($this->colSize / 2);
-
-                    for ($i = 0; $i < $chalf; $i++) {
-                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
-                        $shift = $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $this->show("\n");
-                    }
-                    break;
-                case 'option3':
-                    $chalf = ceil(count($parameter->inputValue) / 3);
-                    $colW = floor($this->colSize / 3);
-                    for ($i = 0; $i < $chalf; $i++) {
-                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
-                        $shift = $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $shift = $chalf + $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . ($colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $this->show("\n");
-                    }
-                    break;
-                case 'option4':
-                    $chalf = ceil(count($parameter->inputValue) / 4);
-                    $colW = floor($this->colSize / 4);
-                    for ($i = 0; $i < $chalf; $i++) {
-                        $this->show("<c>[" . ($i + 1) . "]</c> " . $this->ellipsis($parameter->inputValue[$i], $colW - 5));
-                        $shift = $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . $colW . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $shift = $chalf + $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . ($colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $shift = $chalf + $chalf + $chalf;
-                        if (isset($parameter->inputValue[$i + $shift])) {
-                            $this->show("\e[" . ($colW + $colW + $colW) . "G<c>[" . ($i + 1 + $shift) . "]</c> " . $this->ellipsis($parameter->inputValue[$i + $shift], $colW - 5));
-                        }
-                        $this->show("\n");
-                    }
-                    break;
-            }
-
-
+            $this->showOptions($parameter, $result);
             $this->validate($parameter);
             $input = $parameter->value;
-            if ($parameter->inputType === 'options') {
+            if (strpos($parameter->inputType, 'multiple') === 0) {
                 switch ($input) {
                     case '___input_a':
-                        foreach ($result as &$item) {
-                            $item = true;
+                        foreach ($result as $k => $item) {
+                            $result[$k] = true;
                         }
                         break;
                     case '___input_n':
-                        foreach ($result as &$item) {
-                            $item = false;
+                        foreach ($result as $k => $item) {
+                            $result[$k] = false;
                         }
                         break;
                     case '___input_':
                         $multiple = false;
-                        $resultOld = $result;
-                        $result = [];
-                        foreach ($resultOld as $k => $item) {
-
-                            if ($item) {
-                                $result[] = $parameter->inputValue[$k];
+                        $final = [];
+                        foreach ($result as $k => $item) {
+                            if ($item === true) {
+                                $final[] = $parameter->inputValue[$k];
                             }
                         }
+                        $result = $final;
                         break;
                     default:
                         $pos = array_search($input, $parameter->inputValue, true);
@@ -366,6 +279,135 @@ class CliOne
         return $result;
     }
 
+    /**
+     * @param CliOneParam $parameter
+     * @return void
+     */
+    protected function showOptions($parameter, $result)
+    {
+        // pattern
+        switch ($parameter->inputType) {
+            case 'multiple':
+                $pattern = '{selection}<c>[{key}]</c> {value}';
+                $foot = "\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)";
+                $columns = 1;
+                break;
+            case 'multiple2':
+                $pattern = '{selection}<c>[{key}]</c> {value}';
+                $foot = "\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)";
+                $columns = 2;
+                break;
+            case 'multiple3':
+                $pattern = '{selection}<c>[{key}]</c> {value}';
+                $foot = "\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)";
+                $columns = 3;
+                break;
+            case 'multiple4':
+                $pattern = '{selection}<c>[{key}]</c> {value}';
+                $foot = "\t<c>[a]</c> select all, <c>[n]</c> select none, <c>[]</c> end selection, [*] (is marked as selected)";
+                $columns = 4;
+                break;
+            case 'option':
+                $pattern = '<c>[{key}]</c> {value}';
+                $foot = "";
+                $columns = 1;
+                break;
+            case 'option2':
+                $pattern = '<c>[{key}]</c> {value}';
+                $foot = "";
+                $columns = 2;
+                break;
+            case 'option3':
+                $pattern = '<c>[{key}]</c> {value}';
+                $foot = "";
+                $columns = 3;
+                break;
+            case 'option4':
+                $pattern = '<c>[{key}]</c> {value}';
+                $foot = "";
+                $columns = 4;
+                break;
+            default:
+                return;
+        }
+        /** @noinspection PhpUnusedLocalVariableInspection */
+        [$p, $pq, $f] = $parameter->getPatterColumns();
+        if ($p !== null) {
+            $pattern = $p;
+        }
+        if ($f !== null) {
+            $pattern = $f;
+        }
+        $kvalues = [];
+        $ivalues = [];
+        foreach ($parameter->inputValue as $k => $v) {
+            $kvalues[] = $k;
+            $ivalues[] = $v;
+        }
+        $assoc = !isset($parameter->inputValue[0]);
+        $chalf = (int)ceil(count($ivalues) / $columns);
+        $colW = (int)ceil($this->colSize / $columns);
+        for ($i = 0; $i < $chalf; $i++) {
+            for ($kcol = 1; $kcol < 5; $kcol++) {
+                if ($kcol <= $columns) {
+                    $shift = $chalf * ($kcol - 1);
+                    if (array_key_exists($i + $shift, $kvalues)) {
+                        $keybase = $kvalues[$i + $shift];
+                        $keydisplay = $assoc ? $keybase : ($keybase + 1);
+                        if (strpos($parameter->inputType, 'multiple') === 0) {
+                            $selection = $result[$keybase] ? "[*]" : "[ ]";
+                        } else {
+                            $selection = "[*]";
+                        }
+                        $v = $ivalues[$i + $shift];
+                        $txt = $this->showPattern($parameter, $keydisplay, $v, $selection, $colW, '', $pattern);
+                        $col = ($kcol - 1) * $colW;
+                        $this->show("\e[" . ($col) . "G" . $txt);
+                    }
+                }
+            }
+            $this->show("\n");
+        }
+        if ($foot) {
+            $this->showLine($foot);
+        }
+    }
+
+    /**
+     * @param        $parameter $param
+     * @param string $key       the key to show
+     * @param mixed  $value     the value to show
+     * @param string $selection the selection (used by multiple to show [*])
+     * @param int    $colW      the size of the col
+     * @param string $prefix    A prefix
+     * @param string $pattern   the pattern to use.
+     * @return void
+     */
+    protected function showPattern($parameter, $key, $value, $selection, $colW, $prefix, $pattern)
+    {
+        $desc = $parameter->question ?: $parameter->description;
+        $def = (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default);
+        if ($parameter->inputType === 'password') {
+            $def = '*****';
+        }
+        $valueToShow = (is_object($value) || is_array($value)) ? json_encode($value) : $value;
+        if (is_array($valueToShow)) {
+            $valueinit = reset($valueToShow);
+            $valuenext = next($valueToShow);
+            $valueend = end($valueToShow);
+        } else {
+            $valueinit = '';
+            $valuenext = '';
+            $valueend = '';
+        }
+        // $patern='{selection} {key}{value}';
+        return $this->ellipsis(
+            str_replace(
+                array('{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'),
+                array($selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix), $pattern),
+            $colW - 1);
+    }
+
     protected function ellipsis($text, $lenght)
     {
         $l = strlen($text);
@@ -373,6 +415,80 @@ class CliOne
             return $text;
         }
         return substr($text, 0, $lenght - 3) . '...';
+    }
+
+    /**
+     * It's similar to showLine, but it keeps in the current line.
+     *
+     * @param string $content
+     * @return void
+     * @see \eftec\CliOne\CliOne::showLine
+     */
+    public function show($content)
+    {
+        echo $this->replaceColor($content);
+    }
+
+    /**
+     * It sets the color of the cli<br>
+     * <pre>
+     * e = error (red)
+     * </pre>
+     *
+     * @param                  $content
+     * @param CliOneParam|null $cliOneParam
+     * @return array|string|string[]
+     */
+    public function replaceColor($content, $cliOneParam = null)
+    {
+        $t = floor($this->colSize / 6);
+        if ($cliOneParam !== null) {
+            if (is_array($cliOneParam->inputValue)) {
+                $v = implode('/', $cliOneParam->inputValue);
+            } else {
+                $v = '';
+            }
+            $content = str_replace('<option/>', $v, $content);
+        }
+        $reset = "\033[0m";
+        return str_replace(['<e>', '</e>', '<w>', '</w>', '<g>', '</g>'
+                , '<s>', '</s>', '<i>', '</i>'
+                , '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>'
+                , '<c>', '</c>', '<m>', '</m>', '<y>', '</y>'
+                , '<col0/>', '<col1/>', '<col2/>', '<col3/>', '<col4/>', '<col5/>']
+            , ["\033[31m", $reset, "\033[33m", $reset, "\033[32m", $reset
+                , "\033[32m", $reset, "\033[34m", $reset
+                , "\e[3m", "\e[0m", "\e[1m", "\e[0m", "\e[4m", "\e[0m"
+                , "\033[96m", $reset, "\033[95m", $reset, "\033[93m", $reset
+                , "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G", "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G"
+            ]
+            , $content);
+    }
+
+    /**
+     * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br>
+     * <pre>
+     * <e>error</e> (color red)
+     * <w>warning</w> (color yellow)
+     * <i>information</i> (blue)
+     * <y>yellow</y> (yellow)
+     * <g>green</g> <s>success</s> (color green)
+     * <italic>italic</italic>
+     * <bold>bold</body>
+     * <underline>underline</underline>
+     * <c>cyan</c> (color light cyan)
+     * <m>magenta</m> (color magenta)
+     * <col0/><col1/><col2/><col3/><col4/><col5/>  columns. col0=0 (left),col1--col5 every column of the page.
+     * <option/> it shows all the options available (if the input has some options)
+     * </pre>
+     *
+     *
+     * @param string $content content to display
+     * @return void
+     */
+    public function showLine($content = '', $cliOneParam = null)
+    {
+        echo $this->replaceColor($content, $cliOneParam) . "\n";
     }
 
     /**
@@ -407,12 +523,13 @@ class CliOne
                     $prefix = '';
             }
             if ($askInput) {
-                $desc = $parameter->question ?: $parameter->description;
-                $origInput = $this->readline("$desc <c>[" . (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default) . "]</c> $prefix:");
+                $pattern = $parameter->getPatterColumns()['1'] ?: "{desc} <c>[{def}]</c> {prefix}:";
+                $txt = $this->showPattern($parameter, $parameter->key, $parameter->value, '', $this->colSize, $prefix, $pattern);
+                $origInput = $this->readline($txt);
                 $parameter->value = $origInput;
+                $this->assignParamValueKey($parameter);
                 $parameter->missing = false;
                 //if($parameter->value==='' && $parameter->allowEmpty===true) {
-
                 //}
                 //$parameter->value = (!$parameter->value) ? $parameter->default : $parameter->value;
                 /*if($parameter->value!=='' || !$parameter->allowEmpty) {
@@ -424,19 +541,35 @@ class CliOne
                     } else {
                         $parameter->value = $parameter->default;
                     }
+                    $this->assignParamValueKey($parameter);
                 }
                 switch ($parameter->inputType) {
-                    case 'options':
+                    case 'multiple':
+                    case 'multiple2':
+                    case 'multiple3':
+                    case 'multiple4':
                     case 'option':
                     case 'option2':
                     case 'option3':
                     case 'option4':
-                        if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
-                            $parameter->value = '___input_' . ($parameter->value ?? '');
-                        } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
-                            $parameter->value = $parameter->inputValue[$parameter->value - 1] ?? null;
+                        $assoc = !isset($parameter->inputValue[0]);
+                        if (!$assoc) {
+                            if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
+                                $parameter->value = '___input_' . ($parameter->value ?? '');
+                                $this->assignParamValueKey($parameter);
+                            } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
+                                $parameter->valueKey = $parameter->value;
+                                $parameter->value = $parameter->inputValue[$parameter->value - 1] ?? null;
+                            } else {
+                                $parameter->valueKey = null;
+                                $parameter->value = null;
+                            }
+                        } else if (array_key_exists($parameter->value, $parameter->inputValue)) {
+                            $parameter->valueKey = $parameter->value;
+                            $parameter->value = $parameter->inputValue[$parameter->value] ?? null;
                         } else {
-                            $parameter->value = null;
+                            $parameter->valueKey = $parameter->value;
+                            $parameter->value = '___input_' . $parameter->value;
                         }
                         break;
                 }
@@ -451,6 +584,7 @@ class CliOne
                     $cause = 'it must be a number between the range ' . $parameter->inputValue[0] . ' and ' . $parameter->inputValue[1];
                     break;
                 case 'string':
+                case 'password':
                     if ($parameter->allowEmpty) {
                         $ok = true;
                     } else if ($parameter->value === '' || $parameter->value === null || $parameter->value === false) {
@@ -459,10 +593,15 @@ class CliOne
                         $ok = true;
                     }
                     //$ok = ($parameter->value === '' && $parameter->allowEmpty) || is_string($parameter->value);
-                    $cause = 'it must be a string';
+                    $cause = 'it must be a string not empty';
                     break;
-                case 'options':
-                    if (strpos($parameter->value, ',') === false) {
+                case 'multiple':
+                case 'multiple2':
+                case 'multiple3':
+                case 'multiple4':
+                    if ($parameter->value === null) {
+                        $validateValues[] = ''; // to exit
+                    } else if (strpos($parameter->value, ',') === false) {
                         $validateValues = [$parameter->value];
                     } else {
                         $validateValues = explode(',', $parameter->value);
@@ -473,8 +612,8 @@ class CliOne
                             $ok = true;
                             break;
                         }
-
                         $ok = $parameter->value === '' || in_array($valueTmp, $parameter->inputValue, true);
+                        $valueTmp = str_replace('___input_', '', $valueTmp);
                         $cause = "it must be a valid value [$valueTmp]";
                         if (!$ok) {
                             break;
@@ -486,13 +625,15 @@ class CliOne
                 case 'option3':
                 case 'option4':
                     if ($parameter->value === '___input_') {
+                        $parameter->valueKey = $parameter->value;
                         $parameter->value = '';
                     }
-                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || $parameter->valueKey !== null;
                     $cause = "the option does not exist [$parameter->value]";
                     break;
                 case 'optionshort':
                     if ($parameter->value === '___input_') {
+                        $parameter->valueKey = $parameter->value;
                         $parameter->value = '';
                     }
                     $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
@@ -516,7 +657,6 @@ class CliOne
                 default:
                     $ok = false;
                     $cause = 'unknown $parameter->inputType inputtype';
-
             }
             if (!$ok) {
                 $this->showLine("<w>The value $parameter->key is not correct, $cause</w>");
@@ -528,117 +668,236 @@ class CliOne
         return $ok;
     }
 
+    public function readline($content)
+    {
+        echo $this->replaceColor($content);
+        // globals is used for phpunit.
+        if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
+            $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
+            if ($GLOBALS['PHPUNIT_FAKE_READLINE'][0] >= count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
+                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE ' . json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
+            }
+            $this->showLine('<g><underline>[' . $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]] . ']</underline></g>');
+            return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
+        }
+        return readline("");
+    }
+
     /**
-     * It sets the color of the cli<br>
-     * <pre>
-     * e = error (red)
-     * </pre>
+     * It shows the syntax of a parameter.
+     * @param string $key  the key to show. "*" means all keys.
+     * @param int    $tab  the first separation. Values are between 0 and 5.
+     * @param int    $tab2 the second separation. Values are between 0 and 5.
+     * @return void
+     */
+    public function showParamSyntax($key, $tab = 0, $tab2 = 1, $excludeKey = [])
+    {
+        if ($key === '*') {
+            foreach ($this->parameters as $p) {
+                if (!in_array($p->key, $excludeKey, true)) {
+                    $this->showParamSyntax($p->key, $tab, $tab2);
+                }
+            }
+            return;
+        }
+        $param = $this->getParameter($key);
+        if ($param === false) {
+            $this->showLine("<e>[ERROR]</e> Parameter $key not defined");
+            return;
+        }
+        $v = $param->value;
+        $v = is_array($v) ? json_encode($v) : $v;
+        if ($param->inputType === 'password') {
+            $v = '*****';
+        }
+        /** @noinspection PhpUnnecessaryCurlyVarSyntaxInspection */
+        $this->showLine("<col$tab/><g>-{$param->key}</g><col{$tab2}/>{$param->description} <c>[$v]</c>");
+        foreach ($param->getHelpSyntax() as $help) {
+            $this->showLine("<col$tab2/>$help", $param);
+        }
+    }
+
+    /**
+     * It gets the parameter by the key or false if not found.
      *
-     * @param $content
-     * @return array|string|string[]
+     * @param string $key
+     * @return CliOneParam|false
      */
-    public function replaceColor($content)
+    public function getParameter($key)
     {
-        return str_replace(['<e>', '</e>', '<w>', '</w>', '<g>', '</g>'
-                , '<s>', '</s>', '<i>', '</i>'
-                , '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>'
-                , '<c>', '</c>', '<m>', '</m>']
-            , ["\033[31m", "\033[0m", "\033[33m", "\033[0m", "\033[32m", "\033[0m"
-                , "\033[32m", "\033[0m", "\033[34m", "\033[0m"
-                , "\e[3m", "\e[0m", "\e[1m", "\e[0m", "\e[4m", "\e[0m"
-                , "\033[96m", "\033[0m", "\033[95m", "\033[0m"]
-            , $content);
+        foreach ($this->parameters as $v) {
+            if ($v->key === $key) {
+                return $v;
+            }
+        }
+        return false;
     }
 
+    /**
+     * It sets the value of a parameter manually.<br>
+     * Once the value its set, then the system skip to read the values from the command line or ask for an input.
+     *
+     * @param string $key
+     * @param mixed  $value
+     * @return bool
+     */
+    public function setParam($key, $value)
+    {
+        foreach ($this->parameters as $param) {
+            if ($param->key === $key) {
+                $param->value = $value;
+                $this->assignParamValueKey($param);
+                $param->missing = false;
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
-     * @param CliOneParam $parameter
-     * @return array it returns the value if the field is assigned<br>
-     *                      the default value if the field exists, but it doesn't have value<br>
-     *                      or false if the field is not defined
+     * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
+     * @param string $label
+     * @param string $color =['e','i','w','g','c'][$i]
+     * @param string $content
+     * @return void
      */
-    public function readParameterCli($parameter)
+    public function showCheck($label, $color, $content)
     {
-        global $argv;
-        $p = array_search('-' . $parameter->key, $argv, true);
+        echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
+    }
+
+    public function getValue($key)
+    {
+        $p = $this->getParameter($key);
         if ($p === false) {
-            // the parameter is not found there.
-            $parameter->missing = true;
-            return [false, false];
+            return null;
         }
-        $parameter->missing = false;
-        if (count($argv) > $p + 1) {
-            $next = self::removeTrailSlash($argv[$p + 1]);
-            if (strpos($next, '-', true) === 0) {
-                // -argument1 -argument2 (-argument1 is equals to "" and not -argument2)
-                return [true, ''];
+        return $p->value;
+    }
+
+    public function getValueKey($key)
+    {
+        $p = $this->getParameter($key);
+        if ($p === false) {
+            return null;
+        }
+        return $p->valueKey;
+    }
+
+    public function showparams()
+    {
+        foreach ($this->parameters as $v) {
+            try {
+                $this->showLine("  - $v->key = [" . json_encode($v->default) . "] ");
+            } catch (Exception $e) {
             }
-            return [true, trim($next," \t\n\r\0\x0B\"'")];
         }
-        if ($parameter->default !== '') {
-            return [true, $parameter->default];
+    }
+
+    public function isCli()
+    {
+        if (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__')) {
+            // phpunit is running
+            return false;
         }
-        return [true, ''];
+        if ($this->origin !== null && isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) !== $this->origin) {
+            // it is not running the right file.
+            return false;
+        }
+        // false if it is running a web.
+        return !http_response_code();
     }
 
     /**
-     * It finds the vendor path starting from a route. The route must be inside the application path.
-     * @param string $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then __DIR__
-     * @return string It returns the relative path to where is the vendor path. If not found then it returns the initial path
+     * @param string $filename
+     * @param mixed  $content The content to save. It will be serialized.
+     * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public static function findVendorPath($initPath=null) : string {
-        $initPath=$initPath?:__DIR__;
-        $prefix='';
-        $defaultvendor=$initPath;
-        // finding vendor
-        for($i=0;$i<6;$i++) {
-            if(@file_exists("$initPath/{$prefix}vendor/autoload.php")) {
-                $defaultvendor="{$prefix}vendor";
-                break;
-            }
-            $prefix.='../';
+    public function saveData($filename, $content)
+    {
+        $path = pathinfo($filename, PATHINFO_EXTENSION);
+        if ($path === '') {
+            $filename .= '.php';
         }
-        return $defaultvendor;
+        $contentData = "<?php http_response_code(404); die(1); // eftec/CliOne configuration file ?>\n";
+        $contentData .= json_encode($content, JSON_PRETTY_PRINT);
+        try {
+            $f = @file_put_contents($filename, $contentData);
+            if ($f === false) {
+                throw new RuntimeException("Unable to save file $filename");
+            }
+        } catch (Exception $ex) {
+            return $ex->getMessage();
+        }
+        return "";
     }
 
-
-    public function createParam($key, $isOperator = true)
+    /**
+     * It returns an associative array with all the parameters of the form [key=>value]
+     * @param array $excludeKeys you can add a key that you want to exclude.
+     * @return array
+     */
+    public function getArrayParams($excludeKeys = [])
     {
-        return new CliOneParam($this, $key, $isOperator);
+        $array = [];
+        foreach ($this->parameters as $param) {
+            if (!in_array($param->key, $excludeKeys, true)) {
+                $array[$param->key] = $param->value;
+            }
+        }
+        return $array;
     }
 
-    protected static function removeTrailSlash($txt)
+    /**
+     * It sets the parameters using an array of the form [key=>value]<br>
+     * It also marks the parameters as missing=false
+     * @param array $array       the associative array to use to set the parameters.
+     * @param array $excludeKeys you can add a key that you want to exclude.
+     * @return void
+     */
+    public function setArrayParam($array, $excludeKeys = [])
     {
-        return rtrim($txt, '/\\');
+        foreach ($this->parameters as $param) {
+            if (!in_array($param->key, $excludeKeys, true)) {
+                foreach ($array as $k => $v) {
+                    if ($param->key === $k) {
+                        $param->value = $v;
+                        $this->assignParamValueKey($param);
+                        $param->missing = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param string $filename the filename with or without extension.
+     * @return array it returns an array of the type [bool,mixed]<br>
+     *                         In error it returns [false,"error message"]<br>
+     *                         In success, it returns [true,values de-serialized]<br>
+     */
+    public function readData($filename)
+    {
+        $path = pathinfo($filename, PATHINFO_EXTENSION);
+        if ($path === '') {
+            $filename .= '.php';
+        }
+        try {
+            $content = @file_get_contents($filename);
+            if ($content === false) {
+                throw new RuntimeException("Unable to read file $filename");
+            }
+            $content = substr($content, strpos($content, "\n") + 1); // remove the first line.
+            return [true, json_decode($content, true)];
+        } catch (Exception $ex) {
+            return [false, $ex->getMessage()];
+        }
     }
 
     /** @noinspection GrazieInspection */
-    protected function calculateColSize($min = 80)
+    public function createParam($key, $isOperator = true)
     {
-        try {
-            if (PHP_OS_FAMILY === 'Windows') {
-                $a1 = shell_exec('mode con');
-                /*
-                 * Estado para dispositivo CON:
-                 * ----------------------------
-                 * Líneas:              9001
-                 * Columnas:            85
-                 * Ritmo del teclado:   31
-                 * Retardo del teclado: 1
-                 * Página de códigos:    65001
-                 */
-                $arr = explode("\n", $a1);
-                $col = trim(explode(':', $arr[4])[1]);
-
-            } else {
-                $col = exec('tput cols');
-                /*
-                 * 184
-                 */
-            }
-        } catch (Exception $ex) {
-            $col = 80;
-        }
-        return $col < $min ? $min : $col;
+        return new CliOneParam($this, $key, $isOperator);
     }
 }

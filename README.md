@@ -82,6 +82,15 @@ Select the value of param1 [param1] :hello
 
 
 ## Changelog
+* 1.2 (2022-02-13)
+  * **[replaced]** "options" renamed as "multiple". Added "multiple2","multiple3","multiple4"
+  * **[new]** associative arrays are allowed.
+  * **[new]** added templates.
+  * **[new]** added valuekey.
+* 1.1 (2022-02-12)
+  * **[new]** new methods savedata(),getArrayParams(),setArrayParam(),readData()
+  * **[replaced]** a new argument for the method replaceColor()
+  * **[new]** a new type called password
 * 1.0.1 (2022-02-11)
   * **[Fixed]** namespace.
   * **[Fixed]** replaceColor() fixed a color

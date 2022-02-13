@@ -16,6 +16,20 @@ class CliOneTest extends TestCase
         //, the first value is the current value to read
         //, and the next values are the emulated user input
     }
+    public function testFile() {
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('test1')->add();
+        $t->createParam('test2')->add();
+        $t->getParameter('test1')->value='hello';
+        $this->assertEquals('',$t->saveData('file1',$t->getArrayParams()));
+        $t->getParameter('test1')->value='xxxxxxx';
+        $rd=$t->readData('file2');
+        $this->assertEquals([false,'Unable to read file file2.php'],$rd);
+        $rd=$t->readData('file1');
+        $this->assertEquals([true,['test1' => 'hello', 'test2' => null]],$rd);
+        $t->setArrayParam($rd[1]);
+        $this->assertEquals('hello',$t->getParameter('test1')->value);
+    }
 
     public function testEvalParam()
     {
@@ -79,6 +93,25 @@ class CliOneTest extends TestCase
         $t->createParam('test1')->setDescription('it is a test')->setInput()->add();
         $p = $t->evalParam('test1');
         $this->assertEquals('hello world', $p->value);
+    }
+    public function testInputDefault()
+    {
+        global $argv;
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'hello world'];         // we use this line to simulate the user input
+        $t->createParam('test1')->setDescription('it is a test')->setInput()->add();
+        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
+
+        $t->getParameter('test1')->setDefault($t->getParameter('test1')->value);
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','xxxx'];         // we use this line to simulate the user input
+        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
+
+        $t->getParameter('test1')->setCurrentAsDefault();
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','xxxx'];         // we use this line to simulate the user input
+        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
+
+
     }
 
     public function testInputV2()
@@ -189,17 +222,42 @@ class CliOneTest extends TestCase
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
             ->setDefault(['op1', 'op2'])
-            ->setInput(true, 'options', ['op1', 'op2', 'op3'])->add();
+            ->setInput(true, 'multiple', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
+
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a','op3','op2','op2',''];   // all, remove3, remove2,add2, end
+        $t->getParameter('test1')->setDefault([])
+            ->setInput(true,'multiple2',['op1'=>'op1', 'op2'=>'op2', 'op3'=>'op3']);
+        $p = $t->evalParam('test1', true);
+        $this->assertEquals(['op1', 'op2'], $p->value);
+
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a','n','x',''];   // all, remove all, error,end
+        $t->getParameter('test1')->setDefault([])
+            ->setInput(true,'multiple3',['op1'=>'op1', 'op2'=>'op2', 'op3'=>'op3']);
+        $p = $t->evalParam('test1', true);
+        $this->assertEquals([], $p->value);
 
         $argv = [];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
             ->setDefault(['op1', 'op2'])
-            ->setInput(true, 'options', ['op1', 'op2', 'op3'])->add();
+            ->setInput(true, 'multiple', ['op1', 'op2', 'op3'])->add();
+        $t->showparams();
+        $p = $t->evalParam('test1', true);
+        $this->assertEquals(['op1', 'op2'], $p->value);
+    }
+    public function testTemplate() {
+        global $argv;
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
+        $t->createParam('test1')->setDescription('it is a test')
+            ->setDefault(['op1', 'op2'])
+            ->setPattern('**<c>[{key}]</c>** {value} def:{def} desc{desc}')
+            ->setInput(true, 'multiple', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
@@ -258,7 +316,7 @@ class CliOneTest extends TestCase
         // select "a"ll, de-select 1, end
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a', 1, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
-            ->setInput(true, 'options', ['op1', 'op2', 'op3'])->add();
+            ->setInput(true, 'multiple', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op2', 'op3'], $p->value);

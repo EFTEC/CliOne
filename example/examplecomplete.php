@@ -16,7 +16,12 @@ if($cli->isCli()) {
     $cli->createParam('subparam0')
         ->setDescription('This field is called subparam0 and it is required')
         ->setRequired(true)
-        ->setInput(true,'options',['op1','op2','op3'])
+        ->setInput(true,'multiple2',['op1','op2','op3','op4','op5','op6','op7'])
+        ->add();
+    $cli->createParam('subparam0b')
+        ->setDescription('This field is called subparam0b and it is required')
+        ->setRequired(true)
+        ->setInput(true,'multiple2',['op1'=>'op1','op2'=>'op2','op3'=>'op3','op4'=>'op4','op5'=>'op5','op6'=>'op6','op7'=>'op7'])
         ->add();
     $cli->createParam('subparam1')
         ->setDescription('This field is called subparam1 and it is required')
@@ -26,26 +31,27 @@ if($cli->isCli()) {
     $cli->createParam('subparam1b')
         ->setDescription('This field is called subparam1b and it is required')
         ->setRequired(true)
-        ->setInput(true,'option2',['op1222222222222222222222222','op2','op3','op4','op5'])
+        ->setInput(true,'option2',['op1234567890123456789012345678901234567890','op2','op3','op4','op5'])
         ->add();
     $cli->createParam('subparam1c')
         ->setDescription('This field is called subparam1b and it is required')
         ->setRequired(true)
-        ->setInput(true,'option3',['op1222222222222222222222222','op2','op3','op4','op5','op6','op7','op8','op9','op10'])
+        ->setInput(true,'option3',['op1234567890123456789012345678901234567890','op2','op3','op4','op5','op6','op7','op8','op9','op10'])
         ->add();
     $cli->createParam('subparam1d')
         ->setDescription('This field is called subparam1d and it is required')
         ->setRequired(true)
-        ->setInput(true,'option4',['op1222222222222222222222222','op2','op3','op4','op5','op6','op7','op8','op9','op10'])
+        ->setInput(true,'option4',['op1234567890123456789012345678901234567890','op2','op3','op4','op5','op6','op7','op8','op9','op10'])
         ->add();
     $cli->createParam('subparam2')
-        ->setDescription('This field is called subparam2 and it is required','subparam2 (optionshorts)')
+        ->setDescription('This field is called subparam2 and it is required','subparam2 (optionshorts)',['example: subparam1','example: subparam2'])
         ->setRequired(true)
         ->setInput(true,'optionshort',['yes','no'])
         ->add();
     $cli->createParam('subparam3')
         ->setDescription('This field is called subparam3 and it is required','subparam3 number')
         ->setRequired(true)
+        ->setPatterColumns(null,'it is question: {key} {desc} {def}',null)
         ->setInput(true,'number','')
         ->add();
     $cli->createParam('subparam4')
@@ -69,12 +75,16 @@ if($cli->isCli()) {
     $param1=$cli->evalParam('*');
     if(is_object($param1)) {
         if($param1->key==='param1' && $param1->value!==false) {
-            echo "running param1\n";
-            $param1_3=$cli->evalParam('subparam2');
+            $param1_1b=$cli->evalParam('subparam0b');
             $param1_1=$cli->evalParam('subparam0');
-            $param1_2=$cli->evalParam('subparam1');
-            $param1_2b=$cli->evalParam('subparam1b');
             $param1_2c=$cli->evalParam('subparam1c');
+            $param1_2b=$cli->evalParam('subparam1b');
+            $param1_3=$cli->evalParam('subparam2');
+
+
+            $param1_2=$cli->evalParam('subparam1');
+
+
             $param1_2d=$cli->evalParam('subparam1d');
 
 
@@ -83,9 +93,10 @@ if($cli->isCli()) {
             $param1_6=$cli->evalParam('subparam5',true);
         }
     }
-    foreach($cli->parameters as $v) {
+    $cli->showParamSyntax('*');
+    /*foreach($cli->parameters as $v) {
         echo "$v->key = ".json_encode($v->value)."\n";
-    }
+    }*/
     //var_dump($param1);
 
 /*
