@@ -1,10 +1,8 @@
 <?php /** @noinspection ReturnTypeCanBeDeclaredInspection */
 /** @noinspection PhpUnused */
-
 /** @noinspection PhpMissingFieldTypeInspection */
 
 namespace eftec\CliOne;
-
 /**
  * CliOne - A simple creator of command line argument program.
  *
@@ -21,10 +19,13 @@ class CliOneParam
     private $parent;
     public $key;
     public $isOperator = true;
+    /**
+     * @var bool|string|null
+     */
     public $question = '';
     /** @var mixed */
     public $default = false;
-    public $currentAsDefault=false;
+    public $currentAsDefault = false;
     /** @var
      * bool if true then it allows empty values as valid values.<br>
      * However, "multiple" allows "empty" regardless of this option<br>
@@ -37,7 +38,22 @@ class CliOneParam
     protected $patternQuestion;
     protected $footer;
 
+
+    public $required = false;
+    public $input = false;
+    /** @var bool if true then the value is not entered, but it could have a value (default value) */
+    public $missing = true;
+
     /**
+     * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
+     */
+    public $inputType = 'string';
+    public $inputValue = [];
+    public $value;
+    public $valueKey;
+
+    /**
+     * It returns the syntax of the help.
      * @return array
      */
     public function getHelpSyntax(): array
@@ -46,6 +62,7 @@ class CliOneParam
     }
 
     /**
+     * It sets the syntax of help.
      * @param array $helpSyntax
      * @return CliOneParam
      */
@@ -62,7 +79,8 @@ class CliOneParam
      * <li><b>{key}</b> (for table)it shows the current key</li>
      * <li><b>{value}</b> (for table)it shows the current value. If the value is an array then it is "json"</li>
      * <li><b>{valueinit}</b> (for table)if the value is an array then it shows the first value</li>
-     * <li><b>{valuenext}</b> (for table)if the value is an array then it shows the next value (it could be the same, the second or the last one)</li>
+     * <li><b>{valuenext}</b> (for table)if the value is an array then it shows the next value (it could be the same,
+     * the second or the last one)</li>
      * <li><b>{valueend}</b> (for table)if the value is an array then it shows the last value</li>
      * <li><b>{desc}</b> it shows the description</li>
      * <li><b>{def}</b> it shows the default value</li>
@@ -78,11 +96,11 @@ class CliOneParam
      * @param ?string $footer         the footer line (if any)
      * @return $this
      */
-    public function setPattern($patterColumns=null, $patterQuestion=null, $footer=null) : CliOneParam
+    public function setPattern($patterColumns = null, $patterQuestion = null, $footer = null): CliOneParam
     {
-        $this->patterColumns=$patterColumns;
-        $this->patternQuestion=$patterQuestion;
-        $this->footer=$footer;
+        $this->patterColumns = $patterColumns;
+        $this->patternQuestion = $patterQuestion;
+        $this->footer = $footer;
         return $this;
     }
 
@@ -90,44 +108,38 @@ class CliOneParam
      * It gets the pattern, patternquestion and footer
      * @return array=[pattern,patternquest,footer]
      */
-    public function getPatterColumns() {
-        return [$this->patterColumns,$this->patternQuestion, $this->footer];
+    public function getPatterColumns()
+    {
+        return [$this->patterColumns, $this->patternQuestion, $this->footer];
     }
 
-    public $required = false;
-    public $input = false;
-    /** @var bool if true then the value is not entered, but it could have a value (default value) */
-    public $missing = true;
 
     /**
-     * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
+     * It resets the user input and marks the value as missing.
+     * @return CliOneParam
      */
-    public $inputType = 'string';
-    public $inputValue = [];
-    public $value;
-    public $valueKey;
-
-
     public function resetInput()
     {
         //$this->input=true;
         $this->value = null;
         $this->valueKey = null;
-        $this->currentAsDefault=false;
+        $this->currentAsDefault = false;
         $this->missing = true;
+        return $this;
     }
-    //,$keyFriendly=null,$default='',$description='',$required=false,$input=false,$inputtype='string',$inputvalue=[]
 
     /**
-     * @param CliOne $parent
-     * @param null   $key
-     * @param bool   $isOperator
+     * The constructor. It is used internally
+     * @param CliOne  $parent
+     * @param ?string $key
+     * @param bool    $isOperator
      */
     public function __construct($parent, $key = null, $isOperator = true, $value = null, $valueKey = null)
     {
         $this->parent = $parent;
         $this->key = $key;
         $this->isOperator = $isOperator;
+        /** @noinspection ProperNullCoalescingOperatorUsageInspection */
         $this->question = $isOperator ?? $key;
         $this->value = $value;
         $this->valueKey = $valueKey;
@@ -135,6 +147,8 @@ class CliOneParam
 
 
     /**
+     * It sets the default value that it is used when the user doesn't input the value<br>
+     * Setting a default value could bypass the option isRequired()
      * @param mixed $default
      * @return CliOneParam
      */
@@ -150,8 +164,9 @@ class CliOneParam
      * @param bool $currentAsDefault
      * @return void
      */
-    public function setCurrentAsDefault($currentAsDefault=true) {
-        $this->currentAsDefault=$currentAsDefault;
+    public function setCurrentAsDefault($currentAsDefault = true)
+    {
+        $this->currentAsDefault = $currentAsDefault;
     }
 
     /**
@@ -170,9 +185,10 @@ class CliOneParam
     }
 
     /**
-     * @param string      $description
-     * @param null|string $question
-     * @param string[]    $helpSyntax It adds one or multiple lines of help syntax.
+     * It sets the description
+     * @param string      $description the initial description (used when we show the syntax)
+     * @param null|string $question    The question, it is used in the user input.
+     * @param string[]    $helpSyntax  It adds one or multiple lines of help syntax.
      * @return CliOneParam
      */
     public function setDescription($description, $question = null, $helpSyntax = []): CliOneParam
@@ -185,6 +201,8 @@ class CliOneParam
 
 
     /**
+     * It marks the value as required<br>
+     * The value could be ignored if it used together with setDefault()
      * @param boolean $required
      * @return CliOneParam
      */
@@ -196,7 +214,9 @@ class CliOneParam
 
 
     /**
-     * @param bool   $input
+     * It sets the input type
+     * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
+     *                          entered as argument.
      * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionsimple'][$i]
      * @param mixed  $inputValue
      * @return CliOneParam
@@ -209,12 +229,24 @@ class CliOneParam
         return $this;
     }
 
+    /**
+     * It creates an argument and eval the parameter.<br>
+     * It is a macro of add() and CliOne::evalParam()
+     * @param bool $forceInput if false and the value is already digited, then it is not input anymore
+     * @return CliOneParam|false|mixed
+     */
     public function evalParam($forceInput = false)
     {
         $this->add(true);
         return $this->parent->evalParam($this->key, $forceInput);
     }
 
+    /**
+     * It adds an argument but it is not evaluated.
+     * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
+     *                       if true and the argument exists, then it is replaced.
+     * @return void
+     */
     public function add($override = false): void
     {
         $fail = false;

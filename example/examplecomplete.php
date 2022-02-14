@@ -51,7 +51,7 @@ if($cli->isCli()) {
     $cli->createParam('subparam3')
         ->setDescription('This field is called subparam3 and it is required','subparam3 number')
         ->setRequired(true)
-        ->setPatterColumns(null,'it is question: {key} {desc} {def}',null)
+        ->setPattern(null,'it is question: {key} {desc} {def}',null)
         ->setInput(true,'number','')
         ->add();
     $cli->createParam('subparam4')

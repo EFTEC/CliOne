@@ -27,7 +27,11 @@ class CliOne
     public $parameters = [];
     protected $colSize = 80;
 
-
+    /**
+     * The constructor
+     * @param ?string $origin you can specify the origin file. If you specific the origin file, then isCli will only
+     *                        return true if the file is called directly.
+     */
     public function __construct($origin = null)
     {
         $this->origin = $origin;
@@ -85,6 +89,7 @@ class CliOne
     }
 
     /**
+     * It returns the number of columns present in the screen. The columns are calculated in the constructor.
      * @return int
      */
     public function getColSize()
@@ -214,6 +219,11 @@ class CliOne
         return [true, ''];
     }
 
+    /**
+     * It removes trail slashes.
+     * @param string $txt
+     * @return string
+     */
     protected static function removeTrailSlash($txt)
     {
         return rtrim($txt, '/\\');
@@ -224,7 +234,7 @@ class CliOne
      * @return mixed|string
      * @noinspection DuplicatedCode
      */
-    public function readParameterInput($parameter)
+    protected function readParameterInput($parameter)
     {
         $result = '';
         if (strpos($parameter->inputType, 'multiple') === 0) {
@@ -280,6 +290,8 @@ class CliOne
     }
 
     /**
+     * It shows the listing of options
+     *
      * @param CliOneParam $parameter
      * @return void
      */
@@ -453,7 +465,7 @@ class CliOne
      * @param CliOneParam|null $cliOneParam
      * @return array|string|string[]
      */
-    public function replaceColor($content, $cliOneParam = null)
+    protected function replaceColor($content, $cliOneParam = null)
     {
         $t = floor($this->colSize / 6);
         if ($cliOneParam !== null) {
@@ -510,7 +522,7 @@ class CliOne
      * @param bool        $askInput
      * @return bool
      */
-    public function validate($parameter, $askInput = true)
+    protected function validate($parameter, $askInput = true)
     {
         $ok = false;
         $cause = 'no cause found';
@@ -584,7 +596,7 @@ class CliOne
                         } else if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->valueKey = $parameter->value;
                             $parameter->value = '___input_' . $parameter->value;
-                        } else{
+                        } else {
                             $parameter->valueKey = null;
                             $parameter->value = null;
                         }
@@ -686,7 +698,14 @@ class CliOne
         return $ok;
     }
 
-    public function readline($content)
+    /**
+     * It reads a line input that the user must enter the information<br>
+     * <b>Note:</b> It could be simulated using the global $GLOBALS['PHPUNIT_FAKE_READLINE'] (array)
+     * , where the first value must be 0, and the other values must be the input emulated
+     * @param string $content The prompt.
+     * @return false|mixed|string returns the user input.
+     */
+    protected function readline($content)
     {
         echo $this->replaceColor($content);
         // globals is used for phpunit.
@@ -738,7 +757,7 @@ class CliOne
     /**
      * It gets the parameter by the key or false if not found.
      *
-     * @param string $key
+     * @param string $key the key of the parameter
      * @return CliOneParam|false
      */
     public function getParameter($key)
@@ -755,8 +774,8 @@ class CliOne
      * It sets the value of a parameter manually.<br>
      * Once the value its set, then the system skip to read the values from the command line or ask for an input.
      *
-     * @param string $key
-     * @param mixed  $value
+     * @param string $key the key of the parameter
+     * @param mixed  $value the value to assign.
      * @return bool
      */
     public function setParam($key, $value)
@@ -764,6 +783,7 @@ class CliOne
         foreach ($this->parameters as $param) {
             if ($param->key === $key) {
                 $param->value = $value;
+                $param->valueKey=null;
                 $this->assignParamValueKey($param);
                 $param->missing = false;
                 return true;
@@ -784,6 +804,18 @@ class CliOne
         echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
     }
 
+    /**
+     * It reads a value of a parameter.
+     * <b>Example:</b><bt>
+     * <pre>
+     * // [1] option1
+     * // [2] option2
+     * // select a value [] 2
+     * $v=$this->getValueKey('idparam'); // it will return "option2".
+     * </pre>
+     * @param string $key the key of the parameter to read the value
+     * @return mixed|null It returns the value of the parameter or null if not found.
+     */
     public function getValue($key)
     {
         $p = $this->getParameter($key);
@@ -793,6 +825,19 @@ class CliOne
         return $p->value;
     }
 
+    /**
+     * It reads the value-key of a parameter selected. It is useful for a list of elements.<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * // [1] option1
+     * // [2] option2
+     * // select a value [] 2
+     * $v=$this->getValueKey('idparam'); // it will return 2 instead of "option2"
+     * </pre>
+     * @param string $key the key of the parameter to read the value-key
+     * @return mixed|null It returns the value of the parameter or null if not found.
+     *
+     */
     public function getValueKey($key)
     {
         $p = $this->getParameter($key);
@@ -802,16 +847,34 @@ class CliOne
         return $p->valueKey;
     }
 
+    /**
+     * It will show all the parameters by showing the key, the default value and the value<br>
+     * It is used for debug and testing.
+     * @return void
+     */
     public function showparams()
     {
         foreach ($this->parameters as $v) {
             try {
-                $this->showLine("  - $v->key = [" . json_encode($v->default) . "] ");
+                $this->showLine("$v->key = [" . json_encode($v->default) . "] value:" . json_encode($v->value));
             } catch (Exception $e) {
             }
         }
     }
 
+    /**
+     * It will return true if the PHP is running on CLI<br>
+     * If the constructor specified a file, then it is also used for validation.
+     * <b>Example:</b><br>
+     * <pre>
+     * // page.php:
+     * $inst=new CliOne('page.php'); // this security avoid to call the cli when this file is called by others.
+     * if($inst->isCli()) {
+     *    echo "Is CLI and the current page is page.php";
+     * }
+     * </pre>
+     * @return bool
+     */
     public function isCli()
     {
         if (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__')) {
@@ -827,8 +890,9 @@ class CliOne
     }
 
     /**
-     * @param string $filename
-     * @param mixed  $content The content to save. It will be serialized.
+     * It saves information into a file. The content will be serialized.
+     * @param string $filename the filename (without extension) to where the value will be saved.
+     * @param mixed  $content  The content to save. It will be serialized.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
     public function saveData($filename, $content)
@@ -890,9 +954,10 @@ class CliOne
     }
 
     /**
+     * It reads information from a file. The information will be de-serialized.
      * @param string $filename the filename with or without extension.
      * @return array it returns an array of the type [bool,mixed]<br>
-     *                         In error it returns [false,"error message"]<br>
+     *                         In error, it returns [false,"error message"]<br>
      *                         In success, it returns [true,values de-serialized]<br>
      */
     public function readData($filename)
@@ -913,7 +978,12 @@ class CliOne
         }
     }
 
-    /** @noinspection GrazieInspection */
+    /**
+     * It creates a new parameter to be read from the command line or to be input by the user.
+     * @param string $key The key or the parameter. It must be unique.
+     * @param bool   $isOperator
+     * @return CliOneParam
+     */
     public function createParam($key, $isOperator = true)
     {
         return new CliOneParam($this, $key, $isOperator);
