@@ -217,7 +217,7 @@ class CliOneParam
      * It sets the input type
      * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
      *                          entered as argument.
-     * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionsimple'][$i]
+     * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      * @param mixed  $inputValue
      * @return CliOneParam
      */

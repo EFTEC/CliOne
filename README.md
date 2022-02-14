@@ -1,6 +1,6 @@
 # CliOne
 
-This library helps to create command line (CLI) operator for PHP in Windows and Linux
+This library helps to create command line (CLI) operator for PHP in Windows, Mac and Linux
 
 [![Packagist](https://img.shields.io/packagist/v/eftec/CliOne.svg)](https://packagist.org/packages/eftec/CliOne)
 [![Total Downloads](https://poser.pugx.org/eftec/CliOne/downloads)](https://packagist.org/packages/eftec/CliOne)
@@ -13,6 +13,8 @@ This library helps to create command line (CLI) operator for PHP in Windows and 
 ## Features
 
 ✅ Windows, Linux and Mac Compatible.
+
+✅ This library is simple, it only consists of 2 classes and nothing more and no external dependency.
 
 ✅ Arguments & user input
 
@@ -115,12 +117,9 @@ if($cli->isCli()) { // we validate if we are running a CLI or not.
 ```
 So you can run as:
 
-```shell
-> php ./example1.php -param1 hello
-# it will show hello
-> php ./example1.php -param1 "hello world"
-# it will show hello world
-```
+![](docs/example1.jpg)
+
+
 
 ## Example using user input
 
@@ -144,13 +143,22 @@ if($cli->isCli()) {
 
 It will show the next result
 
-```shell
-> php example2.php              
-Select the value of param1 [param1] :hello
-# it will show hello
-```
+![](docs/example2.jpg)
+
+
+
+## Example with a game
+
+[example/examplegame.php](example/examplegame.php)
+
+![docs/guess.jpg](docs/guess.jpg)
+Image (c) George Beker
+
+![docs/examplegame.jpg](docs/examplegame.jpg) 
 
 ## Showing colors
+
+You can see the tags available in [Types of colors](#types-of-colors)
 
 [example/examplecolor.php](example/examplecolor.php)
 
