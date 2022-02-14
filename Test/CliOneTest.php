@@ -126,6 +126,20 @@ class CliOneTest extends TestCase
         $p = $t->createParam('test1')->setDescription('it is a test', 'test #2')->setInput()->evalParam(true);
         $this->assertEquals('hello world', $p->value);
     }
+    public function testInputOptionDefaultError() {
+        $values=['k1'=>'v1','k2'=>'v2','k3'=>'v3'];
+        global $argv;
+        $argv = [];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', 'k1'];         // we use this line to simulate the user input
+        $t->createParam('test1')
+            ->setDescription('it is a test')
+            ->setAllowEmpty()
+            ->setInput(true, 'option', $values)->add();
+        $t->showparams();
+        $p = $t->evalParam('test1');
+        $this->assertEquals('v1', $p->value);
+    }
 
     public function testInputOption()
     {

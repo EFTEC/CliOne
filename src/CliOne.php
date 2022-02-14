@@ -16,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.2
+ * @version   1.2.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION='1.2';
+    public const VERSION = '1.2.1';
     public $origin;
     /** @var CliOneParam[] */
     public $parameters = [];
@@ -347,6 +347,13 @@ class CliOne
         $assoc = !isset($parameter->inputValue[0]);
         $chalf = (int)ceil(count($ivalues) / $columns);
         $colW = (int)ceil($this->colSize / $columns);
+        $maxL = 0;
+        $iMax = count($ivalues);
+        for ($i = 0; $i < $iMax; $i++) {
+            $keybase = $kvalues[$i];
+            $keydisplay = $assoc ? $keybase : ($keybase + 1);
+            $maxL = max(strlen($keydisplay), $maxL);
+        }
         for ($i = 0; $i < $chalf; $i++) {
             for ($kcol = 1; $kcol < 5; $kcol++) {
                 if ($kcol <= $columns) {
@@ -354,6 +361,13 @@ class CliOne
                     if (array_key_exists($i + $shift, $kvalues)) {
                         $keybase = $kvalues[$i + $shift];
                         $keydisplay = $assoc ? $keybase : ($keybase + 1);
+                        if ($assoc) {
+                            // for padding the keys.
+                            $keydisplay .= str_repeat(' ', $maxL - strlen($keydisplay));
+                        } else {
+                            // for padding the keys.
+                            $keydisplay = str_repeat(' ', $maxL - strlen($keydisplay)) . $keydisplay;
+                        }
                         if (strpos($parameter->inputType, 'multiple') === 0) {
                             $selection = $result[$keybase] ? "[*]" : "[ ]";
                         } else {
@@ -374,13 +388,13 @@ class CliOne
     }
 
     /**
-     * @param        $parameter $param
-     * @param string $key       the key to show
-     * @param mixed  $value     the value to show
-     * @param string $selection the selection (used by multiple to show [*])
-     * @param int    $colW      the size of the col
-     * @param string $prefix    A prefix
-     * @param string $pattern   the pattern to use.
+     * @param CliOneParam $parameter $param
+     * @param string      $key       the key to show
+     * @param mixed       $value     the value to show
+     * @param string      $selection the selection (used by multiple to show [*])
+     * @param int         $colW      the size of the col
+     * @param string      $prefix    A prefix
+     * @param string      $pattern   the pattern to use.
      * @return void
      */
     protected function showPattern($parameter, $key, $value, $selection, $colW, $prefix, $pattern)
@@ -391,10 +405,10 @@ class CliOne
             $def = '*****';
         }
         $valueToShow = (is_object($value) || is_array($value)) ? json_encode($value) : $value;
-        if (is_array($valueToShow)) {
-            $valueinit = reset($valueToShow);
-            $valuenext = next($valueToShow);
-            $valueend = end($valueToShow);
+        if (is_array($value)) {
+            $valueinit = reset($value);
+            $valuenext = next($value);
+            $valueend = end($value);
         } else {
             $valueinit = '';
             $valuenext = '';
@@ -567,9 +581,12 @@ class CliOne
                         } else if (array_key_exists($parameter->value, $parameter->inputValue)) {
                             $parameter->valueKey = $parameter->value;
                             $parameter->value = $parameter->inputValue[$parameter->value] ?? null;
-                        } else {
+                        } else if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->valueKey = $parameter->value;
                             $parameter->value = '___input_' . $parameter->value;
+                        } else{
+                            $parameter->valueKey = null;
+                            $parameter->value = null;
                         }
                         break;
                 }
@@ -629,7 +646,8 @@ class CliOne
                         $parameter->value = '';
                     }
                     $ok = ($parameter->value === '' && $parameter->allowEmpty) || $parameter->valueKey !== null;
-                    $cause = "the option does not exist [$parameter->value]";
+                    $vtmp = is_array($parameter->value) ? reset($parameter->value) : $parameter->value;
+                    $cause = "the option does not exist [$vtmp]";
                     break;
                 case 'optionshort':
                     if ($parameter->value === '___input_') {

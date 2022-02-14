@@ -82,6 +82,9 @@ Select the value of param1 [param1] :hello
 
 
 ## Changelog
+* 1.2.1 (2022-02-13)
+  * **[fixed]** fixed some bugs
+  * **[new]** keys are padded, example [ 1] [ 2] [ 3] ... [99],  [value 1] [value 2] [value  ]
 * 1.2 (2022-02-13)
   * **[replaced]** "options" renamed as "multiple". Added "multiple2","multiple3","multiple4"
   * **[new]** associative arrays are allowed.
