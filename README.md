@@ -510,6 +510,13 @@ if true and the argument exists, then it is replaced. (bool)
 
 
 ## Changelog
+* 1.3 (2022-02-14)
+* **[new]** added autocomplete (tab key)
+* **[new]** added breadcrub
+* **[new]** added showValuesColumn()
+* **[replaced]** now keys (showing in options) are aligned at the center.
+* 1.2.2 (2022-02-14)
+* **[fixed]** fixed a problem where the question is truncated with an ellipsis (...)
 * 1.2.1 (2022-02-13)
   * **[fixed]** fixed some bugs
   * **[new]** keys are padded, example [ 1] [ 2] [ 3] ... [99],  [value 1] [value 2] [value  ]

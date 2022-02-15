@@ -1,4 +1,4 @@
-<?php /** @noinspection ReturnTypeCanBeDeclaredInspection */
+<?php
 /** @noinspection PhpUnused */
 /** @noinspection PhpMissingFieldTypeInspection */
 
@@ -108,7 +108,7 @@ class CliOneParam
      * It gets the pattern, patternquestion and footer
      * @return array=[pattern,patternquest,footer]
      */
-    public function getPatterColumns()
+    public function getPatterColumns(): array
     {
         return [$this->patterColumns, $this->patternQuestion, $this->footer];
     }
@@ -118,7 +118,7 @@ class CliOneParam
      * It resets the user input and marks the value as missing.
      * @return CliOneParam
      */
-    public function resetInput()
+    public function resetInput(): CliOneParam
     {
         //$this->input=true;
         $this->value = null;
@@ -164,7 +164,7 @@ class CliOneParam
      * @param bool $currentAsDefault
      * @return void
      */
-    public function setCurrentAsDefault($currentAsDefault = true)
+    public function setCurrentAsDefault($currentAsDefault = true): void
     {
         $this->currentAsDefault = $currentAsDefault;
     }

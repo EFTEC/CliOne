@@ -16,7 +16,7 @@ if($cli->isCli()) {
     $cli->createParam('subparam0')
         ->setDescription('This field is called subparam0 and it is required')
         ->setRequired(true)
-        ->setInput(true,'multiple2',['op1','op2','op3','op4','op5','op6','op7'])
+        ->setInput(true,'multiple2',['val1','val2','val3','val4','val5','val6','val7'])
         ->add();
     $cli->createParam('subparam0b')
         ->setDescription('This field is called subparam0b and it is required')
@@ -44,9 +44,9 @@ if($cli->isCli()) {
         ->setInput(true,'option4',['op1234567890123456789012345678901234567890','op2','op3','op4','op5','op6','op7','op8','op9','op10'])
         ->add();
     $cli->createParam('subparam2')
-        ->setDescription('This field is called subparam2 and it is required','subparam2 (optionshorts)',['example: subparam1','example: subparam2'])
+        ->setDescription('This field is called subparam2 and it is required','subparam2 (optionshorts) .................................',['example: subparam1','example: subparam2'])
         ->setRequired(true)
-        ->setInput(true,'optionshort',['yes','no'])
+        ->setInput(true,'optionshort',['yes','no','third','fourth','fifth','alpha','beta'])
         ->add();
     $cli->createParam('subparam3')
         ->setDescription('This field is called subparam3 and it is required','subparam3 number')
@@ -75,23 +75,29 @@ if($cli->isCli()) {
     $param1=$cli->evalParam('*');
     if(is_object($param1)) {
         if($param1->key==='param1' && $param1->value!==false) {
-            $param1_1b=$cli->evalParam('subparam0b');
-            $param1_1=$cli->evalParam('subparam0');
-            $param1_2c=$cli->evalParam('subparam1c');
-            $param1_2b=$cli->evalParam('subparam1b');
-            $param1_3=$cli->evalParam('subparam2');
-
-
-            $param1_2=$cli->evalParam('subparam1');
-
-
-            $param1_2d=$cli->evalParam('subparam1d');
-
-
-            $param1_4=$cli->evalParam('subparam3');
-            $param1_5=$cli->evalParam('subparam4');
-            $param1_6=$cli->evalParam('subparam5',true);
+            $cli->upLevel('content #1')->showBread();
+            $param1_1b = $cli->evalParam('subparam0b');
+            $cli->upLevel('content #2')->showBread();
+            $param1_1 = $cli->evalParam('subparam0');
+            $cli->upLevel('content #3')->showBread();
+            $param1_2c = $cli->evalParam('subparam1c');
+            $cli->downLevel()->showBread();
+            $param1_2b = $cli->evalParam('subparam1b');
+            $cli->downLevel()->showBread();
+            $param1_3 = $cli->evalParam('subparam2');
+            $cli->downLevel()->showBread();
+            $param1_2 = $cli->evalParam('subparam1');
+            $param1_2d = $cli->evalParam('subparam1d');
+            $param1_4 = $cli->evalParam('subparam3');
+            $param1_5 = $cli->evalParam('subparam4');
+            $param1_6 = $cli->evalParam('subparam5', true);
+        } else {
+            $cli->showCheck('ERROR','e','examplecomplete.php -param1 is missing');
+            die(1);
         }
+    } else {
+        $cli->showCheck('ERROR','e','examplecomplete.php -param1 is missing');
+        die(1);
     }
     $cli->showParamSyntax('*');
     /*foreach($cli->parameters as $v) {

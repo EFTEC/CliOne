@@ -22,6 +22,11 @@ include __DIR__.'/../src/CliOneParam.php';
 $cli=new CliOne(); // we create an instance
 
 $cli->createParam('test')->setInput(true,'option',['alpha','beta','gamma'])->add();
+$cli->upLevel('level1')->showBread();
+$cli->showValuesColumn(['hello','world','alpha','beta','gamma'],'option2');
+$cli->upLevel('level2')->showBread();
+$cli->showValuesColumn(['col1'=>'hello','col2'=>'world','col3'=>'alpha','col4'=>'beta','col5'=>'gamma'],'option2');
+$cli->downLevel()->showBread();
 
 $cli->showLine("<e>error</e> (color red)");
 $cli->showLine("<w>warning</w> (color yellow)");

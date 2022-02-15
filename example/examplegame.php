@@ -15,10 +15,12 @@ $money=100;
 
 $cli->createParam('bet')
     ->setDescription('','What is your bet?')
+    ->setPattern(null,'{desc} <c>${prefix}</c> :')
     ->setInput(true,'range',[0,100])
     ->add();
 $cli->createParam('number')
-    ->setDescription('','Pick a number')
+    ->setDescription('','Pick a number between 0 and 100')
+    ->setPattern(null,'{desc}:')
     ->setInput(true,'range',[0,100])
     ->add();
 $cli->createParam('question')
