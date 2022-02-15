@@ -20,6 +20,8 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 ✅ Colors available
 
+✅ The design is mostly fluent (it adjust to the width of the screen)
+
 ✅ Validation of values
 
 
@@ -162,6 +164,13 @@ You can see the tags available in [Types of colors](#types-of-colors)
 
 [example/examplecolor.php](example/examplecolor.php)
 
+## Example tables
+
+[example/exampletables.php](example/exampletables.php)
+
+![docs/exampletable.jpg](docs/exampletable.jpg)
+
+
 ```php
 $cli->showLine("<e>error</e> (color red)");
 $cli->showLine("<w>warning</w> (color yellow)");
@@ -234,19 +243,21 @@ if($cli->isCli()) { // is running under cli? (if not then we do nothing)
 
 | tag                                        | description                   |
 | ------------------------------------------ | ----------------------------- |
-| <e>error</e>                               | color red                     |
-| <w>warning</w>                             | color yellow                  |
-| <i>information</i>                         | blue                          |
-| <y>yellow</y>                              | yellow                        |
-| <g>green</g>                               | color green                   |
-| <s>success</s>                             | color green                   |
+| <red>error</red>                           | color red                     |
+| <yellow>warning</yellow>                   | color yellow                  |
+| <blue>information</blue>                   | blue                          |
+| <black>black</black>                       | black                         |
+| <white>white</white>                       | white                         |
+| <green>success</green>                     | color green                   |
 | <italic>italic</italic>                    | italic                        |
 | <bold>bold</body>                          | bold                          |
 | <underline>underline</underline>           | underline                     |
-| <c>cyan</c>                                | color light cyan              |
-| <m>magenta</m>                             | color magenta                 |
-| <col0/><col1/><col2/><col3/><col4/><col5/> | col0 left column              |
+| <cyan>cyan</cyan>                          | color light cyan              |
+| <magenta>magenta</magenta>                 | color magenta                 |
+| <col0/><col1/><col2/><col3/><col4/><col5/> | col0 leftmost column          |
 | <option/>                                  | if the input has some options |
+| <bred>red</bred>                           | background color red          |
+| <byellow><bblue>..                         | background color              |
 
 
 
@@ -510,13 +521,17 @@ if true and the argument exists, then it is replaced. (bool)
 
 
 ## Changelog
+* 1.4 (2022-02-15)
+  * **[replaced]** now all colors are express not abbreviated "<e>" => "<red>", etc.
+  * **[new]** added all basic colors, background and solved a problem with the underline.
+  * **[new]** added showFrame(),showTable(),showWaitCursor(),showProgressBar()
 * 1.3 (2022-02-14)
-* **[new]** added autocomplete (tab key)
-* **[new]** added breadcrub
-* **[new]** added showValuesColumn()
-* **[replaced]** now keys (showing in options) are aligned at the center.
+  * **[new]** added autocomplete (tab key)
+  * **[new]** added breadcrub
+  * **[new]** added showValuesColumn()
+  * **[replaced]** now keys (showing in options) are aligned at the center.
 * 1.2.2 (2022-02-14)
-* **[fixed]** fixed a problem where the question is truncated with an ellipsis (...)
+  * **[fixed]** fixed a problem where the question is truncated with an ellipsis (...)
 * 1.2.1 (2022-02-13)
   * **[fixed]** fixed some bugs
   * **[new]** keys are padded, example [ 1] [ 2] [ 3] ... [99],  [value 1] [value 2] [value  ]

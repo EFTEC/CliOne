@@ -88,7 +88,7 @@ class CliOneParam
      * </ul>
      * <b>Example:</b><br>
      * <pre>
-     * $this->setPattern('<c>[{key}]</c> {value}','{desc} <c>[{def}]</c> {prefix}:','it is the footer');
+     * $this->setPattern('<cyan>[{key}]</cyan> {value}','{desc} <cyan>[{def}]</cyan> {prefix}:','it is the footer');
      * </pre>
      *
      * @param ?string $patterColumns  if null then it will use the default value.
@@ -251,7 +251,7 @@ class CliOneParam
     {
         $fail = false;
         /*if($this->allowEmpty===true && $this->default===false) {
-            $this->parent->showLine("<e>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</e>");
+            $this->parent->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");
             $fail = true;
 
         }*/
@@ -259,7 +259,7 @@ class CliOneParam
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    $this->parent->showLine("<e>error in creation of input $this->key inputType for range must be an array</e>");
+                    $this->parent->showLine("<red>error in creation of input $this->key inputType for range must be an array</red>");
                     $fail = true;
                 }
                 break;
@@ -273,7 +273,7 @@ class CliOneParam
             case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
-                    $this->parent->showLine("<e>error in creation of input $this->key inputType for $this->inputType must be an array</e>");
+                    $this->parent->showLine("<red>error in creation of input $this->key inputType for $this->inputType must be an array</red>");
                     $fail = true;
                 }
                 break;
@@ -286,7 +286,7 @@ class CliOneParam
                     //$this->parent->parameters[$numParam]->parent=null;
                     return;
                 }
-                $this->parent->showLine("<e>error in creation of input $this->key, parameter already defined</e>");
+                $this->parent->showLine("<red>error in creation of input $this->key, parameter already defined</red>");
                 $fail = true;
                 break;
             }
