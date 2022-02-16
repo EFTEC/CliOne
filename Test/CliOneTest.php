@@ -126,6 +126,28 @@ class CliOneTest extends TestCase
         $p = $t->createParam('test1')->setDescription('it is a test', 'test #2')->setInput()->evalParam(true);
         $this->assertEquals('hello world', $p->value);
     }
+    public function testVisual() {
+        $cli = new CliOne('CliOneTest.php');
+        $cli->showFrame(['line1','line2','line3'],['title1','title2']);
+
+
+        $cli->showMessageBox(['line1','line2'],['title1','title2']);
+        $values=[];
+        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>'value2'];
+        $values[]=['col1'=>'value12222222222222','col2'=>'value2','col3'=>'value2'];
+        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>3232];
+        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>'544554'];
+        $cli->showTable($values);
+        $cli->setStyle('mysql')->showTable($values);
+        $cli->setStyle('double')->showTable($values);
+        $cli->setStyle('minimal')->showTable($values);
+        $cli->setStyle('minimal')->showValuesColumn($values,'option3');
+        for($i=0; $i<=100; $i=$i+20) {
+            $cli->setStyle()->showProgressBar($i,100,40," $i%");
+        }
+        $this->assertTrue(true);
+
+    }
     public function testInputOptionDefaultError() {
         $values=['k1'=>'v1','k2'=>'v2','k3'=>'v3'];
         global $argv;

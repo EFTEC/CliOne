@@ -521,6 +521,10 @@ if true and the argument exists, then it is replaced. (bool)
 
 
 ## Changelog
+* 1.4.1 (2022-02-15)
+  * **[fix]** some fix for characters thare unicode. The system will use automatically MB_STRING if the library is available.
+Otherwise, it will use the default library 
+  * **[new]** new styles and patters for components.
 * 1.4 (2022-02-15)
   * **[replaced]** now all colors are express not abbreviated "<e>" => "<red>", etc.
   * **[new]** added all basic colors, background and solved a problem with the underline.

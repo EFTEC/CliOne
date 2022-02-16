@@ -1,4 +1,6 @@
-<?php /** @noinspection PhpUnused
+<?php /** @noinspection PhpComposerExtensionStubsInspection */
+
+/** @noinspection PhpUnused
  * @noinspection PhpMissingFieldTypeInspection
  * @noinspection AlterInForeachInspection
  */
@@ -32,6 +34,17 @@ class CliOne
     public $parameters = [];
     protected $colSize = 80;
     protected $bread = [];
+    /** @var bool if true then mb_string library is loaded, otherwise it is false. it is calculated in the constructor */
+    protected $multibyte = false;
+    protected $styleStack = 'simple';
+    protected $alignStack = ['middle', 'middle', 'middle'];
+    protected $colorStack = [];
+    protected $patternTitleStack;
+    protected $patternCurrentStack;
+    protected $patternSeparatorStack;
+    protected $patternContentStack;
+    protected $wait = 0;
+    protected $waitPrev = '';
 
     /**
      * The constructor
@@ -42,6 +55,7 @@ class CliOne
     {
         $this->origin = $origin;
         $this->colSize = $this->calculateColSize();
+        $this->multibyte = function_exists('mb_strlen');
         // it is used by readline
         readline_completion_function(static function ($input) {
             // Filter Matches
@@ -312,7 +326,7 @@ class CliOne
             if ($content === false) {
                 throw new RuntimeException("Unable to read file $filename");
             }
-            $content = substr($content, strpos($content, "\n") + 1); // remove the first line.
+            $content = $this->substr($content, strpos($content, "\n") + 1); // remove the first line.
             return [true, json_decode($content, true)];
         } catch (Exception $ex) {
             return [false, $ex->getMessage()];
@@ -375,6 +389,18 @@ class CliOne
     }
 
     /**
+     * @param string $title          =['left','right','middle'][$i]
+     * @param string $content        =['left','right','middle'][$i]
+     * @param string $contentNumeric =['left','right','middle'][$i]
+     * @return $this
+     */
+    public function setAlign($title = 'middle', $content = 'middle', $contentNumeric = 'middle'): self
+    {
+        $this->alignStack = [$title, $content, $contentNumeric];
+        return $this;
+    }
+
+    /**
      * It sets the parameters using an array of the form [key=>value]<br>
      * It also marks the parameters as missing=false
      * @param array $array       the associative array to use to set the parameters.
@@ -395,6 +421,12 @@ class CliOne
                 }
             }
         }
+    }
+
+    public function setColor($colors): self
+    {
+        $this->colorStack = $colors;
+        return $this;
     }
 
     /**
@@ -420,6 +452,44 @@ class CliOne
     }
 
     /**
+     * {value} {type}
+     * @param string $pattern1Stack
+     * @return $this
+     */
+    public function setPatternTitle($pattern1Stack = null): CliOne
+    {
+        $this->patternTitleStack = $pattern1Stack;
+        return $this;
+    }
+
+    public function setPatternCurrent($pattern2Stack = null): CliOne
+    {
+        $this->patternCurrentStack = $pattern2Stack;
+        return $this;
+    }
+    public function setPatternContent($pattern4Stack = null): CliOne
+    {
+        $this->patternContentStack = $pattern4Stack;
+        return $this;
+    }
+
+    public function setPatternSeparator($pattern3Stack = null): CliOne
+    {
+        $this->patternSeparatorStack = $pattern3Stack;
+        return $this;
+    }
+
+    /**
+     * @param string $style =['mysql','simple','double','minimal'][$i]
+     * @return $this
+     */
+    public function setStyle($style = 'simple'): self
+    {
+        $this->styleStack = $style;
+        return $this;
+    }
+
+    /**
      * It's similar to showLine, but it keeps in the current line.
      *
      * @param string $content
@@ -431,34 +501,105 @@ class CliOne
         echo $this->replaceColor($content);
     }
 
+    /**
+     * It shows a breadcrumb.<br>
+     * To add values you could use the method uplevel()<br>
+     * To remove a value (going down a level) you could use the method downlevel()<br>
+     * You can also change the style using setPattern1(),setPattern2(),setPattern3()<br>
+     * <pre>
+     * $cli->setPattern1('{value}{type}') // the level
+     *      ->setPattern2('<bred>{value}</bred>{type}') // the current level
+     *      ->setPattern3(' -> ') // the separator
+     *      ->showBread();
+     * </pre>
+     * It shows the current BreadCrumb if any.
+     * @return $this
+     */
     public function showBread(): CliOne
     {
-        $txt = '';
-        foreach ($this->bread as $v) {
+        $this->initStack();
+        $txt = [];
+        $patternNormal = $this->patternTitleStack ?: '{value}{type}';
+        $patternCurrent = $this->patternCurrentStack ?: '<bold>{value}{type}</bold>';
+        $patternSeparator = $this->patternSeparatorStack ?: '>';
+        foreach ($this->bread as $k => $v) {
             if ($v[1]) {
-                $txt .= $v[0] . '(' . $v[1] . ')' . ' > ';
+                [$value, $type] = $v;
             } else {
-                $txt .= $v[0] . ' > ';
+                $value = $v[0];
+                $type = '';
+            }
+            if ($k === count($this->bread) - 1) {
+                $txt[] = str_replace(['{value}', '{type}'], [$value, $type], $patternCurrent);
+            } else {
+                $txt[] = str_replace(['{value}', '{type}'], [$value, $type], $patternNormal);
             }
         }
-        if (strlen($txt) > 3) {
-            $txt = substr($txt, 0, -3);
-        }
-        $content = "\n<yellow>$txt</yellow>\n";
+        $txt = implode($patternSeparator, $txt);
+        $content = "\n$txt";
         $this->show($content);
+        $this->resetStack();
+        $this->showLine();
         return $this;
     }
 
     /**
      * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
      * @param string $label
-     * @param string $color =['e','i','w','g','c'][$i]
+     * @param string $color =['black','green','yellow','cyan','magenta','blue'][$i]
      * @param string $content
      * @return void
      */
     public function showCheck($label, $color, $content): void
     {
         echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
+    }
+
+    /**
+     * It shows a border frame.
+     *
+     * @param string|string[]      $lines  the content.
+     * @param string|string[]|null $titles if null then no title.
+     * @return void
+     * @noinspection PhpUnusedLocalVariableInspection
+     */
+    public function showFrame($lines, $titles = null): void
+    {
+        $this->initstack();
+        $styleFrame = $this->styleStack;
+        [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($styleFrame);
+        [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
+        [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv] = $this->border($styleFrame);
+        $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
+        if (is_string($lines)) {
+            // transform into array
+            $lines = [$lines];
+        }
+        if (is_string($titles)) {
+            // transform into array
+            $titles = [$titles];
+        }
+        if ($ul) {
+            $this->showLine($ul . str_repeat($um, $contentw) . $ur);
+        }
+        if ($titles) {
+            foreach ($titles as $line) {
+                $this->showLine($ml . $this->alignText($line, $contentw, $alignTitle) . $mr);
+            }
+            $this->showLine($cutl . str_repeat($mm, $contentw) . $cutr);
+        }
+        foreach ($lines as $k => $line) {
+            $this->show($ml . $this->alignText($line, $contentw, $alignContent) . $mr);
+            if ($k !== count($lines) - 1) {
+                $this->showLine();
+            }
+        }
+        if ($dl) {
+            $this->showLine();
+            $this->show($dl . str_repeat($dm, $contentw) . $dr);
+        }
+        $this->resetStack();
+        $this->showLine();
     }
 
     /**
@@ -486,6 +627,68 @@ class CliOne
     public function showLine($content = '', $cliOneParam = null): void
     {
         echo $this->replaceColor($content, $cliOneParam) . "\n";
+    }
+
+    /**
+     * @param string|string[] $lines
+     * @param string|string[] $titles
+     * @return void
+     * @noinspection PhpUnusedLocalVariableInspection
+     */
+    public function showMessageBox($lines, $titles = []): void
+    {
+        $this->initstack();
+        $patternTitle=$this->patternTitleStack??'{value}';
+        $patternLines=$this->patternContentStack??'{value}';
+        $style = $this->styleStack;
+        [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv] = $this->border($style);
+        [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
+        // message box
+        [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
+        $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
+        if (is_string($lines)) {
+            // transform into array
+            $lines = [$lines];
+        }
+        if (is_string($titles)) {
+            // transform into array
+            $titles = [$titles];
+        }
+        if (count($titles) > count($lines)) {
+            trigger_error('too many titles');
+            return;
+        }
+        if (count($titles) < count($lines)) {
+            // align to the center by adding the missing lines at the top and bottom.
+            $dif = count($lines) - count($titles);
+            $dtop = floor($dif / 2);
+            $dbottom = ceil($dif / 2);
+            $tmp = [];
+            for ($i = 0; $i < $dtop; $i++) {
+                $tmp[] = '';
+            }
+            foreach ($titles as $title) {
+                $tmp[] = $title;
+            }
+            for ($i = 0; $i < $dbottom; $i++) {
+                $tmp[] = '';
+            }
+            $titles = $tmp;
+        }
+        $maxTitleL = 0;
+        // max title width
+        foreach ($titles as $title) {
+            $maxTitleL = ($this->strlen($title) > $maxTitleL) ? $this->strlen($title) : $maxTitleL;
+        }
+        $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
+        foreach ($lines as $k => $line) {
+            $ttitle=str_replace(['{value}'],$this->alignText($titles[$k], $maxTitleL, $alignTitle),$patternTitle);
+            $tline=str_replace(['{value}'],$this->alignText($line, $contentw - $maxTitleL - 1, $alignContent),$patternLines);
+            $this->showLine($ml .$ttitle  . $mmv . $tline . $mr);
+        }
+        $this->show($dl . str_repeat($um, $maxTitleL) . $cutd . str_repeat($um, $contentw - $maxTitleL - 1) . $dr);
+        $this->resetStack();
+        $this->showLine();
     }
 
     /**
@@ -524,242 +727,41 @@ class CliOne
     }
 
     /**
-     * It shows the values as columns.
-     * @param array       $values        the values to show. It could be an associative array or an indexed array.
-     * @param string      $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
-     * @param null|string $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
-     * @return void
-     */
-    public function showValuesColumn($values, $type, $patternColumn = null): void
-    {
-        $p = new CliOneParam($this, 'dummy', false, null, null);
-        $p->setPattern($patternColumn);
-        $p->inputValue = $values;
-        $p->inputType = $type;
-        $this->internalShowOptions($p, []);
-    }
-
-    /**
-     * It will show all the parameters by showing the key, the default value and the value<br>
-     * It is used for debug and testing.
-     * @return void
-     */
-    public function showparams(): void
-    {
-        foreach ($this->parameters as $v) {
-            try {
-                $this->showLine("$v->key = [" . json_encode($v->default) . "] value:" . json_encode($v->value));
-            } catch (Exception $e) {
-            }
-        }
-    }
-
-    /**
-     * <pre>
-     * // up left, up middle, up right, middle left, middle right, down left, down middle, down right.
-     * [$ul,$um,$ur,$ml,$mr,$dl,$dm,$dr]=$this->border();
-     * </pre>
-     * @param string $style =['mysql','simple','double']
-     * @return string[]
-     */
-    protected function border($style): array
-    {
-        switch ($style) {
-            case 'mysql':
-                return ['+', '-', '+', '|', '|', '+', '-', '+'];
-            case 'double':
-                return ['╔', '═', '╗', '║', '║', '╚', '═', '╝'];
-            case 'simple':
-                return ['┌', '─', '┐', '│', '│', '└', '─', '┘'];
-            default:
-                trigger_error("style not defined $style");
-        }
-        return [];
-    }
-
-    /**
-     * <pre>
-     * [$bf,$bl,$bm,$bd]=$this->shadow();
-     * </pre>
-     * @param string $style =['mysql','simple','double']
-     * @return array|string[]
-     */
-    protected function shadow($style = 'simple'): array
-    {
-        switch ($style) {
-            case 'mysql':
-                return ['#', ' ', '-', '='];
-            case 'simple':
-                return ['█', ' ', '░', '▓'];
-            case 'double':
-                return ['█', '░', '▒', '▓'];
-            default:
-                trigger_error("style not defined $style");
-        }
-        return [];
-    }
-
-    /**
-     * <pre>
-     * // cut left, cut top, cut right, cut bottom , cut middle
-     * [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
-     * </pre>
-     * @param string $style =['mysql','simple','double']
-     * @return string[]
-     */
-    protected function borderCut($style): array
-    {
-        switch ($style) {
-            case 'mysql':
-                return ['+', '+', '+', '+', '+'];
-            case 'double':
-                return ['╠', '╦', '╣', '╩', '╬'];
-            case 'simple':
-                return ['├', '┬', '┤', '┴', '┼'];
-            default:
-                trigger_error("style not defined $style");
-        }
-        return [];
-    }
-
-    /**
-     * @param string $text
-     * @param int    $width
-     * @param string $align =['left','right','middle'][$i]
-     * @return mixed|string
-     */
-    protected function alignText($text, $width, $align)
-    {
-        $len = strlen($text);
-        if ($len > $width) {
-            $text = $this->ellipsis($text, $width);
-            $len = $width;
-        }
-        $padnum = $width - $len;
-        switch ($align) {
-            case 'left':
-                return $text . str_repeat(' ', $padnum);
-            case 'right':
-                return str_repeat(' ', $padnum) . $text;
-            case 'middle':
-                $padleft = floor($padnum / 2);
-                $padright = ceil($padnum / 2);
-                return str_repeat(' ', $padleft) . $text . str_repeat(' ', $padright);
-            default:
-                trigger_error("align incorrect $align");
-        }
-        return $text;
-    }
-
-
-    /**
-     * It shows a border frame.
-     *
-     * @param string|string[]      $lines        the content.
-     * @param string               $style        =['mysql','simple','double']
-     * @param string|string[]|null $titles       if null then no title.
-     * @param string               $alignTitle   =['left','right','middle'][$i]
-     * @param string               $alignContent =['left','right','middle'][$i]
+     * @param numeric     $currentValue     the current value
+     * @param numeric     $max              the max value to fill the bar.
+     * @param int         $columnWidth      the size of the bar (in columns)
+     * @param string|null $currentValueText the current value to display at the left.<br>
+     *                                      if null then it will show the current value (with a space in between)
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showFrame($lines, $style = 'simple', $titles = null, $alignTitle = 'middle', $alignContent = 'middle'): void
+    public function showProgressBar($currentValue, $max, $columnWidth, $currentValueText = null): void
     {
-        $contentw = $this->colSize - 2;
-        if (is_string($lines)) {
-            // transform into array
-            $lines = [$lines];
-        }
-        if (is_string($titles)) {
-            // transform into array
-            $titles = [$titles];
-        }
-        [$ul, $um, $ur, $ml, $mr, $dl, $dm, $dr] = $this->border($style);
-        [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
-        $this->showLine($ul . str_repeat($um, $contentw) . $ur);
-        if ($titles) {
-            foreach ($titles as $line) {
-                $this->showLine($ml . $this->alignText($line, $contentw, $alignTitle) . $mr);
-            }
-            $this->showLine($cutl . str_repeat($um, $contentw) . $cutr);
-        }
-        foreach ($lines as $line) {
-            $this->showLine($ml . $this->alignText($line, $contentw, $alignContent) . $mr);
-        }
-        $this->showLine($dl . str_repeat($dm, $contentw) . $dr);
+        $this->initstack();
+        $style = $this->styleStack;
+        [$alignTitle, $alignContentText, $alignContentNumber] = $this->alignStack;
+        [$bf, $bl, $bm, $bd] = $this->shadow($style);
+        $prop = $columnWidth / $max;
+        $currentValueText = $currentValueText ?? ' ' . $currentValue;
+        $this->show(str_repeat($bf, floor($currentValue * $prop)) . str_repeat($bl, floor($max * $prop) - floor($currentValue * $prop)) . $currentValueText . "\e[" . (floor($max * $prop) + $this->strlen($currentValueText)) . "D");
     }
 
     /**
-     * @param                 $lines
-     * @param                 $style
-     * @param string|string[] $titles
-     * @param                 $alignTitle
-     * @param                 $alignContent
+     * @param array $assocArray An associative array with the values to show. The key is used for index.
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showMessageBox($lines, $style = 'simple', $titles = [], $alignTitle = 'middle', $alignContent = 'middle'): void
+    public function showTable($assocArray): void
     {
-        $contentw = $this->colSize - 2;
-        if (is_string($lines)) {
-            // transform into array
-            $lines = [$lines];
-        }
-        if (is_string($titles)) {
-            // transform into array
-            $titles = [$titles];
-        }
-        if (count($titles) > count($lines)) {
-            trigger_error('too many titles');
-            return;
-        }
-        if (count($titles) < count($lines)) {
-            // align to the center.
-            $dif = count($lines) - count($titles);
-            $dtop = floor($dif / 2);
-            $dbottom = ceil($dif / 2);
-            $tmp = [];
-            for ($i = 0; $i < $dtop; $i++) {
-                $tmp[] = '';
-            }
-            foreach ($titles as $title) {
-                $tmp[] = $title;
-            }
-            for ($i = 0; $i < $dbottom; $i++) {
-                $tmp[] = '';
-            }
-            $titles = $tmp;
-        }
-        $maxTitleL = 0;
-        // max title width
-        foreach ($titles as $title) {
-            $maxTitleL = (strlen($title) > $maxTitleL) ? strlen($title) : $maxTitleL;
-        }
-        [$ul, $um, $ur, $ml, $mr, $dl, $dm, $dr] = $this->border($style);
+        $this->initstack();
+        $style = $this->styleStack;
+        [$alignTitle, $alignContentText, $alignContentNumber] = $this->alignStack;
+        [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv] = $this->border($style);
         [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
-        $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
-        foreach ($lines as $k => $line) {
-            $this->showLine($ml . $this->alignText($titles[$k], $maxTitleL, $alignTitle) . $ml . $this->alignText($line, $contentw - $maxTitleL - 1, $alignContent) . $mr);
-        }
-        $this->showLine($dl . str_repeat($um, $maxTitleL) . $cutd . str_repeat($um, $contentw - $maxTitleL - 1) . $dr);
-    }
-
-    /**
-     * @param array  $assocArray         An associative array with the values to show. The key is used for index.
-     * @param string $style              =['mysql','simple','double']
-     * @param string $alignTitle         =['left','right','middle'][$i] The alignment of the title
-     * @param string $alignContentText   =['left','right','middle'][$i] The alignment of the content (text)
-     * @param string $alignContentNumber =['left','right','middle'][$i] The alignment of the content (number)
-     * @return void
-     */
-    public function showTable($assocArray, $style = 'simple', $alignTitle = 'middle', $alignContentText = 'middle', $alignContentNumber = 'middle'): void
-    {
         if (count($assocArray) === 0) {
             return;
         }
-        $contentw = $this->colSize - 2;
-        [$ul, $um, $ur, $ml, $mr, $dl, $dm, $dr] = $this->border($style);
-        [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
+        $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         $columns = array_keys($assocArray[0]);
         $maxColumnSize = [];
         foreach ($columns as $column) {
@@ -767,8 +769,8 @@ class CliOne
         }
         foreach ($assocArray as $row) {
             foreach ($columns as $column) {
-                if (strlen($row[$column]) > $maxColumnSize[$column]) {
-                    $maxColumnSize[$column] = strlen($row[$column]);
+                if ($this->strlen($row[$column]) > $maxColumnSize[$column]) {
+                    $maxColumnSize[$column] = $this->strlen($row[$column]);
                 }
             }
         }
@@ -787,50 +789,74 @@ class CliOne
             $maxColumnSize[$columns[0]]++;
         }
         // top
-        $txt = $ul;
-        foreach ($maxColumnSize as $size) {
-            $txt .= str_repeat($um, $size) . $cutt;
+        if ($ul) {
+            $txt = $ul;
+            foreach ($maxColumnSize as $size) {
+                $txt .= str_repeat($um, $size) . $cutt;
+            }
+            $txt = $this->substr($txt, 0, -$this->strlen($cutt)) . $ur;
+            $this->showLine($txt);
         }
-        $txt = rtrim($txt, $cutt) . $ur;
-        $this->showLine($txt);
         // title
         $txt = $ml;
         foreach ($maxColumnSize as $colName => $size) {
-            $txt .= $this->alignText($colName, $size, $alignTitle) . $mr;
+            $txt .= $this->alignText($colName, $size, $alignTitle) . $mmv;
         }
-        $txt = rtrim($txt, $mr) . $mr;
+        $txt = $this->substr($txt, 0, -$this->strlen($mmv)) . $mr;
         $this->showLine($txt);
         // botton title
         $txt = $cutl;
         foreach ($maxColumnSize as $size) {
-            $txt .= str_repeat($um, $size) . $cutm;
+            $txt .= str_repeat($mm, $size) . $cutm;
         }
         $txt = rtrim($txt, $cutm) . $cutr;
         $this->showLine($txt);
         // content
-        foreach ($assocArray as $line) {
+        foreach ($assocArray as $k => $line) {
             $txt = $ml;
             foreach ($maxColumnSize as $colName => $size) {
                 $line[$colName] = $line[$colName] ?? '(null)';
                 $txt .= $this->alignText(
                         $line[$colName],
                         $size,
-                        is_numeric($line[$colName]) ? $alignContentNumber : $alignContentText) . $mr;
+                        is_numeric($line[$colName]) ? $alignContentNumber : $alignContentText) . $mmv;
             }
-            $txt = rtrim($txt, $mr) . $mr;
-            $this->showLine($txt);
+            $txt = rtrim($txt, $mmv) . $mr;
+            if ($k === count($assocArray) - 1) {
+                $this->show($txt);
+            } else {
+                $this->showLine($txt);
+            }
         }
         // botton table
-        $txt = $dl;
-        foreach ($maxColumnSize as $size) {
-            $txt .= str_repeat($dm, $size) . $cutd;
+        if ($dl) {
+            $this->showLine();
+            $txt = $dl;
+            foreach ($maxColumnSize as $size) {
+                $txt .= str_repeat($dm, $size) . $cutd;
+            }
+            $txt = rtrim($txt, $cutd) . $dr;
+            $this->show($txt);
         }
-        $txt = rtrim($txt, $cutd) . $dr;
-        $this->showLine($txt);
+        $this->resetStack();
+        $this->showLine();
     }
 
-    protected $wait = 0;
-    protected $waitPrev = '';
+    /**
+     * It shows the values as columns.
+     * @param array       $values        the values to show. It could be an associative array or an indexed array.
+     * @param string      $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
+     * @param null|string $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
+     * @return void
+     */
+    public function showValuesColumn($values, $type, $patternColumn = null): void
+    {
+        $p = new CliOneParam($this, 'dummy', false, null, null);
+        $p->setPattern($patternColumn);
+        $p->inputValue = $values;
+        $p->inputType = $type;
+        $this->internalShowOptions($p, []);
+    }
 
     public function showWaitCursor($init = true, $postfixValue = ''): void
     {
@@ -862,27 +888,40 @@ class CliOne
         if ($init) {
             $this->show($c . $postfixValue);
         } else {
-            $this->show("\e[" . (strlen($this->waitPrev) + 1) . "D" . $c . $postfixValue); // [2D 2 left, [C 1 right
+            $this->show("\e[" . ($this->strlen($this->waitPrev) + 1) . "D" . $c . $postfixValue); // [2D 2 left, [C 1 right
         }
         $this->waitPrev = $postfixValue;
     }
 
     /**
-     * @param numeric     $currentValue     the current value
-     * @param numeric     $max              the max value to fill the bar.
-     * @param int         $columnWidth      the size of the bar (in columns)
-     * @param string|null $currentValueText the current value to display at the left.<br>
-     *                                      if null then it will show the current value (with a space in between)
-     * @param string      $style            = ['simple','double','mysql'][$i]
+     * It will show all the parameters by showing the key, the default value and the value<br>
+     * It is used for debug and testing.
      * @return void
-     * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showProgressBar($currentValue, $max, $columnWidth, $currentValueText = null, $style = 'simple'): void
+    public function showparams(): void
     {
-        [$bf, $bl, $bm, $bd] = $this->shadow($style);
-        $prop = $columnWidth / $max;
-        $currentValueText = $currentValueText ?? ' ' . $currentValue;
-        $this->show(str_repeat($bf, floor($currentValue * $prop)) . str_repeat($bl, floor($max * $prop) - floor($currentValue * $prop)) . $currentValueText . "\e[" . (floor($max * $prop) + strlen($currentValueText)) . "D");
+        foreach ($this->parameters as $v) {
+            try {
+                $this->showLine("$v->key = [" . json_encode($v->default) . "] value:" . json_encode($v->value));
+            } catch (Exception $e) {
+            }
+        }
+    }
+
+    public function strlen($content)
+    {
+        if ($this->multibyte) {
+            return mb_strlen($content);
+        }
+        return strlen($content);
+    }
+
+    public function substr($content, $offset, $length = null)
+    {
+        if ($this->multibyte) {
+            return mb_substr($content, $offset, $length);
+        }
+        return substr($content, $offset, $length);
     }
 
     /**
@@ -895,6 +934,35 @@ class CliOne
     {
         $this->bread[] = [$content, $type];
         return $this;
+    }
+
+    /**
+     * @param string $text
+     * @param int    $width
+     * @param string $align =['left','right','middle'][$i]
+     * @return mixed|string
+     */
+    protected function alignText($text, $width, $align)
+    {
+        $len = $this->strlen($text);
+        if ($len > $width) {
+            $text = $this->ellipsis($text, $width);
+            $len = $width;
+        }
+        $padnum = $width - $len;
+        switch ($align) {
+            case 'left':
+                return $text . str_repeat(' ', $padnum);
+            case 'right':
+                return str_repeat(' ', $padnum) . $text;
+            case 'middle':
+                $padleft = floor($padnum / 2);
+                $padright = ceil($padnum / 2);
+                return str_repeat(' ', $padleft) . $text . str_repeat(' ', $padright);
+            default:
+                trigger_error("align incorrect $align");
+        }
+        return $text;
     }
 
     /**
@@ -912,6 +980,68 @@ class CliOne
         }
         $k = array_search($param->value, $param->inputValue, true);
         $param->valueKey = $k === false ? null : $k;
+    }
+
+    /**
+     * <pre>
+     * // up left, up middle, up right, middle left, middle right, down left, down middle, down right.
+     * [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv]=$this->border();
+     * </pre>
+     * @param string $style =['mysql','simple','double']
+     * @return string[]
+     */
+    protected function border($style): array
+    {
+        switch ($style) {
+            case 'mysql':
+                return [
+                    '+', '-', '+',
+                    '|', '-', '|',
+                    '+', '-', '+', '|'];
+            case 'double':
+                return [
+                    '╔', '═', '╗',
+                    '║', '═', '║',
+                    '╚', '═', '╝', '║'];
+            case 'simple':
+                return [
+                    '┌', '─', '┐',
+                    '│', '─', '│',
+                    '└', '─', '┘', '│'];
+            case 'minimal':
+                return [
+                    '', '', '',
+                    '', '-', '',
+                    '', '', '', ' ']; // note: the last is a space
+            default:
+                trigger_error("style not defined $style");
+        }
+        return [];
+    }
+
+    /**
+     * <pre>
+     * // cut left, cut top, cut right, cut bottom , cut middle
+     * [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
+     * </pre>
+     * @param string $style =['mysql','simple','double']
+     * @return string[]
+     */
+    protected function borderCut($style): array
+    {
+        switch ($style) {
+            case 'mysql':
+                return ['+', '+', '+', '+', '+'];
+            case 'double':
+                return ['╠', '╦', '╣', '╩', '╬'];
+            case 'simple':
+                return ['├', '┬', '┤', '┴', '┼'];
+            case 'minimal':
+                return ['', '', '', '', ' '];
+            default:
+                trigger_error("style not defined $style");
+        }
+        return [];
     }
 
     protected function calculateColSize($min = 40)
@@ -944,11 +1074,18 @@ class CliOne
 
     protected function ellipsis($text, $lenght)
     {
-        $l = strlen($text);
+        $l = $this->strlen($text);
         if ($l <= $lenght) {
             return $text;
         }
-        return substr($text, 0, $lenght - 3) . '...';
+        return $this->substr($text, 0, $lenght - 3) . '...';
+    }
+
+    protected function initStack(): void
+    {
+        foreach ($this->colorStack as $color) {
+            $this->show("<$color>");
+        }
     }
 
     /**
@@ -1027,7 +1164,7 @@ class CliOne
         for ($i = 0; $i < $iMax; $i++) {
             $keybase = $kvalues[$i];
             $keydisplay = $assoc ? $keybase : ($keybase + 1);
-            $maxL = max(strlen($keydisplay), $maxL);
+            $maxL = max($this->strlen($keydisplay), $maxL);
         }
         for ($i = 0; $i < $chalf; $i++) {
             for ($kcol = 1; $kcol < 5; $kcol++) {
@@ -1039,7 +1176,7 @@ class CliOne
                         if ($assoc) {
                             // for padding the keys (assoc)
                             $keydisplay = $this->alignText($keydisplay, $maxL, 'middle');
-                            //$keydisplay .= str_repeat(' ', $maxL - strlen($keydisplay));
+                            //$keydisplay .= str_repeat(' ', $maxL - $this->strlen($keydisplay));
                         } else {
                             // for padding the keys (numeric)
                             $keydisplay = $this->alignText($keydisplay, $maxL, 'right');
@@ -1204,37 +1341,70 @@ class CliOne
             }
             $content = str_replace('<option/>', $v, $content);
         }
-
-
-
         return str_replace(
             [
                 '<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
                 '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
                 '<cyan>', '</cyan>', '<magenta>', '</magenta>',
-                '<bred>', '</bred>','<byellow>','</byellow>','<bgreen>', '</bgreen>',
-                '<bwhite>', '</bwhite>', '<bblue>', '</bblue>', '<bblack>','</bblack>',
+                '<bred>', '</bred>', '<byellow>', '</byellow>', '<bgreen>', '</bgreen>',
+                '<bwhite>', '</bwhite>', '<bblue>', '</bblue>', '<bblack>', '</bblack>',
                 '<bcyan>', '</bcyan>', '<bmagenta>', '</bmagenta>',
                 '<col0/>', '<col1/>', '<col2/>',
                 '<col3/>', '<col4/>', '<col5/>',
-                '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>','<strikethrough>','</strikethrough>'
+                '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'
             ]
             ,
             [
                 "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
                 "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
                 "\e[36m", "\e[39m", "\e[35m", "\e[39m",
-
-                "\e[41m", "\e[49m","\e[43m", "\e[49m","\e[42m", "\e[49m",
+                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
                 "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
                 "\e[46m", "\e[49m", "\e[45m", "\e[49m",
-
                 "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
                 "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
                 "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
-
             ]
             , $content);
+    }
+
+    protected function resetStack(): CliOne
+    {
+        foreach ($this->colorStack as $color) {
+            $this->show("</$color>");
+        }
+        $this->styleStack = 'simple';
+        $this->alignStack = ['middle', 'middle', 'middle'];
+        $this->colorStack = [];
+        $this->patternTitleStack = null;
+        $this->patternCurrentStack = null;
+        $this->patternSeparatorStack = null;
+        $this->patternContentStack = null;
+        return $this;
+    }
+
+    /**
+     * <pre>
+     * [$bf,$bl,$bm,$bd]=$this->shadow();
+     * </pre>
+     * @param string $style =['mysql','simple','double']
+     * @return array|string[]
+     */
+    protected function shadow($style = 'simple'): array
+    {
+        switch ($style) {
+            case 'mysql':
+                return ['#', ' ', '-', '='];
+            case 'simple':
+                return ['█', ' ', '░', '▓'];
+            case 'double':
+                return ['█', '░', '▒', '▓'];
+            case 'minimal':
+                return ['*', ' ', ' ', ' '];
+            default:
+                trigger_error("style not defined $style");
+        }
+        return [];
     }
 
     /**
@@ -1452,5 +1622,37 @@ class CliOne
             }
         }
         return $ok;
+    }
+    /**
+     * Replaces all variables defined between {{ }} by a variable inside the dictionary of values.<br>
+     * Example:<br>
+     *      replaceCurlyVariable('hello={{var}}',['var'=>'world']) // hello=world<br>
+     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world']) // hello=<br>
+     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world'],true) // hello={{var}}<br>
+     *
+     * @param string $string           The input value. It could contain variables defined as {{namevar}}
+     * @param array  $values           The dictionary of values.
+     * @param bool   $notFoundThenKeep [false] If true and the value is not found, then it keeps the value.
+     *                                 Otherwise, it is replaced by an empty value
+     *
+     * @return string|string[]|null
+     */
+    public static function replaceCurlyVariable($string, $values, $notFoundThenKeep = false) {
+        if (strpos($string, '{{') === false) {
+            return $string;
+        } // nothing to replace.
+        return preg_replace_callback('/{{\s?(\w+)\s?}}/u', static function ($matches) use ($values, $notFoundThenKeep) {
+            if (is_array($matches)) {
+                $item = substr($matches[0], 2, -2); // removes {{ and }}
+                /** @noinspection NestedTernaryOperatorInspection */
+                /** @noinspection NullCoalescingOperatorCanBeUsedInspection */
+                /** @noinspection PhpIssetCanBeReplacedWithCoalesceInspection */
+                return isset($values[$item]) ? $values[$item] : ($notFoundThenKeep ? $matches[0] : '');
+            }
+
+            $item = substr($matches, 2, -2); // removes {{ and }}
+
+            return $values[$item] ?? $notFoundThenKeep ? $matches : '';
+        }, $string);
     }
 }
