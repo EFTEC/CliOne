@@ -22,7 +22,21 @@ class CliOneTest extends TestCase
         $this->assertNotEmpty(CliOne::VERSION);
         $this->assertStringContainsString('vendor',CliOne::findVendorPath());
     }
-
+    public function testArgNone()
+    {
+        global $argv;
+        unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+        $argv = ['program.php', '-dosave','xxxx']; // this value must be ignored
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'bbb','yes'];
+        $t = new CliOne('CliOneTest.php');
+        $this->assertEquals('yes'
+            ,$t->createParam('dosave','none')
+            ->setRequired(false)
+            ->setDefault('false')
+            ->setInput(true,'optionshort',['yes','no'])
+            ->setDescription('','Do you want to save?')
+            ->evalParam(true,true));
+    }
     public function testFile()
     {
         $t = new CliOne('CliOneTest.php');

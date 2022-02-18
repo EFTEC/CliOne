@@ -763,13 +763,16 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.5.1 (2022-02-18)
+  * **[fix]** fixed a problem when the type is "none", it returned null instead of false.
 * 1.5 (2022-02-17)
   * **[fix]** corrected the display and trim of some text when the text uses a color.
-  * 
+  * **[new]** it allows multiples types of arguments (not only flags), including positional, flags, long-flags are none.
+  * **[new]** added stack. Some visual elements allows to stack values.
 * 1.4.1 (2022-02-15)
   * **[fix]** some fix for characters thare unicode. The system will use automatically MB_STRING if the library is available.
   Otherwise, it will use the default library 
-  * **[new]** new styles and patters for components.
+  * **[new]** new styles and patterns for components.
 * 1.4 (2022-02-15)
   * **[replaced]** now all colors are express not abbreviated "<e>" => "<red>", etc.
   * **[new]** added all basic colors, background and solved a problem with the underline.

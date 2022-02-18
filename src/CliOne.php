@@ -1,7 +1,6 @@
 <?php /** @noinspection PhpComposerExtensionStubsInspection */
 
 /**
- * @noinspection PhpMissingFieldTypeInspection
  * @noinspection AlterInForeachInspection
  */
 
@@ -148,22 +147,26 @@ class CliOne
      * <b>Example:</b><br>
      * <pre>
      * $this->createParam('k1','first'); // php program.php thissubcommand
-     * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3 <val>
+     * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3
+     * <val>
      * </pre>
      * @param string $key   The key or the parameter. It must be unique.
      * @param string $type  =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
      *                      <b>flag</b>: (default) it reads a flag "php program.php -thisflag value"<br>
      *                      <b>first</b>: it reads the first argument "php program.php thisarg" (without value)<br>
-     *                      <b>second</b>: it reads the second argument "php program.php sc1 thisarg" (without value)<br>
+     *                      <b>second</b>: it reads the second argument "php program.php sc1 thisarg" (without
+     *                      value)<br>
      *                      <b>last</b>: it reads the second argument "php program.php ... thisarg" (without value)<br>
      *                      <b>longflag</b>: it reads a longflag "php program --thislongflag value<br>
-     *                      <b>last</b>: it reads the second argument "php program.php ... thisvalue" (without value)<br>
+     *                      <b>last</b>: it reads the second argument "php program.php ... thisvalue" (without
+     *                      value)<br>
      *                      <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
-     *                      <b>none</b>: the value it is not captured via argument, so it could be user-input, but it is
+     *                      <b>none</b>: the value it is not captured via argument, so it could be user-input, but it
+     *                      is
      *                      not stored<br>
      *                      none parameters could always be overridden, and they are used to "temporary" input such as
      *                      validations (y/n).
-     * @param array $alias  A simple array with the name of the arguments to read (without - or --)<br>
+     * @param array  $alias A simple array with the name of the arguments to read (without - or --)<br>
      *                      if the type is a flag, then the alias is a double flag "--".<br>
      *                      if the type is a double flag, then the alias is a flag.
      * @return CliOneParam
@@ -207,46 +210,46 @@ class CliOne
     {
         $valueK = null;
         $notfound = true;
-        foreach ($this->parameters as $k => $param) {
-            if ($param->key === $key || ($key === '*' && $param->type === 'flag')) {
+        foreach ($this->parameters as $k => $parameter) {
+            if ($parameter->key === $key || ($key === '*' && $parameter->type === 'flag')) {
                 $notfound = false;
-                if ($param->missing === false && !$forceInput) {
+                if ($parameter->missing === false && !$forceInput) {
                     // the parameter is already read, skipping.
-                    return $returnValue === true ? $param->value : $param;
+                    return $returnValue === true ? $parameter->value : $parameter;
                 }
-                if ($param->currentAsDefault && $param->value !== null && $param->missing === true) {
-                    $param->value = $param->currentAsDefault;
-                    $this->assignParamValueKey($param);
-                    return $returnValue === true ? $param->value : $param;
+                if ($parameter->currentAsDefault && $parameter->value !== null && $parameter->missing === true) {
+                    $parameter->value = $parameter->currentAsDefault;
+                    $this->assignParamValueKey($parameter);
+                    return $returnValue === true ? $parameter->value : $parameter;
                 }
-                [$def, $param->value] = $this->readParameterArgFlag($param);
+                [$def, $parameter->value] = $this->readParameterArgFlag($parameter);
                 if ($key === '*' && $def === false) {
                     // value not found, not asking for input.
                     continue;
                 }
                 if ($def === false) {
                     // the value is not defined as an argument
-                    if ($param->input === true) {
+                    if ($parameter->input === true) {
                         $def = true;
-                        $param->value = $this->readParameterInput($param);
+                        $parameter->value = $this->readParameterInput($parameter);
                     }
-                    if ($def === false || $param->value === false) {
-                        $param->value = $param->default;
-                        if ($param->required && $param->value === false) {
-                            $this->showLine("<red>Field $param->key is missing</red>");
-                            $param->value = false;
+                    if ($def === false || $parameter->value === false) {
+                        $parameter->value = $parameter->default;
+                        if ($parameter->required && $parameter->value === false) {
+                            $this->showLine("<red>Field $parameter->key is missing</red>");
+                            $parameter->value = false;
                         }
                     }
                 } else {
                     // the value is defined as an argument.
-                    $ok = $this->validate($param, false);
+                    $ok = $this->validate($parameter, false);
                     if (!$ok) {
-                        $param->value = false;
+                        $parameter->value = false;
                     }
                 }
                 $valueK = $k;
             }
-            if ($key === '*' && $param->value !== false) {
+            if ($key === '*' && $parameter->value !== false) {
                 // value found, exiting.
                 break;
             }
@@ -268,9 +271,9 @@ class CliOne
     public function getArrayParams($excludeKeys = []): array
     {
         $array = [];
-        foreach ($this->parameters as $param) {
-            if (!in_array($param->key, $excludeKeys, true)) {
-                $array[$param->key] = $param->value;
+        foreach ($this->parameters as $parameter) {
+            if (!in_array($parameter->key, $excludeKeys, true)) {
+                $array[$parameter->key] = $parameter->value;
             }
         }
         return $array;
@@ -424,7 +427,7 @@ class CliOne
                 break;
             default:
                 $parameter->missing = true;
-                return [null, null];
+                return [false, null];
         }
         if ($position === false) {
             $value = $this->argv[$trueName] ?? null;
@@ -531,13 +534,13 @@ class CliOne
      */
     public function setArrayParam($array, $excludeKeys = []): void
     {
-        foreach ($this->parameters as $param) {
-            if (!in_array($param->key, $excludeKeys, true)) {
+        foreach ($this->parameters as $parameter) {
+            if (!in_array($parameter->key, $excludeKeys, true)) {
                 foreach ($array as $k => $v) {
-                    if ($param->key === $k) {
-                        $param->value = $v;
-                        $this->assignParamValueKey($param);
-                        $param->missing = false;
+                    if ($parameter->key === $k) {
+                        $parameter->value = $v;
+                        $this->assignParamValueKey($parameter);
+                        $parameter->missing = false;
                         break;
                     }
                 }
@@ -547,7 +550,7 @@ class CliOne
 
     /**
      * It sets the color in the stack
-     * @param string $colors=['black','green','yellow','cyan','magenta','blue'][$i]
+     * @param array $colors =['black','green','yellow','cyan','magenta','blue'][$i]
      * @return $this
      */
     public function setColor($colors): self
@@ -566,12 +569,12 @@ class CliOne
      */
     public function setParam($key, $value): bool
     {
-        foreach ($this->parameters as $param) {
-            if ($param->key === $key) {
-                $param->value = $value;
-                $param->valueKey = null;
-                $this->assignParamValueKey($param);
-                $param->missing = false;
+        foreach ($this->parameters as $parameter) {
+            if ($parameter->key === $key) {
+                $parameter->value = $value;
+                $parameter->valueKey = null;
+                $this->assignParamValueKey($parameter);
+                $parameter->missing = false;
                 return true;
             }
         }
@@ -785,7 +788,7 @@ class CliOne
     {
         $this->initstack();
         $patternTitle = $this->patternTitleStack ?? '{value}';
-        $patternLines = $this->patternContentStack ?? '{value}';
+        $patternContent = $this->patternContentStack ?? '{value}';
         $style = $this->styleStack;
         [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv] = $this->border($style);
         [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
@@ -828,8 +831,12 @@ class CliOne
         }
         $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
         foreach ($lines as $k => $line) {
-            $ttitle = str_replace(['{value}'], $this->alignText($titles[$k], $maxTitleL, $alignTitle), $patternTitle);
-            $tline = str_replace(['{value}'], $this->alignText($line, $contentw - $maxTitleL - 1, $alignContent), $patternLines);
+            $ttitle = str_replace(['{value}'],
+                $this->alignText($titles[$k], $maxTitleL, $alignTitle),
+                $patternTitle);
+            $tline = str_replace(['{value}'],
+                $this->alignText($line, $contentw - $maxTitleL - 1, $alignContent),
+                $patternContent);
             $this->showLine($ml . $ttitle . $mmv . $tline . $mr);
         }
         $this->show($dl . str_repeat($um, $maxTitleL) . $cutd . str_repeat($um, $contentw - $maxTitleL - 1) . $dr);
@@ -848,27 +855,23 @@ class CliOne
     public function showParamSyntax($key, $tab = 0, $tab2 = 1, $excludeKey = []): void
     {
         if ($key === '*') {
-            foreach ($this->parameters as $p) {
-                if (!in_array($p->key, $excludeKey, true)) {
-                    $this->showParamSyntax($p->key, $tab, $tab2);
+            foreach ($this->parameters as $parameter) {
+                if(($parameter->type !== 'none') && !in_array($parameter->key, $excludeKey, true)) {
+                    $this->showParamSyntax($parameter->key, $tab, $tab2);
                 }
             }
             return;
         }
-        $param = $this->getParameter($key);
-        if ($param === false) {
+        $parameter = $this->getParameter($key);
+        if ($parameter === false) {
             $this->showLine("<red>[ERROR]</red> Parameter $key not defined");
             return;
         }
-        $v = $param->value;
-        $v = is_array($v) ? json_encode($v) : $v;
-        if ($param->inputType === 'password') {
-            $v = '*****';
-        }
+        $v = $this->showParamValue($parameter);
         /** @noinspection PhpUnnecessaryCurlyVarSyntaxInspection */
-        $this->showLine("<col$tab/><green>-{$param->key}</green><col{$tab2}/>{$param->description} <bold><cyan>[$v]</cyan></bold>");
-        foreach ($param->getHelpSyntax() as $help) {
-            $this->showLine("<col$tab2/>$help", $param);
+        $this->showLine("<col$tab/><green>-{$parameter->key}</green><col{$tab2}/>{$parameter->description} <bold><cyan>[$v]</cyan></bold>");
+        foreach ($parameter->getHelpSyntax() as $help) {
+            $this->showLine("<col$tab2/>$help", $parameter);
         }
     }
 
@@ -1006,7 +1009,8 @@ class CliOne
 
     /**
      * It shows a waiting cursor.
-     * @param bool $init the first time this method is called, you must set this value as true. Then, every update must be false.
+     * @param bool   $init         the first time this method is called, you must set this value as true. Then, every
+     *                             update must be false.
      * @param string $postfixValue if you want to set a profix value such as percentage, advance, etc.
      * @return void
      */
@@ -1052,12 +1056,32 @@ class CliOne
      */
     public function showparams(): void
     {
-        foreach ($this->parameters as $v) {
+        foreach ($this->parameters as $parameter) {
             try {
-                $this->showLine("$v->key = [" . json_encode($v->default) . "] value:" . json_encode($v->value));
+                $this->showLine("$parameter->key = [" .
+                    json_encode($parameter->default) . "] value:" .
+                    $this->showParamValue($parameter->value));
             } catch (Exception $e) {
             }
         }
+    }
+
+    /**
+     * @param CliOneParam $parameter
+     * @return string
+     */
+    public function showParamValue($parameter): string
+    {
+        if($parameter->inputType==='password') {
+            return '*****';
+        }
+        if($parameter->value==='null') {
+            return '(null)';
+        }
+        if(is_array($parameter->value)) {
+            return json_encode($parameter->value);
+        }
+        return $parameter->value;
     }
 
     /**
@@ -1146,20 +1170,20 @@ class CliOne
     }
 
     /**
-     * @param CliOneParam $param
+     * @param CliOneParam $parameter
      * @return void
      */
-    protected function assignParamValueKey($param): void
+    protected function assignParamValueKey($parameter): void
     {
-        if (!is_array($param->inputValue)) {
+        if (!is_array($parameter->inputValue)) {
             return;
         }
-        if ($param->value !== null && strpos($param->value, $this->emptyValue) === 0) {
-            $param->valueKey = str_replace($this->emptyValue, '', $param->value);
+        if ($parameter->value !== null && strpos($parameter->value, $this->emptyValue) === 0) {
+            $parameter->valueKey = str_replace($this->emptyValue, '', $parameter->value);
             return;
         }
-        $k = array_search($param->value, $param->inputValue, true);
-        $param->valueKey = $k === false ? null : $k;
+        $k = array_search($parameter->value, $parameter->inputValue, true);
+        $parameter->valueKey = $k === false ? null : $k;
     }
 
     /**
@@ -1667,7 +1691,7 @@ class CliOne
         if ($parameter->inputType === 'password') {
             $def = '*****';
         }
-        $valueToShow = (is_object($value) || is_array($value)) ? json_encode($value) : $value;
+        $valueToShow =  (is_object($value) || is_array($value)) ? json_encode($value) : $value;
         if (is_array($value)) {
             $valueinit = reset($value);
             $valuenext = next($value);
@@ -1719,7 +1743,7 @@ class CliOne
             if ($askInput) {
                 $pattern = $parameter->getPatterColumns()['1'] ?: "{desc} <bold><cyan>[{def}]</cyan></bold> {prefix}:";
                 // the 9999 is to indicate to never ellipses this input.
-                $txt = $this->showPattern($parameter, $parameter->key, $parameter->value, '', 9999, $prefix, $pattern);
+                $txt = $this->showPattern($parameter, $parameter->key,$this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 $origInput = $this->readline($txt, $parameter);
                 $parameter->value = $origInput;
                 $this->assignParamValueKey($parameter);

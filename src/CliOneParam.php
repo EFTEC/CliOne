@@ -1,6 +1,6 @@
 <?php
-/** @noinspection PhpUnused */
-/** @noinspection PhpMissingFieldTypeInspection */
+
+
 
 namespace eftec\CliOne;
 /**
@@ -67,6 +67,7 @@ class CliOneParam
      * It sets the syntax of help.
      * @param array $helpSyntax
      * @return CliOneParam
+     * @noinspection PhpUnused
      */
     public function setHelpSyntax(array $helpSyntax): CliOneParam
     {
@@ -119,6 +120,7 @@ class CliOneParam
     /**
      * It resets the user input and marks the value as missing.
      * @return CliOneParam
+     * @noinspection PhpUnused
      */
     public function resetInput(): CliOneParam
     {
@@ -239,12 +241,14 @@ class CliOneParam
      * It creates an argument and eval the parameter.<br>
      * It is a macro of add() and CliOne::evalParam()
      * @param bool $forceInput if false and the value is already digited, then it is not input anymore
+     * @param bool $returnValue If true, then it returns the value obtained.<br>
+     *                          If false (default value), it returns an instance of CliOneParam.
      * @return CliOneParam|false|mixed
      */
-    public function evalParam($forceInput = false)
+    public function evalParam($forceInput = false, $returnValue = false)
     {
         $this->add(true);
-        return $this->parent->evalParam($this->key, $forceInput);
+        return $this->parent->evalParam($this->key, $forceInput, $returnValue);
     }
 
     /**
@@ -287,12 +291,12 @@ class CliOneParam
                 }
                 break;
         }
-        foreach ($this->parent->parameters as $numParam => $param) {
-            if ($param->key === $this->key) {
+        foreach ($this->parent->parameters as $keyParam => $parameter) {
+            if ($parameter->key === $this->key) {
                 if ($override) {
                     // override
-                    $this->parent->parameters[$numParam] = $this;
-                    //$this->parent->parameters[$numParam]->parent=null;
+                    $this->parent->parameters[$keyParam] = $this;
+                    //$this->parent->parameters[$keyParam]->parent=null;
                     return;
                 }
                 $this->parent->showLine("<red>error in creation of input $this->key, parameter already defined</red>");
