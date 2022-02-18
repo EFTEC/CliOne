@@ -28,6 +28,7 @@ $cli->upLevel('level2')->showBread();
 $cli->showValuesColumn(['col1'=>'hello','col2'=>'world','col3'=>'alpha','col4'=>'beta','col5'=>'gamma'],'option2');
 $cli->downLevel()->showBread();
 $cli->showLine("<bold>bold</bold>");
+$cli->showLine("<dim>dim</dim>");
 $cli->showLine("<bred>background red</bred>");
 $cli->showLine("<bblue>background red</bblue>");
 $cli->showLine("<bwhite><black>background white</black> </bwhite>");

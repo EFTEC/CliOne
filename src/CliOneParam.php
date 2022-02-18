@@ -18,7 +18,9 @@ class CliOneParam
     /** @var CliOne */
     private $parent;
     public $key;
-    public $isOperator = true;
+    /** @var string=['first','last','second','flag','longflag','onlyinput','none'][$i]  */
+    public $type;
+    public $alias=[];
     /**
      * @var bool|string|null
      */
@@ -132,15 +134,19 @@ class CliOneParam
      * The constructor. It is used internally
      * @param CliOne  $parent
      * @param ?string $key
-     * @param bool    $isOperator
+     * @param bool    $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param array   $alias
+     * @param null    $value
+     * @param null    $valueKey
      */
-    public function __construct($parent, $key = null, $isOperator = true, $value = null, $valueKey = null)
+    public function __construct($parent, $key = null, $type = true,$alias=[], $value = null, $valueKey = null)
     {
         $this->parent = $parent;
         $this->key = $key;
-        $this->isOperator = $isOperator;
+        $this->type = $type;
+        $this->alias = $alias;
         /** @noinspection ProperNullCoalescingOperatorUsageInspection */
-        $this->question = $isOperator ?? $key;
+        $this->question = $type ?? $key;
         $this->value = $value;
         $this->valueKey = $valueKey;
     }
@@ -249,6 +255,9 @@ class CliOneParam
      */
     public function add($override = false): void
     {
+        if($this->type==='none') {
+            $override=true;
+        }
         $fail = false;
         /*if($this->allowEmpty===true && $this->default===false) {
             $this->parent->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");

@@ -16,70 +16,89 @@ class CliOneTest extends TestCase
         //, the first value is the current value to read
         //, and the next values are the emulated user input
     }
-    public function testFile() {
+    public function testMisc() {
+        $t = new CliOne('CliOneTest.php');
+        $this->assertGreaterThan(20,$t->getColSize());
+        $this->assertNotEmpty(CliOne::VERSION);
+        $this->assertStringContainsString('vendor',CliOne::findVendorPath());
+    }
+
+    public function testFile()
+    {
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->add();
         $t->createParam('test2')->add();
-        $t->getParameter('test1')->value='hello';
-        $this->assertEquals('',$t->saveData('file1',$t->getArrayParams()));
-        $t->getParameter('test1')->value='xxxxxxx';
-        $rd=$t->readData('file2');
-        $this->assertEquals([false,'Unable to read file file2.php'],$rd);
-        $rd=$t->readData('file1');
-        $this->assertEquals([true,['test1' => 'hello', 'test2' => null]],$rd);
+        $t->getParameter('test1')->value = 'hello';
+        $this->assertEquals('', $t->saveData('file1', $t->getArrayParams()));
+        $t->getParameter('test1')->value = 'xxxxxxx';
+        $rd = $t->readData('file2');
+        $this->assertEquals([false, 'Unable to read file file2.php'], $rd);
+        $rd = $t->readData('file1');
+        $this->assertEquals([true, ['test1' => 'hello', 'test2' => null]], $rd);
         $t->setArrayParam($rd[1]);
-        $this->assertEquals('hello',$t->getParameter('test1')->value);
+        $this->assertEquals('hello', $t->getParameter('test1')->value);
+    }
+
+    public function testEvalAlias()
+    {
+        global $argv;
+        unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+        $argv = ['program.php', '--test1', 'hello', '-test2', '"hello world"'];
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('test1', 'flag', ['test1'])->add();
+        $this->assertEquals('hello', $t->evalParam('test1')->value);
     }
 
     public function testEvalParam()
     {
         global $argv;
-
         unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
-
+        $argv = ['program.php', 'testopxxx','testop2', '-test1', 'hello', '-test2', '"hello world"', '--test3', '"hello world"','testop3'];
         $t = new CliOne('CliOneTest.php');
+        $t->createParam('testop', 'first')->setRequired(false)->setAllowEmpty()->add();
+        $t->createParam('testop2', 'second')->setRequired(false)->setAllowEmpty()->add();
+        $t->createParam('testop3', 'last')->setRequired(false)->setAllowEmpty()->add();
         $t->createParam('test1')->add();
         $t->createParam('test2')->add();
-        $argv = ['-test1', 'hello', '-test2', '"hello world"'];
-        $p = $t->evalParam('test2');
-        $this->assertEquals('hello world', $p->value);
-
+        $t->createParam('test3', 'longflag')->add();
+        $this->assertEquals('testopxxx', $t->evalParam('testop')->value);
+        $this->assertEquals('testop2', $t->evalParam('testop2')->value);
+        $this->assertEquals('testop3', $t->evalParam('testop3')->value);
+        $this->assertEquals('hello', $t->evalParam('test1')->value);
+        $this->assertEquals('hello world', $t->evalParam('test2')->value);
+        $this->assertEquals('hello world', $t->evalParam('test3')->value);
         // test 2.
+        $argv = ['program.php', '-test1', 'hello', '-test2', 'world'];
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->add();
         $t->createParam('test2')->add();
-        $argv = ['-test1', 'hello', '-test2', 'world'];
-        $p = $t->evalParam();
+        $p = $t->evalParam('test1');
         $this->assertEquals('hello', $p->value);
-
         // test 3
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->setDefault('not found')->add();
-        $argv = [];
         $p = $t->evalParam('test1');
         $this->assertEquals('not found', $p->value);
-
         // test 3b
-        $GLOBALS['PHPUNIT_FAKE_READLINE']=[0,''];
+        $argv = ['program.php',];
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];
         $t = new CliOne('CliOneTest.php');
-        $t->createParam('test1b')->setDescription('','desc:')->setInput()->setDefault('not found')->setAllowEmpty()->add();
-        $argv = [];
-        $p = $t->evalParam('test1b',true);
+        $t->createParam('test1b')->setDescription('', 'desc:')->setInput()->setDefault('not found')->setAllowEmpty()->add();
+        $p = $t->evalParam('test1b', true);
         $this->assertEquals('not found', $p->value);
         unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
-
         // test 4
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->setRequired()->add();
-        $argv = [];
         $p = $t->evalParam('test1');
         $this->assertEquals(false, $p->value);
-
         // test 5
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->setRequired()->add();
         $t->setParam('test1', 'hello world');
-        $argv = [];
         $p = $t->evalParam('test1');
         $this->assertEquals('hello world', $p->value);
     }
@@ -87,37 +106,34 @@ class CliOneTest extends TestCase
     public function testInput()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'hello world'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput()->add();
         $p = $t->evalParam('test1');
         $this->assertEquals('hello world', $p->value);
     }
+
     public function testInputDefault()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'hello world'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput()->add();
-        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
-
+        $this->assertEquals('hello world', $t->evalParam('test1', true)->value);
         $t->getParameter('test1')->setDefault($t->getParameter('test1')->value);
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','xxxx'];         // we use this line to simulate the user input
-        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
-
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
+        $this->assertEquals('hello world', $t->evalParam('test1', true)->value);
         $t->getParameter('test1')->setCurrentAsDefault();
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','xxxx'];         // we use this line to simulate the user input
-        $this->assertEquals('hello world', $t->evalParam('test1',true)->value);
-
-
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
+        $this->assertEquals('hello world', $t->evalParam('test1', true)->value);
     }
 
     public function testInputV2()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'hello world'];         // we use this line to simulate the user input
         $p = $t->createParam('test1')->setDescription('it is a test', 'test #1')->setInput()->evalParam(true);
@@ -126,32 +142,35 @@ class CliOneTest extends TestCase
         $p = $t->createParam('test1')->setDescription('it is a test', 'test #2')->setInput()->evalParam(true);
         $this->assertEquals('hello world', $p->value);
     }
-    public function testVisual() {
+
+    public function testVisual()
+    {
+        global $argv;
+        $argv = ['program.php',];
         $cli = new CliOne('CliOneTest.php');
-        $cli->showFrame(['line1','line2','line3'],['title1','title2']);
-
-
-        $cli->showMessageBox(['line1','line2'],['title1','title2']);
-        $values=[];
-        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>'value2'];
-        $values[]=['col1'=>'value12222222222222','col2'=>'value2','col3'=>'value2'];
-        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>3232];
-        $values[]=['col1'=>'value1','col2'=>'value2','col3'=>'544554'];
+        $cli->showFrame(['line1', 'line2', 'line3'], ['title1', 'title2']);
+        $cli->showMessageBox(['line1', 'line2'], ['title1', 'title2']);
+        $values = [];
+        $values[] = ['col1' => 'value1', 'col2' => 'value2', 'col3' => 'value2'];
+        $values[] = ['col1' => 'value12222222222222', 'col2' => 'value2', 'col3' => 'value2'];
+        $values[] = ['col1' => 'value1', 'col2' => 'value2', 'col3' => 3232];
+        $values[] = ['col1' => 'value1', 'col2' => 'value2', 'col3' => '544554'];
         $cli->showTable($values);
         $cli->setStyle('mysql')->showTable($values);
         $cli->setStyle('double')->showTable($values);
         $cli->setStyle('minimal')->showTable($values);
-        $cli->setStyle('minimal')->showValuesColumn($values,'option3');
-        for($i=0; $i<=100; $i=$i+20) {
-            $cli->setStyle()->showProgressBar($i,100,40," $i%");
+        $cli->setStyle('minimal')->showValuesColumn($values, 'option3');
+        for ($i = 0; $i <= 100; $i += 20) {
+            $cli->setStyle()->showProgressBar($i, 100, 40, " $i%");
         }
         $this->assertTrue(true);
-
     }
-    public function testInputOptionDefaultError() {
-        $values=['k1'=>'v1','k2'=>'v2','k3'=>'v3'];
+
+    public function testInputOptionDefaultError()
+    {
+        $values = ['k1' => 'v1', 'k2' => 'v2', 'k3' => 'v3'];
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', 'k1'];         // we use this line to simulate the user input
         $t->createParam('test1')
@@ -161,29 +180,28 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('v1', $p->value);
+        $this->assertEquals('k1', $t->getValueKey('test1'));
     }
 
     public function testInputOption()
     {
-        $values=['op1aaaaaaaa','op2','op3','op4','op5','op6','op7'];
+        $values = ['op1aaaaaaaa', 'op2', 'op3', 'op4', 'op5', 'op6', 'op7'];
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '10', '', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '10', '', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')
@@ -195,24 +213,21 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option2', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option3', $values)->add();
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('op3', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'X', '3'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')->setInput(true, 'option4', $values)->add();
@@ -224,7 +239,7 @@ class CliOneTest extends TestCase
     public function testInputEmpty()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')
@@ -234,8 +249,7 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'hello']; // we use this line to simulate the user input
         //, the first value is the current value to read
@@ -247,13 +261,12 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('hello', $p->value);
-
     }
 
     public function testInputOptions()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
@@ -262,20 +275,17 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
-
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a','op3','op2','op2',''];   // all, remove3, remove2,add2, end
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a', 'op3', 'op2', 'op2', ''];   // all, remove3, remove2,add2, end
         $t->getParameter('test1')->setDefault([])
-            ->setInput(true,'multiple2',['op1'=>'op1', 'op2'=>'op2', 'op3'=>'op3']);
+            ->setInput(true, 'multiple2', ['op1' => 'op1', 'op2' => 'op2', 'op3' => 'op3']);
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
-
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a','n','x',''];   // all, remove all, error,end
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a', 'n', 'x', ''];   // all, remove all, error,end
         $t->getParameter('test1')->setDefault([])
-            ->setInput(true,'multiple3',['op1'=>'op1', 'op2'=>'op2', 'op3'=>'op3']);
+            ->setInput(true, 'multiple3', ['op1' => 'op1', 'op2' => 'op2', 'op3' => 'op3']);
         $p = $t->evalParam('test1', true);
         $this->assertEquals([], $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
@@ -285,9 +295,11 @@ class CliOneTest extends TestCase
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
     }
-    public function testTemplate() {
+
+    public function testTemplate()
+    {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
@@ -298,27 +310,26 @@ class CliOneTest extends TestCase
         $p = $t->evalParam('test1', true);
         $this->assertEquals(['op1', 'op2'], $p->value);
     }
+
     public function testInputOptionShort()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         // select "a"ll, de-select 1, end
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','o','op1'];         // we use this line to simulate the user input
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'o', 'op1'];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
             ->setInput(true, 'optionshort', ['op1', 'op2', 'op3'])->add();
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('op1', $p->value);
-
-        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '','y'];         // we use this line to simulate the user input
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'y'];         // we use this line to simulate the user input
         $t->createParam('test1s')->setDescription('it is a test')
             ->setInput(true, 'optionshort', ['yes', 'no'])->add();
         $t->showparams();
         $p = $t->evalParam('test1s', true);
         $this->assertEquals('yes', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         // select "a"ll, de-select 1, end
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
@@ -329,8 +340,7 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('op1', $p->value);
-
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         // select "a"ll, de-select 1, end
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
@@ -341,13 +351,12 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1', true);
         $this->assertEquals('op1', $p->value);
-
     }
 
     public function testInputOptions2()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         // select "a"ll, de-select 1, end
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'a', 1, ''];         // we use this line to simulate the user input
@@ -361,7 +370,7 @@ class CliOneTest extends TestCase
     public function testInputRage()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 33];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
@@ -374,7 +383,7 @@ class CliOneTest extends TestCase
     public function testInputNumber()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 33];         // we use this line to simulate the user input
         $t->createParam('test1')->setDescription('it is a test')
@@ -388,7 +397,7 @@ class CliOneTest extends TestCase
     public function testOthers()
     {
         global $argv;
-        $argv = [];
+        $argv = ['program.php',];
         $t = new CliOne('CliOneTest.php');
         $this->assertEquals(false, $t->isCli());
     }

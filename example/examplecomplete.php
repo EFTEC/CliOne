@@ -72,7 +72,7 @@ if($cli->isCli()) {
         ->setRequired(true)
         ->add();
 
-    $param1=$cli->evalParam('*');
+    $param1=$cli->evalParam('param1');
     if(is_object($param1)) {
         if($param1->key==='param1' && $param1->value!==false) {
             $cli->upLevel('content #1')->showBread();
@@ -92,11 +92,11 @@ if($cli->isCli()) {
             $param1_5 = $cli->evalParam('subparam4');
             $param1_6 = $cli->evalParam('subparam5', true);
         } else {
-            $cli->showCheck('ERROR','e','examplecomplete.php -param1 is missing');
+            $cli->showCheck('ERROR','red','examplecomplete.php -param1 is missing');
             die(1);
         }
     } else {
-        $cli->showCheck('ERROR','e','examplecomplete.php -param1 is missing');
+        $cli->showCheck('ERROR','red','examplecomplete.php -param1 is missing');
         die(1);
     }
     $cli->showParamSyntax('*');

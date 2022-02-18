@@ -15,7 +15,7 @@ $money=100;
 
 $cli->createParam('bet')
     ->setDescription('','What is your bet?')
-    ->setPattern(null,'{desc} <c>${prefix}</c> :')
+    ->setPattern(null,'{desc} <cyan>${prefix}</cyan> :')
     ->setInput(true,'range',[0,100])
     ->add();
 $cli->createParam('number')
@@ -37,7 +37,7 @@ $title="
   \_____|\__,_|\___||___/___/                                                          
 ";
 $cli->showLine($title);
-$cli->showLine('<y>Rules</y>');
+$cli->showLine('<yellow>Rules</yellow>');
 $cli->showLine('It is a small game where you must guess a number between 0 and 100.');
 $cli->showLine("Initially you have $chanceLimit chances to guess the number. However with every game, your chances are reduced by one.");
 $cli->showLine("You start betting money and if you find the number then you double your bet");
@@ -55,7 +55,7 @@ $cli->showLine("Your current fund is :<bold>\$$money</bold>");
 while(true) {
     $bet = $cli->evalParam('bet', true);
     if ($bet->value == 0) {
-        $cli->showLine('<y>Chicken!</y>');
+        $cli->showLine('<yellow>Chicken!</yellow>');
     } else {
         break;
     }
@@ -65,37 +65,37 @@ while(true) {
     $number=$cli->evalParam('number',true);
     if($number->value<$numbertarget) {
         $chance++;
-        $cli->showLine('<w>Your number is too small</w>');
+        $cli->showLine('<yellow>Your number is too small</yellow>');
         $distance=abs($number->value-$numbertarget);
         if($distance<5) {
-            $cli->showLine('<g>You are too close</g>');
+            $cli->showLine('<green>You are too close</green>');
         }
 
         $cli->showLine('You have <bold>'.($chanceLimit-$chance).'</bold> chances');
     }
     if($number->value>$numbertarget) {
         $chance++;
-        $cli->showLine('<w>Your number is too big</w>');
+        $cli->showLine('<yellow>Your number is too big</yellow>');
         $distance=abs($number->value-$numbertarget);
         if($distance<5) {
-            $cli->showLine('<g>You are too close</g>');
+            $cli->showLine('<green>You are too close</green>');
         }
         $cli->showLine('You have <bold>'.($chanceLimit-$chance).'</bold> chances');
     }
     if($chance===$chanceLimit) {
         $money-=$bet->value;
-        $cli->showLine("<e>You loss \$$bet->value</e> the number was <bold>$numbertarget</bold>");
+        $cli->showLine("<red>You loss \$$bet->value</red> the number was <bold>$numbertarget</bold>");
         $again=true;
     }
     if($number->value==$numbertarget) {
         $money+=$bet->value;
-        $cli->showLine("<g>Jackpot! You win \$$bet->value</g>");
+        $cli->showLine("<green>Jackpot! You win \$$bet->value</green>");
         $again=true;
     }
     if($again) {
         $again=false;
         if($money<=0) {
-            $cli->showLine('<e>Game over</e> You loss all your money');
+            $cli->showLine('<red>Game over</red> You loss all your money');
             die(1);
         }
         if($chanceLimit<2) {
@@ -109,7 +109,7 @@ while(true) {
                 $cli->showLine("Your current fund is :<bold>\$$money</bold>");
                 $bet = $cli->evalParam('bet', true);
                 if ($bet->value == 0) {
-                    $cli->showLine('<y>Chicken!</y>');
+                    $cli->showLine('<yellow>Chicken!</yellow>');
                 } else {
                     break;
                 }
@@ -121,7 +121,7 @@ while(true) {
     }
 }
 $cli->showLine("Money collected :<bold>\$$money</bold>");
-$cli->showLine('<g>Bye</g>');
+$cli->showLine('<green>Bye</green>');
 
 
 function cleargame() {

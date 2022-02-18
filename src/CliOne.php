@@ -1,6 +1,6 @@
 <?php /** @noinspection PhpComposerExtensionStubsInspection */
 
-/** @noinspection PhpUnused
+/**
  * @noinspection PhpMissingFieldTypeInspection
  * @noinspection AlterInForeachInspection
  */
@@ -11,18 +11,18 @@ use Exception;
 use RuntimeException;
 
 /**
- * CliOne - A simple creator of command line argument program.
+ * CliOne - A simple creator of command-line argument program.
  *
  * @package   CliOne
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.3
+ * @version   1.5
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.3';
+    public const VERSION = '1.5';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
@@ -45,14 +45,55 @@ class CliOne
     protected $patternContentStack;
     protected $wait = 0;
     protected $waitPrev = '';
+    /**
+     * the arguments as a couple key/value. If the value is missing, then it is ''
+     * @var array
+     */
+    protected $argv = [];
 
     /**
      * The constructor
-     * @param ?string $origin you can specify the origin file. If you specific the origin file, then isCli will only
+     * @param ?string $origin you can specify the origin file. If you specify the origin file, then isCli will only
      *                        return true if the file is called directly.
      */
     public function __construct($origin = null)
     {
+        global $argv;
+        $this->argv = [];
+        $c = count($argv);
+        // the first argument is the name of the program, i.e ./program.php, so it is excluded.
+        for ($i = 1; $i < $c; $i++) {
+            $x = explode('=', $argv[$i], 2);
+            if (count($x) === 2) {
+                // the argument is merged with a symbol "="
+                // program.php arg=value
+                // program.php -arg=value
+                // program.php --arg=value
+                $this->argv[$x[0]] = trim($x[1], " \t\n\r\0\x0B\"'");
+            } else {
+                $x2 = $argv[$i + 1] ?? null;
+                if ($x2 !== null && strpos($x2, '-') !== 0) {
+                    // it is not the last argument and the next argument is not a flag.
+                    // program.php -arg value
+                    // program.php --arg value
+                    /** @noinspection NestedPositiveIfStatementsInspection */
+                    if ($argv[$i][0] === '-') {
+                        $this->argv[$argv[$i]] = trim($x2, " \t\n\r\0\x0B\"'");
+                        $i++;
+                    } else {
+                        // program.php subcommand (it is a positional argument, and it doesn't have value).
+                        $this->argv[$argv[$i]] = '';
+                    }
+                } else {
+                    // it is the last argument or the next argument is a flag.
+                    // program.php arg -arg2
+                    // program.php -arg -arg2
+                    // program.php --arg -arg2
+                    // program.php subcommand1 -bbb dddd subcommand2 (the last argument could be positional)
+                    $this->argv[$argv[$i]] = '';
+                }
+            }
+        }
         $this->origin = $origin;
         $this->colSize = $this->calculateColSize();
         $this->multibyte = function_exists('mb_strlen');
@@ -95,6 +136,7 @@ class CliOne
      * It removes trail slashes.
      * @param string $txt
      * @return string
+     * @noinspection PhpUnused
      */
     protected static function removeTrailSlash($txt): string
     {
@@ -102,14 +144,33 @@ class CliOne
     }
 
     /**
-     * It creates a new parameter to be read from the command line or to be input by the user.
-     * @param string $key The key or the parameter. It must be unique.
-     * @param bool   $isOperator
+     * It creates a new parameter to be read from the command line and/or to be input manually by the user<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->createParam('k1','first'); // php program.php thissubcommand
+     * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3 <val>
+     * </pre>
+     * @param string $key   The key or the parameter. It must be unique.
+     * @param string $type  =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
+     *                      <b>flag</b>: (default) it reads a flag "php program.php -thisflag value"<br>
+     *                      <b>first</b>: it reads the first argument "php program.php thisarg" (without value)<br>
+     *                      <b>second</b>: it reads the second argument "php program.php sc1 thisarg" (without value)<br>
+     *                      <b>last</b>: it reads the second argument "php program.php ... thisarg" (without value)<br>
+     *                      <b>longflag</b>: it reads a longflag "php program --thislongflag value<br>
+     *                      <b>last</b>: it reads the second argument "php program.php ... thisvalue" (without value)<br>
+     *                      <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
+     *                      <b>none</b>: the value it is not captured via argument, so it could be user-input, but it is
+     *                      not stored<br>
+     *                      none parameters could always be overridden, and they are used to "temporary" input such as
+     *                      validations (y/n).
+     * @param array $alias  A simple array with the name of the arguments to read (without - or --)<br>
+     *                      if the type is a flag, then the alias is a double flag "--".<br>
+     *                      if the type is a double flag, then the alias is a flag.
      * @return CliOneParam
      */
-    public function createParam($key, $isOperator = true): CliOneParam
+    public function createParam($key, $type = 'flag', $alias = []): CliOneParam
     {
-        return new CliOneParam($this, $key, $isOperator);
+        return new CliOneParam($this, $key, $type, $alias);
     }
 
     /**
@@ -135,9 +196,11 @@ class CliOne
      * $t->createParam('argument1')->add();
      * $result=$t->evalParam('argument1'); // an object ClieOneParam where value is "hello"
      * </pre>
-     * @param string $key    the key to read.<br>
-     *                       If $key='*' then it reads all the first keys and returns the first key
-     *                       found if it has a value.
+     * @param string $key         the key to read.<br>
+     *                            If $key='*' then it reads the first flag and returns its value (if any).
+     * @param bool   $forceInput  it forces input no matter if the value is already inserted.
+     * @param bool   $returnValue If true, then it returns the value obtained.<br>
+     *                            If false (default value), it returns an instance of CliOneParam.
      * @return mixed Returns false if not value is found.
      */
     public function evalParam($key = '*', $forceInput = false, $returnValue = false)
@@ -145,7 +208,7 @@ class CliOne
         $valueK = null;
         $notfound = true;
         foreach ($this->parameters as $k => $param) {
-            if ($param->key === $key || ($key === '*' && $param->isOperator === true)) {
+            if ($param->key === $key || ($key === '*' && $param->type === 'flag')) {
                 $notfound = false;
                 if ($param->missing === false && !$forceInput) {
                     // the parameter is already read, skipping.
@@ -156,7 +219,7 @@ class CliOne
                     $this->assignParamValueKey($param);
                     return $returnValue === true ? $param->value : $param;
                 }
-                [$def, $param->value] = $this->readParameterCli($param);
+                [$def, $param->value] = $this->readParameterArgFlag($param);
                 if ($key === '*' && $def === false) {
                     // value not found, not asking for input.
                     continue;
@@ -214,7 +277,7 @@ class CliOne
     }
 
     /**
-     * It returns the number of columns present in the screen. The columns are calculated in the constructor.
+     * It returns the number of columns present on the screen. The columns are calculated in the constructor.
      * @return int
      */
     public function getColSize(): int
@@ -326,7 +389,7 @@ class CliOne
             if ($content === false) {
                 throw new RuntimeException("Unable to read file $filename");
             }
-            $content = $this->substr($content, strpos($content, "\n") + 1); // remove the first line.
+            $content = substr($content, strpos($content, "\n") + 1); // remove the first line.
             return [true, json_decode($content, true)];
         } catch (Exception $ex) {
             return [false, $ex->getMessage()];
@@ -339,32 +402,86 @@ class CliOne
      *                      the default value if the field exists, but it doesn't have value<br>
      *                      or false if the field is not defined
      */
-    public function readParameterCli($parameter): array
+    public function readParameterArgFlag($parameter): array
     {
-        global $argv;
-        $p = array_search('-' . $parameter->key, $argv, true);
-        if ($p === false) {
-            // the parameter is not found there.
+        //
+        $position = false;
+        switch ($parameter->type) {
+            case 'last':
+            case 'second':
+            case 'first':
+                $position = true;
+                $trueName = $parameter->key;
+                $extraName = '-';
+                break;
+            case 'flag':
+                $trueName = '-' . $parameter->key;
+                $extraName = '--';
+                break;
+            case 'longflag':
+                $trueName = '--' . $parameter->key;
+                $extraName = '-';
+                break;
+            default:
+                $parameter->missing = true;
+                return [null, null];
+        }
+        if ($position === false) {
+            $value = $this->argv[$trueName] ?? null;
+        } else {
+            $keys = array_keys($this->argv);
+            switch ($parameter->type) {
+                case 'first':
+                    if (count($this->argv) >= 1) {
+                        $keyP = $keys[0];
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+                case 'second':
+                    if (count($this->argv) > 1) {
+                        $keyP = $keys[1];
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+                case 'last':
+                    if (count($this->argv) > 1) {
+                        $keyP = end($keys);
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+            }
+            /** @noinspection PhpUndefinedVariableInspection */
+            if ($value !== null && $keyP[0] === '-') {
+                // positional argument exists however it is a flag.
+                $value = null;
+            }
+        }
+        if ($value === null) {
+            // if the value is not found.
             $parameter->missing = true;
+            // we try find in the alias (if any).
+            foreach ($parameter->alias as $ali) {
+                $value = $this->argv[$extraName . $ali] ?? null;
+                if ($value !== null) {
+                    $parameter->missing = false;
+                    return [true, $value];
+                }
+            }
             return [false, false];
         }
+        // the value is found and we return the value.
         $parameter->missing = false;
-        if (count($argv) > $p + 1) {
-            $next = self::removeTrailSlash($argv[$p + 1]);
-            if (strpos($next, '-', true) === 0) {
-                // -argument1 -argument2 (-argument1 is equals to "" and not -argument2)
-                return [true, ''];
-            }
-            return [true, trim($next, " \t\n\r\0\x0B\"'")];
-        }
-        if ($parameter->default !== '') {
-            return [true, $parameter->default];
-        }
-        return [true, ''];
+        return [true, $value];
     }
 
     /**
-     * It saves information into a file. The content will be serialized.
+     * It saves the information into a file. The content will be serialized.
      * @param string $filename the filename (without extension) to where the value will be saved.
      * @param mixed  $content  The content to save. It will be serialized.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
@@ -389,9 +506,14 @@ class CliOne
     }
 
     /**
-     * @param string $title          =['left','right','middle'][$i]
-     * @param string $content        =['left','right','middle'][$i]
-     * @param string $contentNumeric =['left','right','middle'][$i]
+     * It sets the alignment.  This method is stackable.<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $cli->setAlign('left','left','right')->setStyle('double')->showTable($values);
+     * </pre>>
+     * @param string $title          =['left','right','middle'][$i] the alignment of the title
+     * @param string $content        =['left','right','middle'][$i] the alignment of the content
+     * @param string $contentNumeric =['left','right','middle'][$i] the alignment of the content (numeric)
      * @return $this
      */
     public function setAlign($title = 'middle', $content = 'middle', $contentNumeric = 'middle'): self
@@ -423,6 +545,11 @@ class CliOne
         }
     }
 
+    /**
+     * It sets the color in the stack
+     * @param string $colors=['black','green','yellow','cyan','magenta','blue'][$i]
+     * @return $this
+     */
     public function setColor($colors): self
     {
         $this->colorStack = $colors;
@@ -431,7 +558,7 @@ class CliOne
 
     /**
      * It sets the value of a parameter manually.<br>
-     * Once the value its set, then the system skip to read the values from the command line or ask for an input.
+     * Once the value is set, then the system skips to read the values from the command line or ask for input.
      *
      * @param string $key   the key of the parameter
      * @param mixed  $value the value to assign.
@@ -453,7 +580,7 @@ class CliOne
 
     /**
      * {value} {type}
-     * @param string $pattern1Stack
+     * @param string|null string $pattern1Stack if null then it will use the default value.
      * @return $this
      */
     public function setPatternTitle($pattern1Stack = null): CliOne
@@ -462,22 +589,40 @@ class CliOne
         return $this;
     }
 
+    /**
+     * <bold>{value}{type}</bold>
+     * @param string|null $pattern2Stack if null then it will use the default value.
+     * @return $this
+     */
     public function setPatternCurrent($pattern2Stack = null): CliOne
     {
         $this->patternCurrentStack = $pattern2Stack;
         return $this;
     }
+
+    /**
+     * ">"
+     * @param string|null $pattern3Stack if null then it will use the default value.
+     * @return $this
+     */
+    public function setPatternSeparator($pattern3Stack = null): CliOne
+    {
+        $this->patternSeparatorStack = $pattern3Stack;
+        return $this;
+    }
+
+    /**
+     * Not used yet.
+     * @param null|string $pattern4Stack if null then it will use the default value.
+     * @return $this
+     * @noinspection PhpUnused
+     */
     public function setPatternContent($pattern4Stack = null): CliOne
     {
         $this->patternContentStack = $pattern4Stack;
         return $this;
     }
 
-    public function setPatternSeparator($pattern3Stack = null): CliOne
-    {
-        $this->patternSeparatorStack = $pattern3Stack;
-        return $this;
-    }
 
     /**
      * @param string $style =['mysql','simple','double','minimal'][$i]
@@ -612,6 +757,7 @@ class CliOne
      * <green>green</green> <green>success</green> (color green)
      * <italic>italic</italic>
      * <bold>bold</body>
+     * <dim>dim</dim>
      * <underline>underline</underline>
      * <cyan>cyan</cyan> (color light cyan)
      * <magenta>magenta</magenta> (color magenta)
@@ -638,8 +784,8 @@ class CliOne
     public function showMessageBox($lines, $titles = []): void
     {
         $this->initstack();
-        $patternTitle=$this->patternTitleStack??'{value}';
-        $patternLines=$this->patternContentStack??'{value}';
+        $patternTitle = $this->patternTitleStack ?? '{value}';
+        $patternLines = $this->patternContentStack ?? '{value}';
         $style = $this->styleStack;
         [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv] = $this->border($style);
         [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
@@ -682,9 +828,9 @@ class CliOne
         }
         $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
         foreach ($lines as $k => $line) {
-            $ttitle=str_replace(['{value}'],$this->alignText($titles[$k], $maxTitleL, $alignTitle),$patternTitle);
-            $tline=str_replace(['{value}'],$this->alignText($line, $contentw - $maxTitleL - 1, $alignContent),$patternLines);
-            $this->showLine($ml .$ttitle  . $mmv . $tline . $mr);
+            $ttitle = str_replace(['{value}'], $this->alignText($titles[$k], $maxTitleL, $alignTitle), $patternTitle);
+            $tline = str_replace(['{value}'], $this->alignText($line, $contentw - $maxTitleL - 1, $alignContent), $patternLines);
+            $this->showLine($ml . $ttitle . $mmv . $tline . $mr);
         }
         $this->show($dl . str_repeat($um, $maxTitleL) . $cutd . str_repeat($um, $contentw - $maxTitleL - 1) . $dr);
         $this->resetStack();
@@ -720,7 +866,7 @@ class CliOne
             $v = '*****';
         }
         /** @noinspection PhpUnnecessaryCurlyVarSyntaxInspection */
-        $this->showLine("<col$tab/><green>-{$param->key}</green><col{$tab2}/>{$param->description} <cyan>[$v]</cyan>");
+        $this->showLine("<col$tab/><green>-{$param->key}</green><col{$tab2}/>{$param->description} <bold><cyan>[$v]</cyan></bold>");
         foreach ($param->getHelpSyntax() as $help) {
             $this->showLine("<col$tab2/>$help", $param);
         }
@@ -747,7 +893,8 @@ class CliOne
     }
 
     /**
-     * @param array $assocArray An associative array with the values to show. The key is used for index.
+     * It shows an associative array.  This command is the end of a stack.
+     * @param array $assocArray An associative array with the values to show. The key is used for the index.
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
@@ -779,7 +926,6 @@ class CliOne
         foreach ($columns as $column) {
             $maxColumnSize[$column] = (int)round($maxColumnSize[$column] * $contentwCorrected / $totalCol);
         }
-        //var_dump($maxColumnSize);
         if (array_sum($maxColumnSize) > $contentwCorrected) {
             // we correct the precision error of round by removing 1 to the first column
             $maxColumnSize[$columns[0]]--;
@@ -794,7 +940,7 @@ class CliOne
             foreach ($maxColumnSize as $size) {
                 $txt .= str_repeat($um, $size) . $cutt;
             }
-            $txt = $this->substr($txt, 0, -$this->strlen($cutt)) . $ur;
+            $txt = $this->removechar($txt, $this->strlen($cutt, false)) . $ur;
             $this->showLine($txt);
         }
         // title
@@ -802,7 +948,7 @@ class CliOne
         foreach ($maxColumnSize as $colName => $size) {
             $txt .= $this->alignText($colName, $size, $alignTitle) . $mmv;
         }
-        $txt = $this->substr($txt, 0, -$this->strlen($mmv)) . $mr;
+        $txt = $this->removechar($txt, $this->strlen($mmv, false)) . $mr;
         $this->showLine($txt);
         // botton title
         $txt = $cutl;
@@ -858,6 +1004,12 @@ class CliOne
         $this->internalShowOptions($p, []);
     }
 
+    /**
+     * It shows a waiting cursor.
+     * @param bool $init the first time this method is called, you must set this value as true. Then, every update must be false.
+     * @param string $postfixValue if you want to set a profix value such as percentage, advance, etc.
+     * @return void
+     */
     public function showWaitCursor($init = true, $postfixValue = ''): void
     {
         if ($init) {
@@ -895,7 +1047,7 @@ class CliOne
 
     /**
      * It will show all the parameters by showing the key, the default value and the value<br>
-     * It is used for debug and testing.
+     * It is used for debugging and testing.
      * @return void
      */
     public function showparams(): void
@@ -908,20 +1060,48 @@ class CliOne
         }
     }
 
-    public function strlen($content)
+    /**
+     * It determines the size of a string
+     * @param      $content
+     * @param bool $visual visual means that it considers the visual lenght, false means it considers characters.
+     * @return false|int
+     */
+    public function strlen($content, $visual = true)
     {
-        if ($this->multibyte) {
-            return mb_strlen($content);
+        $contentClear = $this->colorLess($content);
+        if ($this->multibyte && $visual) {
+            return mb_strlen($contentClear);
         }
-        return strlen($content);
+        return strlen($contentClear);
+    }
+
+    /**
+     * remove visible characters at the end of the string. It ignores invisible (such as colors) characters.
+     * @param string $content
+     * @param int    $numchar
+     * @return string
+     */
+    public function removechar($content, $numchar): string
+    {
+        $contentMask = $this->colorMask($content);
+        $l = strlen($content);
+        $count = 0;
+        for ($i = $l - 1; $i >= 0; $i--) {
+            if ($contentMask[$i] !== chr(250)) {
+                $content = substr($content, 0, $i) . substr($content, $i + 1);
+                $count++;
+                if ($count >= $numchar) {
+                    break;
+                }
+            }
+        }
+        return $content;
     }
 
     public function substr($content, $offset, $length = null)
     {
-        if ($this->multibyte) {
-            return mb_substr($content, $offset, $length);
-        }
-        return substr($content, $offset, $length);
+        $contentClear = $this->colorLess($content);
+        return substr($contentClear, $offset, $length);
     }
 
     /**
@@ -1078,7 +1258,7 @@ class CliOne
         if ($l <= $lenght) {
             return $text;
         }
-        return $this->substr($text, 0, $lenght - 3) . '...';
+        return $this->removechar($text, $l - $lenght + 3) . '...';
     }
 
     protected function initStack(): void
@@ -1100,42 +1280,42 @@ class CliOne
         // pattern
         switch ($parameter->inputType) {
             case 'multiple':
-                $pattern = '{selection}<cyan>[{key}]</cyan> {value}';
-                $foot = "\t<cyan>[a]</cyan> select all, <cyan>[n]</cyan> select none, <cyan>[]</cyan> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
+                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 1;
                 break;
             case 'multiple2':
-                $pattern = '{selection}<cyan>[{key}]</cyan> {value}';
-                $foot = "\t<cyan>[a]</cyan> select all, <cyan>[n]</cyan> select none, <cyan>[]</cyan> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
+                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 2;
                 break;
             case 'multiple3':
-                $pattern = '{selection}<cyan>[{key}]</cyan> {value}';
-                $foot = "\t<cyan>[a]</cyan> select all, <cyan>[n]</cyan> select none, <cyan>[]</cyan> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
+                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 3;
                 break;
             case 'multiple4':
-                $pattern = '{selection}<cyan>[{key}]</cyan> {value}';
-                $foot = "\t<cyan>[a]</cyan> select all, <cyan>[n]</cyan> select none, <cyan>[]</cyan> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><cyan>[{key}]<cyan></bold> {value}';
+                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 4;
                 break;
             case 'option':
-                $pattern = '<cyan>[{key}]</cyan> {value}';
+                $pattern = '<bold><cyan>[{key}]</cyan></bold> {value}';
                 $foot = "";
                 $columns = 1;
                 break;
             case 'option2':
-                $pattern = '<cyan>[{key}]</cyan> {value}';
+                $pattern = '<bold><cyan>[{key}]</cyan></bold> {value}';
                 $foot = "";
                 $columns = 2;
                 break;
             case 'option3':
-                $pattern = '<cyan>[{key}]</cyan> {value}';
+                $pattern = '<bold><cyan>[{key}]</cyan></bold> {value}';
                 $foot = "";
                 $columns = 3;
                 break;
             case 'option4':
-                $pattern = '<cyan>[{key}]</cyan> {value}';
+                $pattern = '<bold><cyan>[{key}]</cyan></bold> {value}';
                 $foot = "";
                 $columns = 4;
                 break;
@@ -1202,7 +1382,7 @@ class CliOne
 
     /**
      * @param CliOneParam $parameter
-     * @return mixed|string
+     * @return array|string|null
      * @noinspection DuplicatedCode
      */
     protected function readParameterInput($parameter)
@@ -1329,8 +1509,9 @@ class CliOne
      * @param                  $content
      * @param CliOneParam|null $cliOneParam
      * @return array|string|string[]
+     * @noinspection DuplicatedCode
      */
-    protected function replaceColor($content, $cliOneParam = null)
+    public function replaceColor($content, $cliOneParam = null)
     {
         $t = floor($this->colSize / 6);
         if ($cliOneParam !== null) {
@@ -1351,7 +1532,7 @@ class CliOne
                 '<bcyan>', '</bcyan>', '<bmagenta>', '</bmagenta>',
                 '<col0/>', '<col1/>', '<col2/>',
                 '<col3/>', '<col4/>', '<col5/>',
-                '<italic>', '</italic>', '<bold>', '</bold>', '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'
+                '<italic>', '</italic>', '<bold>', '</bold>', '<dim>', '</dim>', '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'
             ]
             ,
             [
@@ -1363,9 +1544,71 @@ class CliOne
                 "\e[46m", "\e[49m", "\e[45m", "\e[49m",
                 "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
                 "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
-                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
+                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
             ]
             , $content);
+    }
+
+    protected function colorLess($content)
+    {
+        $t = floor($this->colSize / 6);
+        /** @noinspection DuplicatedCode */
+        return str_replace(
+            [
+                "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
+                "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
+                "\e[36m", "\e[39m", "\e[35m", "\e[39m",
+                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
+                "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
+                "\e[46m", "\e[49m", "\e[45m", "\e[49m",
+                "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
+                "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
+                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
+            ]
+            ,
+            [
+                "", "", "", "", "", "",
+                "", "", "", "", "", "",
+                "", "", "", "",
+                "", "", "", "", "", "",
+                "", "", "", "", "", "",
+                "", "", "", "",
+                "", "", "",
+                "", "", "",
+                "", "", "", "", "", "", "", "", "", ""
+            ], $content);
+    }
+
+    protected function colorMask($content)
+    {
+        $t = floor($this->colSize / 6);
+        $m5 = str_repeat(chr(250), 5);
+        $m4 = str_repeat(chr(250), 4);
+        /** @noinspection DuplicatedCode */
+        return str_replace(
+            [
+                "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
+                "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
+                "\e[36m", "\e[39m", "\e[35m", "\e[39m",
+                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
+                "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
+                "\e[46m", "\e[49m", "\e[45m", "\e[49m",
+                "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
+                "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
+                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
+            ]
+            ,
+            [
+                $m5, $m5, $m5, $m5, $m5, $m5,
+                $m5, $m5, $m5, $m5, $m5, $m5,
+                $m5, $m5, $m5, $m5,
+                $m5, $m5, $m5, $m5, $m5, $m5,
+                $m5, $m5, $m5, $m5, $m5, $m5,
+                $m5, $m5, $m5, $m5,
+                $m4, str_repeat(chr(250), 3 + $this->strlen($t)), str_repeat(chr(250), 3 + $this->strlen($t * 2)),
+                str_repeat(chr(250), 3 + $this->strlen($t * 3)), str_repeat(chr(250), 3 + $this->strlen($t * 4)), str_repeat(chr(250), 3 + $this->strlen($t * 5)),
+                $m4, $m5, $m4, $m5, $m4, $m5, $m4, $m5, $m4, $m5
+            ], $content);
     }
 
     protected function resetStack(): CliOne
@@ -1415,9 +1658,9 @@ class CliOne
      * @param int         $colW      the size of the col
      * @param string      $prefix    A prefix
      * @param string      $pattern   the pattern to use.
-     * @return void
+     * @return string
      */
-    protected function showPattern($parameter, $key, $value, $selection, $colW, $prefix, $pattern)
+    protected function showPattern($parameter, $key, $value, $selection, $colW, $prefix, $pattern): string
     {
         $desc = $parameter->question ?: $parameter->description;
         $def = (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default);
@@ -1435,11 +1678,11 @@ class CliOne
             $valueend = '';
         }
         // $patern='{selection} {key}{value}';
-        return $this->ellipsis(
-            str_replace(
-                array('{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'),
-                array($selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix), $pattern),
-            $colW - 1);
+        $text = str_replace(
+            array('{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'),
+            array($selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix), $pattern);
+        $text = $this->replaceColor($text);
+        return $this->ellipsis($text, $colW - 1);
     }
 
     /**
@@ -1474,7 +1717,7 @@ class CliOne
                     $prefix = '';
             }
             if ($askInput) {
-                $pattern = $parameter->getPatterColumns()['1'] ?: "{desc} <cyan>[{def}]</cyan> {prefix}:";
+                $pattern = $parameter->getPatterColumns()['1'] ?: "{desc} <bold><cyan>[{def}]</cyan></bold> {prefix}:";
                 // the 9999 is to indicate to never ellipses this input.
                 $txt = $this->showPattern($parameter, $parameter->key, $parameter->value, '', 9999, $prefix, $pattern);
                 $origInput = $this->readline($txt, $parameter);
@@ -1623,6 +1866,7 @@ class CliOne
         }
         return $ok;
     }
+
     /**
      * Replaces all variables defined between {{ }} by a variable inside the dictionary of values.<br>
      * Example:<br>
@@ -1636,8 +1880,10 @@ class CliOne
      *                                 Otherwise, it is replaced by an empty value
      *
      * @return string|string[]|null
+     * @noinspection PhpUnused
      */
-    public static function replaceCurlyVariable($string, $values, $notFoundThenKeep = false) {
+    public static function replaceCurlyVariable($string, $values, $notFoundThenKeep = false)
+    {
         if (strpos($string, '{{') === false) {
             return $string;
         } // nothing to replace.
@@ -1649,9 +1895,7 @@ class CliOne
                 /** @noinspection PhpIssetCanBeReplacedWithCoalesceInspection */
                 return isset($values[$item]) ? $values[$item] : ($notFoundThenKeep ? $matches[0] : '');
             }
-
             $item = substr($matches, 2, -2); // removes {{ and }}
-
             return $values[$item] ?? $notFoundThenKeep ? $matches : '';
         }, $string);
     }
