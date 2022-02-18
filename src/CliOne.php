@@ -91,6 +91,7 @@ class CliOne
 
         $this->argv = [];
         $c = count($argv);
+
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
         for ($i = 1; $i < $c; $i++) {
             $x = explode('=', $argv[$i], 2);
@@ -197,7 +198,7 @@ class CliOne
      *                      not stored<br>
      *                      none parameters could always be overridden, and they are used to "temporary" input such as
      *                      validations (y/n).
-     * @param array  $alias A simple array with the name of the arguments to read (without - or --)<br>
+     * @param array|string  $alias A simple array with the name of the arguments to read (without - or --)<br>
      *                      if the type is a flag, then the alias is a double flag "--".<br>
      *                      if the type is a double flag, then the alias is a flag.
      * @return CliOneParam
@@ -247,11 +248,12 @@ class CliOne
         $notfound = true;
         foreach ($this->parameters as $k => $parameter) {
             if ($parameter->key === $key || ($key === '*' && $parameter->type === 'flag')) {
+                $currentValue=$parameter->value;
                 $notfound = false;
-                if ($parameter->missing === false && !$forceInput) {
-                    // the parameter is already read, skipping.
-                    return $returnValue === true ? $parameter->value : $parameter;
-                }
+                //if ($parameter->missing === false && !$forceInput) {
+                // the parameter is already read, skipping.
+                //    return $returnValue === true ? $parameter->value : $parameter;
+                //}
                 if ($parameter->currentAsDefault && $parameter->value !== null && $parameter->missing === true) {
                     $parameter->value = $parameter->currentAsDefault;
                     $this->assignParamValueKey($parameter);
@@ -262,6 +264,11 @@ class CliOne
                     // value not found, not asking for input.
                     continue;
                 }
+                if($def===false  && $currentValue!==null && $forceInput===false) {
+                    $def=true;
+                    $parameter->value=$currentValue;
+                    $this->assignParamValueKey($parameter);
+                }
                 if ($def === false) {
                     // the value is not defined as an argument
                     if ($parameter->input === true) {
@@ -271,7 +278,7 @@ class CliOne
                     if ($def === false || $parameter->value === false) {
                         $parameter->value = $parameter->default;
                         if ($parameter->required && $parameter->value === false) {
-                            $this->showLine("<red>Field $parameter->key is missing</red>");
+                            $this->showCheck('ERROR','red',"Field $parameter->key is missing");
                             $parameter->value = false;
                         }
                     }
@@ -290,7 +297,7 @@ class CliOne
             }
         }
         if ($notfound) {
-            $this->showLine("<red>parameter $key not defined</red>");
+            $this->showCheck('ERROR','red',"parameter $key not defined");
         }
         if ($valueK === false || $valueK === null) {
             return false;
@@ -596,7 +603,8 @@ class CliOne
 
     /**
      * It sets the value of a parameter manually.<br>
-     * Once the value is set, then the system skips to read the values from the command line or ask for input.
+     * If the value is present as argument, then the value of the argument is used<br>
+     * If the value is not present as argument, then the user input is skipped.
      *
      * @param string $key   the key of the parameter
      * @param mixed  $value the value to assign.
@@ -907,13 +915,18 @@ class CliOne
             return;
         }
         $parameter = $this->getParameter($key);
+        $paramprefix=$parameter->type==='longflag'?'--':'-';
+        $paramprefixalias=$parameter->type==='longflag'?'-':'--';
         if ($parameter === false) {
-            $this->showLine("<red>[ERROR]</red> Parameter $key not defined");
+            $this->showCheck('ERROR','red',"Parameter $key not defined");
             return;
         }
         $v = $this->showParamValue($parameter);
         /** @noinspection PhpUnnecessaryCurlyVarSyntaxInspection */
-        $this->showLine("<col$tab/><green>-{$parameter->key}</green><col{$tab2}/>{$parameter->description} <bold><cyan>[$v]</cyan></bold>");
+        $this->showLine("<col$tab/><green>$paramprefix{$parameter->key}</green><col{$tab2}/>{$parameter->description} <bold><cyan>[$v]</cyan></bold>");
+        if(count($parameter->alias)>0) {
+            $this->showLine("<col$tab2/>Alias: <green>$paramprefixalias".implode(' -',$parameter->alias).'</green>', $parameter);
+        }
         foreach ($parameter->getHelpSyntax() as $help) {
             $this->showLine("<col$tab2/>$help", $parameter);
         }
@@ -1214,6 +1227,8 @@ class CliOne
     }
 
     /**
+     * With the value of the parameter, the system assign the valuekey of the parameter<br>
+     * If the parameter doesn't have inputvalues, or the value is not in the list of inputvalues, then it does nothing.
      * @param CliOneParam $parameter
      * @return void
      */
@@ -1498,7 +1513,7 @@ class CliOne
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
                         } else {
-                            $this->showLine("<red>unknow selection $input</red>");
+                            $this->showCheck('ERROR','red,',"unknow selection $input");
                         }
                 }
             } else {
@@ -1870,7 +1885,7 @@ class CliOne
                     $cause = 'unknown $parameter->inputType inputtype';
             }
             if (!$ok) {
-                $this->showLine("<yellow>The value $parameter->key is not correct, $cause</yellow>");
+                $this->showLine('WARNING','yellow',"The value $parameter->key is not correct, $cause");
             }
             if ($askInput === false) {
                 break;

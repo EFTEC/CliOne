@@ -23,9 +23,9 @@ class CliOneTest extends TestCase
         $t->upLevel('level1',' (type)');
         $t->showBread();
         $t->downLevel();
-        $t->showBread(false);
+        $t->showBread();
         $t->downLevel(3);
-        $t->showBread(false);
+        $t->showBread();
         $t->showLine('---bread---');
 
 
@@ -124,12 +124,19 @@ class CliOneTest extends TestCase
         $p = $t->evalParam('test1');
         $this->assertEquals(false, $p->value);
         // test 5
-        $argv = ['program.php',];
+        $argv = ['program.php','-test1','apple'];
         $t = new CliOne('CliOneTest.php');
         $t->createParam('test1')->setRequired()->add();
         $t->setParam('test1', 'hello world');
         $p = $t->evalParam('test1');
-        $this->assertEquals('hello world', $p->value);
+        $this->assertEquals('apple', $p->value);
+        // test 5
+        $argv = ['program.php'];
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('test1')->setRequired()->add();
+        $t->setParam('test1', 'hello world2');
+        $p = $t->evalParam('test1');
+        $this->assertEquals('hello world2', $p->value);
     }
 
     public function testInput()

@@ -137,7 +137,7 @@ class CliOneParam
      * @param CliOne  $parent
      * @param ?string $key
      * @param bool    $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
-     * @param array   $alias
+     * @param array|string   $alias
      * @param null    $value
      * @param null    $valueKey
      */
@@ -146,7 +146,7 @@ class CliOneParam
         $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
-        $this->alias = $alias;
+        $this->alias = is_array($alias)? $alias : [$alias];
         /** @noinspection ProperNullCoalescingOperatorUsageInspection */
         $this->question = $type ?? $key;
         $this->value = $value;
