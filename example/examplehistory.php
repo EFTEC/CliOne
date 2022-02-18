@@ -8,19 +8,19 @@ $cli=new CliOne();
 if($cli->isCli()) {
     $cli->createParam('param1','none')
         ->setInput(true,'string')
-        ->addHistory()
+        ->setAddHistory()
         ->setRequired(true)
         ->setDefault('param1')
         ->evalParam(true);
     $cli->createParam('param1','none')
         ->setInput(true,'string')
-        ->addHistory()
+        ->setAddHistory()
         ->setRequired(true)
         ->setDefault('param1')
         ->evalParam(true);
     $cli->createParam('param1','none')
         ->setInput(true,'string',null,['first','second'])
-        ->addHistory()
+        ->setAddHistory()
         ->setRequired(true)
         ->setDefault('param1')
         ->evalParam(true);

@@ -1,4 +1,5 @@
-<?php /** @noinspection ReturnTypeCanBeDeclaredInspection */
+<?php /** @noinspection ForgottenDebugOutputInspection */
+/** @noinspection ReturnTypeCanBeDeclaredInspection */
 
 /** @noinspection DuplicatedCode */
 
@@ -37,17 +38,23 @@ class CliOneTest extends TestCase
         $argv = ['program.php', '-dosave','xxxx']; // this value must be ignored
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'bbb','yes'];
         $t = new CliOne('CliOneTest.php');
-        $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
+        $t->createParam('aaa','none')->setInput()->setAddHistory()->evalParam();
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'ccc','yes'];
-        $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
-        if(PHP_MAJOR_VERSION>=7 && PHP_MINOR_VERSION>3) {
+        $t->createParam('aaa','none')->setInput()->setAddHistory()->evalParam();
+        if(PHP_MAJOR_VERSION<=7 && PHP_MINOR_VERSION<3) {
+            $this->assertEquals([], $t->listHistory());
+        } else {
             $this->assertEquals(['bbb', 'ccc'], $t->listHistory());
             $t->clearHistory();
             $this->assertEquals([], $t->listHistory());
             $t->setHistory(['bbb', 'ccc']);
             $this->assertEquals(['bbb', 'ccc'], $t->listHistory());
-        } else {
-            $this->assertEquals([], $t->listHistory());
+
+            $t->createParam('aaa4','none')->setInput()->setHistory(['a','b','c'])->setAddHistory()->evalParam();
+            $this->assertEquals(['a','b','c'], $t->getParameter('aaa4')->getHistory());
+            $t->setHistory(['bbb', 'ccc']);
+            $this->assertEquals(['bbb', 'ccc'], $t->listHistory());
+
         }
 
     }
@@ -185,6 +192,50 @@ class CliOneTest extends TestCase
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
         $this->assertEquals('hello world', $t->evalParam('test1', true)->value);
     }
+    public function testcurrentAsDefault() {
+        global $argv;
+        $argv = ['program.php',];
+        $cli = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];
+        $cli->createParam('param1','onlyinput')
+            ->setDescription('This field is called param1 and it is required')
+            ->setInput()
+            ->setRequired()
+            ->setCurrentAsDefault()
+            ->setDefault('IT MUST NOT BE VISIBLE')
+            ->add();
+        $cli->setParam('param1','IT MUST BE VISIBLE');
+        $param1 = $cli->evalParam('param1',true);
+        $this->assertEquals('IT MUST BE VISIBLE', $param1->value);
+
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];
+        $cli->createParam('param2','onlyinput')
+            ->setDescription('This field is called param1 and it is required')
+            ->setInput()
+            ->setRequired()
+            ->setCurrentAsDefault()
+            ->setDefault('IT MUST BE VISIBLE2')
+            ->add();
+        var_dump($cli->getParameter('param2')->value);
+        //$cli->setParam('param2','IT MUST BE VISIBLE');
+        $param2 = $cli->evalParam('param2',true);
+
+        $this->assertEquals('IT MUST BE VISIBLE2', $param2->value);
+    }
+    public function testValid() {
+        global $argv;
+        $argv = ['program.php',];
+        $t = new CliOne('CliOneTest.php');
+        $t->setSilentError(true);
+        $this->assertEquals(true,$t->createParam('param1')->add());
+        $this->assertEquals(true,$t->getParameter('param1')->isValid());
+        $this->assertEquals(false,$t->createParam('param1')->add());
+        $this->assertEquals(false,$t->getParameter('helloworld')->isValid());
+        $this->assertEquals(true,$t->createParam('multi1','flag',['alpha','beta'])->add());
+        $this->assertEquals(false,$t->createParam('alpha','flag',['a','b'])->add());
+        $this->assertEquals(false,$t->createParam('gamma','flag',['alpha'])->add());
+        $this->assertEquals(false,$t->createParam('delta','flag',['alpha'])->add());
+    }
 
     public function testInputV2()
     {
@@ -247,6 +298,7 @@ class CliOneTest extends TestCase
         $t->showparams();
         $p = $t->evalParam('test1');
         $this->assertEquals('v1', $p->value);
+        $this->assertEquals('v1', $t->getValue('test1'));
         $this->assertEquals('k1', $t->getValueKey('test1'));
     }
 

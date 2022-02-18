@@ -138,6 +138,26 @@ Now, what if you want to create multiples alias for the same parameter.
 $cli->createParam('h','flag',['help'])->add();  // it adds an alias longflag called "help"
 ```
 
+## Flow
+
+* (optional) you can set the current value using the method setParam()
+* If the type of parameter is not "onlyinput" and "none", then it reads the parameter
+  * Example: php program.php -param1 value --param2 -param3="hello world" parampositional
+* If the parameter is found, then it is returned, **end of the flow**.
+* If the parameter is not found then
+  * If setCurrentAsDefault() is set, and the current value is not null, then the default value is the current value.
+  * Otherwise, the default value is the value set using the method setDefault(). If none, then it uses null.
+* if input is true setInput(true) then it asks to user-input the value
+  * if the user doesn't fill the information, then it returns the default value (if any), **end of the flow**
+  * if the user fills the information, but it is incorrect, then it asks again and again.
+  * if the user fills the right information, then it returns this value, **end of the flow**
+
+Note:
+* isRequired() if the value is missing, then it shows an error.
+* setAllowEmpty() if the value is empty (not missing), then it allows to enter an empty value.
+
+
+
 ## Examples
 
 ### Example using arguments
@@ -765,6 +785,12 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.5.5 (2022-02-18)
+  * getParameter() always returns a parameter, no matter if it does not exist.
+    * You can use the method isValid() to check its validity  
+  * setSilentError() you can silent the error output.
+  * addhistory() renamed as setAddHistory()
+  * To add a new parameter add() validates if the key is already in use, if the key is an alias of other, or if the alias is in use.
 * 1.5.4 (2022-02-18)
   * fixed a problem with the default value.
   * added history (if available)

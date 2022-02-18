@@ -1,7 +1,5 @@
 <?php
 
-
-
 namespace eftec\CliOne;
 /**
  * CliOne - A simple creator of command line argument program.
@@ -10,15 +8,19 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   0.5
+ * @version   1.5.5
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
 {
+    /**
+     * The key of the parameter. If null then the parameter is invalid.
+     * @var string|null
+     */
     public $key;
-    /** @var string=['first','last','second','flag','longflag','onlyinput','none'][$i]  */
+    /** @var string=['first','last','second','flag','longflag','onlyinput','none'][$i] */
     public $type;
-    public $alias=[];
+    public $alias = [];
     /**
      * @var bool|string|null
      */
@@ -44,30 +46,30 @@ class CliOneParam
     public $inputValue = [];
     public $value;
     public $valueKey;
-    protected $addHistory=false;
+    protected $addHistory = false;
     protected $helpSyntax = [];
     protected $patterColumns;
     protected $patternQuestion;
     protected $footer;
-    protected $history=[];
+    protected $history = [];
     /** @var CliOne */
     private $parent;
 
     /**
      * The constructor. It is used internally
-     * @param CliOne  $parent
-     * @param ?string $key
-     * @param bool    $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
-     * @param array|string   $alias
-     * @param null    $value
-     * @param null    $valueKey
+     * @param CliOne       $parent
+     * @param ?string      $key
+     * @param bool         $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param array|string $alias
+     * @param null         $value
+     * @param null         $valueKey
      */
-    public function __construct($parent, $key = null, $type = true,$alias=[], $value = null, $valueKey = null)
+    public function __construct($parent, $key = null, $type = true, $alias = [], $value = null, $valueKey = null)
     {
         $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
-        $this->alias = is_array($alias)? $alias : [$alias];
+        $this->alias = is_array($alias) ? $alias : [$alias];
         /** @noinspection ProperNullCoalescingOperatorUsageInspection */
         $this->question = $type ?? $key;
         $this->value = $value;
@@ -75,15 +77,30 @@ class CliOneParam
     }
 
     /**
+     * Return the if the parameter is valid (if the key is not null).
+     * @return bool
+     */
+    public function isValid(): bool
+    {
+        return $this->key!==null;
+    }
+
+    /**
      * It adds an argument but it is not evaluated.
      * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
      *                       if true and the argument exists, then it is replaced.
-     * @return void
+     * @return bool
      */
-    public function add($override = false): void
+    public function add($override = false): bool
     {
-        if($this->type==='none') {
-            $override=true;
+        if($this->key===null) {
+            if(!$this->parent->isSilentError()) {
+                $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
+            }
+            return false;
+        }
+        if ($this->type === 'none') {
+            $override = true;
         }
         $fail = false;
         /*if($this->allowEmpty===true && $this->default===false) {
@@ -95,7 +112,9 @@ class CliOneParam
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    $this->parent->showCheck('ERROR','red',"error in creation of input $this->key inputType for range must be an array");
+                    if(!$this->parent->isSilentError()) {
+                        $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
+                    }
                     $fail = true;
                 }
                 break;
@@ -109,7 +128,9 @@ class CliOneParam
             case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
-                    $this->parent->showCheck('ERROR','red',"error in creation of input $this->key inputType for $this->inputType must be an array");
+                    if(!$this->parent->isSilentError()) {
+                        $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for $this->inputType must be an array");
+                    }
                     $fail = true;
                 }
                 break;
@@ -120,32 +141,61 @@ class CliOneParam
                     // override
                     $this->parent->parameters[$keyParam] = $this;
                     //$this->parent->parameters[$keyParam]->parent=null;
-                    return;
+                    return true;
                 }
-                $this->parent->showCheck('ERROR','red',"error in creation of input $this->key, parameter already defined");
+                if(!$this->parent->isSilentError()) {
+                    $this->parent->showCheck('ERROR', 'red',
+                        "error in creation of input $this->key,parameter already defined");
+                }
                 $fail = true;
                 break;
+            }
+            if (in_array($this->key, $parameter->alias, true)) {
+                // we found an alias that matches the parameter.
+                if(!$this->parent->isSilentError()) {
+                    $this->parent->showCheck('ERROR', 'red',
+                        "error in creation of input $this->key,parameter already defined as an alias");
+                }
+                $fail = true;
+                break;
+            }
+            foreach($this->alias as $alias) {
+                if(($alias === $parameter->key) && !$this->parent->isSilentError()) {
+                    $this->parent->showCheck('ERROR', 'red',
+                        "error in creation of alias $this->key/$alias,parameter already defined");
+                }
+                if (in_array($alias, $parameter->alias, true)) {
+                    // we found an alias that matches the parameter.
+                    if(!$this->parent->isSilentError()) {
+                        $this->parent->showCheck('ERROR', 'red',
+                            "error in creation of alias $this->key/$alias,parameter already defined as other alias");
+                    }
+                    $fail = true;
+                    break;
+                }
             }
         }
         if (!$fail) {
             $this->parent->parameters[] = $this;
             //$this->parent = null;
         }
+        return !$fail;
     }
 
-    public function addHistory($add=true): CliOneParam
+    public function setAddHistory($add = true): CliOneParam
     {
-        $this->addHistory=$add;
+        $this->addHistory = $add;
         return $this;
     }
+
 
     /**
      * It creates an argument and eval the parameter.<br>
      * It is a macro of add() and CliOne::evalParam()
-     * @param bool $forceInput if false and the value is already digited, then it is not input anymore
+     * @param bool $forceInput  if false and the value is already digited, then it is not input anymore
      * @param bool $returnValue If true, then it returns the value obtained.<br>
      *                          If false (default value), it returns an instance of CliOneParam.
-     * @return CliOneParam|false|mixed
+     * @return mixed
      */
     public function evalParam($forceInput = false, $returnValue = false)
     {
@@ -183,6 +233,7 @@ class CliOneParam
     }
 
     /**
+     * It sets the local history. It could be used to autocomplete.
      * @param array $history
      * @return CliOneParam
      */
@@ -202,6 +253,7 @@ class CliOneParam
     }
 
     /**
+     * true if the evaluation of this parameter is added automatically in the global history
      * @return bool
      */
     public function isAddHistory(): bool
@@ -209,15 +261,7 @@ class CliOneParam
         return $this->addHistory;
     }
 
-    /**
-     * @param bool $addHistory
-     * @return CliOneParam
-     */
-    public function setAddHistory(bool $addHistory): CliOneParam
-    {
-        $this->addHistory = $addHistory;
-        return $this;
-    }
+
 
     /**
      * It resets the user input and marks the value as missing.
@@ -253,11 +297,12 @@ class CliOneParam
      * if true then it set the current value as the default value but only if the value is not missing.<br>
      * The default value is assigned every time evalParam() is called.
      * @param bool $currentAsDefault
-     * @return void
+     * @return CliOneParam
      */
-    public function setCurrentAsDefault($currentAsDefault = true): void
+    public function setCurrentAsDefault($currentAsDefault = true): CliOneParam
     {
         $this->currentAsDefault = $currentAsDefault;
+        return $this;
     }
 
     /**
@@ -289,18 +334,29 @@ class CliOneParam
 
     /**
      * It sets the input type
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->createParam('selection')->setInput(true,'optionsimple',['yes','no'])->add();
+     * $this->createParam('name')->setInput(true,'string')->add();
+     * $this->createParam('many')->setInput(true,'multiple3',['op1','op2,'op3'])->add();
+     * </pre>
+     *
      * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
      *                          entered as argument.
      * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
-     * @param mixed  $inputValue
+     * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
+     *                           This value allows string, arrays and associative arrays<br>
+     *                           The values indicated here are used for input and validation<br>
+     *                           The library also uses this value for the auto-complete feature (tab-key).
+     * @param array  $history   you can add a custom history for this parameter
      * @return CliOneParam
      */
-    public function setInput($input = true, $inputType = 'string', $inputValue = null,$history=[]): CliOneParam
+    public function setInput($input = true, $inputType = 'string', $inputValue = null, $history = []): CliOneParam
     {
         $this->input = $input;
         $this->inputType = $inputType;
         $this->inputValue = $inputValue;
-        $this->history=$history;
+        $this->history = $history;
         return $this;
     }
 
