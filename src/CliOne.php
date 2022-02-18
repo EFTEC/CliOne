@@ -16,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.5.2
+ * @version   1.5.3
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.5.2';
+    public const VERSION = '1.5.3';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
