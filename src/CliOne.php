@@ -1075,7 +1075,7 @@ class CliOne
         if($parameter->inputType==='password') {
             return '*****';
         }
-        if($parameter->value==='null') {
+        if($parameter->value===null) {
             return '(null)';
         }
         if(is_array($parameter->value)) {
