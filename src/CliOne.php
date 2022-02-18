@@ -12,12 +12,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.5.5
+ * @version   1.6
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.5.5';
+    public const VERSION = '1.6';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
@@ -435,6 +435,84 @@ class CliOne
         }
         return $parameter->value;
     }
+    public function readParameterArgFlag($parameter): array
+    {
+        //
+        $position = false;
+        switch ($parameter->type) {
+            case 'last':
+            case 'second':
+            case 'first':
+                $position = true;
+                $trueName = $parameter->key;
+                $extraName = '-';
+                break;
+            case 'flag':
+                $trueName = '-' . $parameter->key;
+                $extraName = '--';
+                break;
+            case 'longflag':
+                $trueName = '--' . $parameter->key;
+                $extraName = '-';
+                break;
+            default:
+                $parameter->missing = true;
+                return [false, null];
+        }
+        /** @noinspection DuplicatedCode */
+        if ($position === false) {
+            $value = $this->argv[$trueName] ?? null;
+        } else {
+            $keys = array_keys($this->argv);
+            switch ($parameter->type) {
+                case 'first':
+                    if (count($this->argv) >= 1) {
+                        $keyP = $keys[0];
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+                case 'second':
+                    if (count($this->argv) > 1) {
+                        $keyP = $keys[1];
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+                case 'last':
+                    if (count($this->argv) > 1) {
+                        $keyP = end($keys);
+                        $value = $keyP;
+                    } else {
+                        $value = null;
+                    }
+                    break;
+            }
+            /** @noinspection PhpUndefinedVariableInspection */
+            if ($value !== null && $keyP[0] === '-') {
+                // positional argument exists however it is a flag.
+                $value = null;
+            }
+        }
+        if ($value === null) {
+            // if the value is not found.
+            $parameter->missing = true;
+            // we try find in the alias (if any).
+            foreach ($parameter->alias as $ali) {
+                $value = $this->argv[$extraName . $ali] ?? null;
+                if ($value !== null) {
+                    $parameter->missing = false;
+                    return [true, $value];
+                }
+            }
+            return [false, false];
+        }
+        // the value is found and we return the value.
+        $parameter->missing = false;
+        return [true, $value];
+    }
 
     /**
      * It reads the value-key of a parameter selected. It is useful for a list of elements.<br>
@@ -511,13 +589,23 @@ class CliOne
     }
 
     /**
-     * @param CliOneParam $parameter
-     * @return array it returns the value if the field is assigned<br>
-     *                      the default value if the field exists, but it doesn't have value<br>
-     *                      or false if the field is not defined
+     * Returns true if the parameter is present with or without data.<br>
+     * The parameter is not changed, neither the default values nor user input are applied<br>
+     * Returned Values:<br>
+     * <ul>
+     * <li><b>none</b> the value is not present, ex: </li>
+     * <li><b>empty</b> the value is present but is empty, ex: -arg1</li>
+     * <li><b>value</b> the value is present, and it has a value, ex: -arg1 value</li>
+     * </ul>
+     * @param string $key
+     * @return string=['none','empty','value']
      */
-    public function readParameterArgFlag($parameter): array
+    public function isParameterPresent($key): string
     {
+        $parameter=$this->getParameter($key);
+        if(!$parameter->isValid()) {
+            return 'none';
+        }
         //
         $position = false;
         switch ($parameter->type) {
@@ -537,9 +625,9 @@ class CliOne
                 $extraName = '-';
                 break;
             default:
-                $parameter->missing = true;
-                return [false, null];
+                return 'none';
         }
+        /** @noinspection DuplicatedCode */
         if ($position === false) {
             $value = $this->argv[$trueName] ?? null;
         } else {
@@ -577,21 +665,15 @@ class CliOne
             }
         }
         if ($value === null) {
-            // if the value is not found.
-            $parameter->missing = true;
-            // we try find in the alias (if any).
             foreach ($parameter->alias as $ali) {
                 $value = $this->argv[$extraName . $ali] ?? null;
                 if ($value !== null) {
-                    $parameter->missing = false;
-                    return [true, $value];
+                    return 'value';
                 }
             }
-            return [false, false];
+            return 'none';
         }
-        // the value is found and we return the value.
-        $parameter->missing = false;
-        return [true, $value];
+        return $value?'value':'empty';
     }
 
     /**

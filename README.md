@@ -151,6 +151,9 @@ $cli->createParam('h','flag',['help'])->add();  // it adds an alias longflag cal
   * if the user doesn't fill the information, then it returns the default value (if any), **end of the flow**
   * if the user fills the information, but it is incorrect, then it asks again and again.
   * if the user fills the right information, then it returns this value, **end of the flow**
+* if input is true setInput(false) then
+  * Note: we were unable to read the values of the argument, and we don't want to read from user input. 
+  * it returns the default value, and it could raise an error, **end of the flow**
 
 Note:
 * isRequired() if the value is missing, then it shows an error.
@@ -785,6 +788,8 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.6 (2022-02-18)
+  * **[new]** new method isParameterPresent() 
 * 1.5.5 (2022-02-18)
   * getParameter() always returns a parameter, no matter if it does not exist.
     * You can use the method isValid() to check its validity  

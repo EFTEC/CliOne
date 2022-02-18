@@ -301,6 +301,24 @@ class CliOneTest extends TestCase
         $this->assertEquals('v1', $t->getValue('test1'));
         $this->assertEquals('k1', $t->getValueKey('test1'));
     }
+    public function testisParamPresent() {
+        global $argv;
+        $argv = ['program.php','-flag1','--flag3','--flag4','value','-f6','value2'];
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('flag1')->add();
+        $t->createParam('flag2')->add();
+        $t->createParam('flag3','longflag')->add();
+        $t->createParam('flag4','longflag')->add();
+        $t->createParam('flag6','longflag','f6')->add();
+        $t->createParam('flag7','longflag','f7')->add();
+        $this->assertEquals('empty',$t->isParameterPresent('flag1'));
+        $this->assertEquals('none',$t->isParameterPresent('flag2'));
+        $this->assertEquals('empty',$t->isParameterPresent('flag3'));
+        $this->assertEquals('value',$t->isParameterPresent('flag4'));
+        $this->assertEquals('none',$t->isParameterPresent('flag5'));
+        $this->assertEquals('value',$t->isParameterPresent('flag6'));
+        $this->assertEquals('none',$t->isParameterPresent('flag7'));
+    }
 
     public function testInputOption()
     {
