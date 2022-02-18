@@ -16,6 +16,21 @@ class CliOneTest extends TestCase
         //, the first value is the current value to read
         //, and the next values are the emulated user input
     }
+    public function testBread() {
+        $t = new CliOne('CliOneTest.php');
+        $t->showLine('---bread---');
+        $t->showBread();
+        $t->upLevel('level1',' (type)');
+        $t->showBread();
+        $t->downLevel();
+        $t->showBread(false);
+        $t->downLevel(3);
+        $t->showBread(false);
+        $t->showLine('---bread---');
+
+
+        $this->assertTrue(true);
+    }
     public function testMisc() {
         $t = new CliOne('CliOneTest.php');
         $this->assertGreaterThan(20,$t->getColSize());
@@ -156,14 +171,25 @@ class CliOneTest extends TestCase
         $p = $t->createParam('test1')->setDescription('it is a test', 'test #2')->setInput()->evalParam(true);
         $this->assertEquals('hello world', $p->value);
     }
-
+    public function testEscape()
+    {
+        $cli = new CliOne('CliOneTest.php');
+        $txt="<red><bold>hello</bold></red>";
+        $this->assertEquals("\e[31m\e[01mhello\e[22m\e[39m",$cli->colorText($txt));
+        $this->assertEquals("hello",$cli->colorLess($cli->colorText($txt)));
+        $this->assertEquals(str_repeat(chr(250),10)."hello".str_repeat(chr(250),10),$cli->colorMask($cli->colorText($txt)));
+    }
     public function testVisual()
     {
         global $argv;
         $argv = ['program.php',];
         $cli = new CliOne('CliOneTest.php');
         $cli->showFrame(['line1', 'line2', 'line3'], ['title1', 'title2']);
+        $this->assertEquals(["","a",""],$cli->alignLinesMiddle(["a"],3));
+        $this->assertEquals(["","a","",""],$cli->alignLinesMiddle(["a"],4));
         $cli->showMessageBox(['line1', 'line2'], ['title1', 'title2']);
+        $cli->showMessageBox(["one","two","three"],["title"]);
+        $cli->showMessageBox(["content"],["one","two","three"]);
         $values = [];
         $values[] = ['col1' => 'value1', 'col2' => 'value2', 'col3' => 'value2'];
         $values[] = ['col1' => 'value12222222222222', 'col2' => 'value2', 'col3' => 'value2'];

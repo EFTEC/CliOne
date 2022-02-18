@@ -16,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.5
+ * @version   1.5.2
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.5';
+    public const VERSION = '1.5.2';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
@@ -49,6 +49,30 @@ class CliOne
      * @var array
      */
     protected $argv = [];
+    /** @var bool if true then it will not show colors */
+    public $noColor=false;
+
+    public $colorTags=['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
+        '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
+        '<cyan>', '</cyan>', '<magenta>', '</magenta>',
+        '<bred>', '</bred>', '<byellow>', '</byellow>', '<bgreen>', '</bgreen>',
+        '<bwhite>', '</bwhite>', '<bblue>', '</bblue>', '<bblack>', '</bblack>',
+        '<bcyan>', '</bcyan>', '<bmagenta>', '</bmagenta>'];
+    public $styleTextTags=['<italic>', '</italic>', '<bold>', '</bold>', '<dim>', '</dim>',
+        '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'];
+    public $columnTags=['<col0/>', '<col1/>', '<col2/>',
+        '<col3/>', '<col4/>', '<col5/>',];
+
+    public $colorEscape=["\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
+        "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
+        "\e[36m", "\e[39m", "\e[35m", "\e[39m",
+        "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
+        "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
+        "\e[46m", "\e[49m", "\e[45m", "\e[49m",];
+    /** @var string[] note, it must be 2 digits */
+    public $styleTextEscape=["\e[03m", "\e[23m", "\e[01m", "\e[22m", "\e[02m", "\e[22m",
+        "\e[04m", "\e[24m", "\e[09m", "\e[29m"];
+    public $columnEscape=[];
 
     /**
      * The constructor
@@ -58,6 +82,13 @@ class CliOne
     public function __construct($origin = null)
     {
         global $argv;
+        if (getenv('NO_COLOR')) {
+            $this->noColor=true;
+        }
+        $t = floor($this->colSize / 6);
+        $this->columnEscape=["\e[000G", "\e[" . sprintf('%03d',$t) . "G", "\e[" .sprintf('%03d',$t * 2) . "G",
+            "\e[" . sprintf('%03d',$t * 3) . "G", "\e[" .sprintf('%03d',$t * 4) . "G", "\e[" . sprintf('%03d',$t * 5) . "G"];
+
         $this->argv = [];
         $c = count($argv);
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
@@ -177,12 +208,16 @@ class CliOne
     }
 
     /**
-     * Down a level in the breadcrub.
+     * Down a level in the breadcrub.<br>
+     * If down more than the number of levels available, then it clears the stack.
+     * @param int $number number of levels to down.
      * @return CliOne
      */
-    public function downLevel(): CliOne
+    public function downLevel($number=1): CliOne
     {
-        array_pop($this->bread);
+        for($i=0;$i<$number;$i++) {
+            array_pop($this->bread);
+        }
         return $this;
     }
 
@@ -646,7 +681,7 @@ class CliOne
      */
     public function show($content): void
     {
-        echo $this->replaceColor($content);
+        echo $this->colorText($content);
     }
 
     /**
@@ -661,15 +696,21 @@ class CliOne
      *      ->showBread();
      * </pre>
      * It shows the current BreadCrumb if any.
+     * @param bool $showIfEmpty if true then it shows the breadcrumb even if it is empty (empty line)<br>
+     *                          if false (default) then it doesn't show the breadcrumb if it is empty.
      * @return $this
      */
-    public function showBread(): CliOne
+    public function showBread($showIfEmpty=false): CliOne
     {
         $this->initStack();
+        if($showIfEmpty===false && count($this->bread)===0) {
+            $this->resetStack();
+            return $this;
+        }
         $txt = [];
         $patternNormal = $this->patternTitleStack ?: '{value}{type}';
         $patternCurrent = $this->patternCurrentStack ?: '<bold>{value}{type}</bold>';
-        $patternSeparator = $this->patternSeparatorStack ?: '>';
+        $patternSeparator = $this->patternSeparatorStack ?: ' > ';
         foreach ($this->bread as $k => $v) {
             if ($v[1]) {
                 [$value, $type] = $v;
@@ -700,7 +741,7 @@ class CliOne
      */
     public function showCheck($label, $color, $content): void
     {
-        echo $this->replaceColor("<$color>[$label]</$color> $content") . "\n";
+        echo $this->colorText("<$color>[$label]</$color> $content") . "\n";
     }
 
     /**
@@ -759,7 +800,7 @@ class CliOne
      * <yellow>yellow</yellow> (yellow)
      * <green>green</green> <green>success</green> (color green)
      * <italic>italic</italic>
-     * <bold>bold</body>
+     * <bold>bold</bold>
      * <dim>dim</dim>
      * <underline>underline</underline>
      * <cyan>cyan</cyan> (color light cyan)
@@ -775,7 +816,7 @@ class CliOne
      */
     public function showLine($content = '', $cliOneParam = null): void
     {
-        echo $this->replaceColor($content, $cliOneParam) . "\n";
+        echo $this->colorText($content, $cliOneParam) . "\n";
     }
 
     /**
@@ -804,25 +845,11 @@ class CliOne
             $titles = [$titles];
         }
         if (count($titles) > count($lines)) {
-            trigger_error('too many titles');
-            return;
+            $lines = $this->alignLinesMiddle($lines,count($titles));
         }
         if (count($titles) < count($lines)) {
             // align to the center by adding the missing lines at the top and bottom.
-            $dif = count($lines) - count($titles);
-            $dtop = floor($dif / 2);
-            $dbottom = ceil($dif / 2);
-            $tmp = [];
-            for ($i = 0; $i < $dtop; $i++) {
-                $tmp[] = '';
-            }
-            foreach ($titles as $title) {
-                $tmp[] = $title;
-            }
-            for ($i = 0; $i < $dbottom; $i++) {
-                $tmp[] = '';
-            }
-            $titles = $tmp;
+            $titles = $this->alignLinesMiddle($titles,count($lines));
         }
         $maxTitleL = 0;
         // max title width
@@ -842,6 +869,23 @@ class CliOne
         $this->show($dl . str_repeat($um, $maxTitleL) . $cutd . str_repeat($um, $contentw - $maxTitleL - 1) . $dr);
         $this->resetStack();
         $this->showLine();
+    }
+    public function alignLinesMiddle($lines, $numberLines): array
+    {
+        $dif = $numberLines-count($lines) ;
+        $dtop = floor($dif / 2);
+        $dbottom = ceil($dif / 2);
+        $tmp = [];
+        for ($i = 0; $i < $dtop; $i++) {
+            $tmp[] = '';
+        }
+        foreach ($lines as $line) {
+            $tmp[] = $line;
+        }
+        for ($i = 0; $i < $dbottom; $i++) {
+            $tmp[] = '';
+        }
+        return $tmp;
     }
 
     /**
@@ -1304,23 +1348,23 @@ class CliOne
         // pattern
         switch ($parameter->inputType) {
             case 'multiple':
-                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
-                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><cyan>[{key}]</cyan></bold> {value}';
+                $foot = "\t<bold><cyan>[a]</cyan></bold> select all, <bold><cyan>[n]</cyan></bold> select none, <bold><cyan>[]</cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 1;
                 break;
             case 'multiple2':
-                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
-                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><cyan>[{key}]</cyan></bold> {value}';
+                $foot = "\t<bold><cyan>[a]</cyan></bold> select all, <bold><cyan>[n]</cyan></bold> select none, <bold><cyan>[]</cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 2;
                 break;
             case 'multiple3':
-                $pattern = '{selection}<bold><bold><cyan>[{key}]<cyan></bold></bold> {value}';
-                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><cyan>[{key}]</cyan></bold> {value}';
+                $foot = "\t<bold><cyan>[a]</cyan></bold> select all, <bold><cyan>[n]</cyan></bold> select none, <bold><cyan>[]</cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 3;
                 break;
             case 'multiple4':
-                $pattern = '{selection}<bold><cyan>[{key}]<cyan></bold> {value}';
-                $foot = "\t<bold><cyan>[a]<cyan></bold> select all, <bold><cyan>[n]<cyan></bold> select none, <bold><cyan>[]<cyan></bold> end selection, [*] (is marked as selected)";
+                $pattern = '{selection}<bold><cyan>[{key}]</cyan></bold> {value}';
+                $foot = "\t<bold><cyan>[a]</cyan></bold> select all, <bold><cyan>[n]</cyan></bold> select none, <bold><cyan>[]</cyan></bold> end selection, [*] (is marked as selected)";
                 $columns = 4;
                 break;
             case 'option':
@@ -1407,7 +1451,7 @@ class CliOne
     /**
      * @param CliOneParam $parameter
      * @return array|string|null
-     * @noinspection DuplicatedCode
+
      */
     protected function readParameterInput($parameter)
     {
@@ -1474,7 +1518,7 @@ class CliOne
      */
     protected function readline($content, $parameter)
     {
-        echo $this->replaceColor($content);
+        echo $this->colorText($content);
         // globals is used for phpunit.
         if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
             $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
@@ -1512,6 +1556,9 @@ class CliOne
         return readline("");
     }
 
+
+
+
     /**
      * It sets the color of the cli<br>
      * <pre>
@@ -1521,7 +1568,7 @@ class CliOne
      * <yellow>yellow</yellow> (yellow)
      * <green>green</green>  (color green)
      * <italic>italic</italic>
-     * <bold>bold</body>
+     * <bold>bold</bold>
      * <underline>underline</underline>
      * <strikethrough>strikethrough</strikethrough>
      * <cyan>cyan</cyan> (color light cyan)
@@ -1533,11 +1580,10 @@ class CliOne
      * @param                  $content
      * @param CliOneParam|null $cliOneParam
      * @return array|string|string[]
-     * @noinspection DuplicatedCode
+
      */
-    public function replaceColor($content, $cliOneParam = null)
+    public function colorText($content, $cliOneParam = null)
     {
-        $t = floor($this->colSize / 6);
         if ($cliOneParam !== null) {
             if (is_array($cliOneParam->inputValue)) {
                 $v = implode('/', $cliOneParam->inputValue);
@@ -1546,93 +1592,35 @@ class CliOne
             }
             $content = str_replace('<option/>', $v, $content);
         }
-        return str_replace(
-            [
-                '<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
-                '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
-                '<cyan>', '</cyan>', '<magenta>', '</magenta>',
-                '<bred>', '</bred>', '<byellow>', '</byellow>', '<bgreen>', '</bgreen>',
-                '<bwhite>', '</bwhite>', '<bblue>', '</bblue>', '<bblack>', '</bblack>',
-                '<bcyan>', '</bcyan>', '<bmagenta>', '</bmagenta>',
-                '<col0/>', '<col1/>', '<col2/>',
-                '<col3/>', '<col4/>', '<col5/>',
-                '<italic>', '</italic>', '<bold>', '</bold>', '<dim>', '</dim>', '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'
-            ]
-            ,
-            [
-                "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
-                "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
-                "\e[36m", "\e[39m", "\e[35m", "\e[39m",
-                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
-                "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
-                "\e[46m", "\e[49m", "\e[45m", "\e[49m",
-                "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
-                "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
-                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
-            ]
-            , $content);
+        $content=str_replace($this->colorTags,$this->noColor ? array_fill(0,count($this->colorTags),''): $this->colorEscape, $content);
+        $content=str_replace($this->styleTextTags,$this->styleTextEscape, $content);
+        return str_replace($this->columnTags,$this->columnEscape, $content);
     }
 
-    protected function colorLess($content)
+    /**
+     * It removes all the escape characters of a content
+     * @param string $content
+     * @return string
+     */
+    public function colorLess($content): string
     {
-        $t = floor($this->colSize / 6);
-        /** @noinspection DuplicatedCode */
-        return str_replace(
-            [
-                "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
-                "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
-                "\e[36m", "\e[39m", "\e[35m", "\e[39m",
-                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
-                "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
-                "\e[46m", "\e[49m", "\e[45m", "\e[49m",
-                "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
-                "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
-                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
-            ]
-            ,
-            [
-                "", "", "", "", "", "",
-                "", "", "", "", "", "",
-                "", "", "", "",
-                "", "", "", "", "", "",
-                "", "", "", "", "", "",
-                "", "", "", "",
-                "", "", "",
-                "", "", "",
-                "", "", "", "", "", "", "", "", "", ""
-            ], $content);
+        $content=str_replace($this->colorEscape,array_fill(0,count($this->colorEscape),''),$content);
+        $content=str_replace($this->styleTextEscape,array_fill(0,count($this->styleTextEscape),''),$content);
+        return str_replace($this->columnEscape,array_fill(0,count($this->columnEscape),''),$content);
     }
 
-    protected function colorMask($content)
+    /**
+     * It masks (with a char 250) all the escape characters.
+     * @param $content
+     * @return array|string|string[]
+     */
+    public function colorMask($content)
     {
-        $t = floor($this->colSize / 6);
-        $m5 = str_repeat(chr(250), 5);
-        $m4 = str_repeat(chr(250), 4);
-        /** @noinspection DuplicatedCode */
-        return str_replace(
-            [
-                "\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
-                "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
-                "\e[36m", "\e[39m", "\e[35m", "\e[39m",
-                "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
-                "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
-                "\e[46m", "\e[49m", "\e[45m", "\e[49m",
-                "\e[0G", "\e[" . ($t) . "G", "\e[" . ($t * 2) . "G",
-                "\e[" . ($t * 3) . "G", "\e[" . ($t * 4) . "G", "\e[" . ($t * 5) . "G",
-                "\e[3m", "\e[23m", "\e[1m", "\e[22m", "\e[2m", "\e[22m", "\e[4m", "\e[24m", "\e[9m", "\e[29m"
-            ]
-            ,
-            [
-                $m5, $m5, $m5, $m5, $m5, $m5,
-                $m5, $m5, $m5, $m5, $m5, $m5,
-                $m5, $m5, $m5, $m5,
-                $m5, $m5, $m5, $m5, $m5, $m5,
-                $m5, $m5, $m5, $m5, $m5, $m5,
-                $m5, $m5, $m5, $m5,
-                $m4, str_repeat(chr(250), 3 + $this->strlen($t)), str_repeat(chr(250), 3 + $this->strlen($t * 2)),
-                str_repeat(chr(250), 3 + $this->strlen($t * 3)), str_repeat(chr(250), 3 + $this->strlen($t * 4)), str_repeat(chr(250), 3 + $this->strlen($t * 5)),
-                $m4, $m5, $m4, $m5, $m4, $m5, $m4, $m5, $m4, $m5
-            ], $content);
+        $m5 = str_repeat(chr(250), 5); // colorescape and styletextescape uses \e[00m notation
+        $m6 = str_repeat(chr(250), 6); // columnEscape uses \e[000m notation
+        $content=str_replace($this->colorEscape,array_fill(0,count($this->colorEscape),$m5),$content);
+        $content=str_replace($this->styleTextEscape,array_fill(0,count($this->styleTextEscape),$m5),$content);
+        return str_replace($this->columnEscape,array_fill(0,count($this->columnEscape),$m6),$content);
     }
 
     protected function resetStack(): CliOne
@@ -1705,7 +1693,7 @@ class CliOne
         $text = str_replace(
             array('{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'),
             array($selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix), $pattern);
-        $text = $this->replaceColor($text);
+        $text = $this->colorText($text);
         return $this->ellipsis($text, $colW - 1);
     }
 

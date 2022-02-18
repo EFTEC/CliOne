@@ -20,9 +20,11 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 ✅ Colors available
 
-✅ The design is mostly fluent (it adjust to the width of the screen)
+✅ The design is mostly fluent (it adjusts to the width of the screen)
 
 ✅ Validation of values
+
+✅ Support NO_COLOR environment variable. See https://no-color.org/
 
 
 
@@ -101,9 +103,9 @@ $cli=new CliOne(); // instance of the library
 php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valueflag2 subcommandlatest
 ```
 
-The system allows to read multiple types of arguments
+The system allows reading multiple types of arguments
 
-* **first**: this argument does not have value and it is position (in the very first position), it could be not be prefixed with a "-"
+* **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
 * **second**: this argument is also positional (second position) and does not have any value
 * **last**: this argument is also positional and it is always at the latest argument
 * **flag**: the argument is prefixed with a single "-". This argument not need to be a single character.
@@ -260,21 +262,21 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
 
 ## Types of user input
 
-| userinput    | description                                                  |
-| ------------ | ------------------------------------------------------------ |
-| number       | the value must be a number                                   |
-| range        | the value must be a number between a range of values         |
-| string       | the value must be a string (by default, nulls are not string) |
+| userinput    | description                                                             |
+|--------------|-------------------------------------------------------------------------|
+| number       | the value must be a number                                              |
+| range        | the value must be a number between a range of values                    |
+| string       | the value must be a string (by default, nulls are not string)           |
 | password     | the value must be a string (and if it is displayed, then it shows ****) |
-| multiple     | It allows to select one or many values displated in 1 column |
-| multiple2    | The same than multiple but displayed in 2 columns            |
-| multiple3    | The same than multiple but displayed in 3 columns            |
-| multiple4    | The same than multiple but displayed in 4 columns            |
-| option       | It allows to select one from many values displayed in a column |
-| option2      | The same than option but displayed in 2 columns              |
-| option3      | The same than option but displayed in 3 columns              |
-| option4      | The same than option but displayed in 4 columns              |
-| optionsimple | It allows to select one from many values. It doesn't use columns |
+| multiple     | It allows to select one or many values displated in 1 column            |
+| multiple2    | The same than multiple but displayed in 2 columns                       |
+| multiple3    | The same than multiple but displayed in 3 columns                       |
+| multiple4    | The same than multiple but displayed in 4 columns                       |
+| option       | It allows to select one from many values displayed in a column          |
+| option2      | The same than option but displayed in 2 columns                         |
+| option3      | The same than option but displayed in 3 columns                         |
+| option4      | The same than option but displayed in 4 columns                         |
+| optionsimple | It allows to select one from many values. It doesn't use columns        |
 
 ## Types of colors
 
@@ -513,7 +515,7 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
   <yellow>yellow</yellow> (yellow)
   <green>green</green> <green>success</green> (color green)
   <italic>italic</italic>
-  <bold>bold</body>
+  <bold>bold</bold>
   <dim>dim</dim>
   <underline>underline</underline>
   <cyan>cyan</cyan> (color light cyan)
@@ -597,7 +599,7 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
   <yellow>yellow</yellow> (yellow)
   <green>green</green>  (color green)
   <italic>italic</italic>
-  <bold>bold</body>
+  <bold>bold</bold>
   <underline>underline</underline>
   <strikethrough>strikethrough</strikethrough>
   <cyan>cyan</cyan> (color light cyan)
@@ -763,8 +765,11 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.5.2 (2022-02-18)
+  * **[fix]** some cleanups of the code.
 * 1.5.1 (2022-02-18)
   * **[fix]** fixed a problem when the type is "none", it returned null instead of false.
+  * **[new]** CliOneParam::evalParam() could return the value instead of the instance.
 * 1.5 (2022-02-17)
   * **[fix]** corrected the display and trim of some text when the text uses a color.
   * **[new]** it allows multiples types of arguments (not only flags), including positional, flags, long-flags are none.
