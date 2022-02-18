@@ -40,11 +40,15 @@ class CliOneTest extends TestCase
         $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'ccc','yes'];
         $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
-        $this->assertEquals(['bbb','ccc'],$t->listHistory());
-        $t->clearHistory();
-        $this->assertEquals([],$t->listHistory());
-        $t->setHistory(['bbb','ccc']);
-        $this->assertEquals(['bbb','ccc'],$t->listHistory());
+        if(PHP_MAJOR_VERSION>=7 && PHP_MINOR_VERSION>3) {
+            $this->assertEquals(['bbb', 'ccc'], $t->listHistory());
+            $t->clearHistory();
+            $this->assertEquals([], $t->listHistory());
+            $t->setHistory(['bbb', 'ccc']);
+            $this->assertEquals(['bbb', 'ccc'], $t->listHistory());
+        } else {
+            $this->assertEquals([], $t->listHistory());
+        }
 
     }
     public function testMisc() {

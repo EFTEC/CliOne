@@ -15,8 +15,6 @@ namespace eftec\CliOne;
  */
 class CliOneParam
 {
-    /** @var CliOne */
-    private $parent;
     public $key;
     /** @var string=['first','last','second','flag','longflag','onlyinput','none'][$i]  */
     public $type;
@@ -35,17 +33,10 @@ class CliOneParam
      */
     public $allowEmpty = false;
     public $description = '';
-    protected $helpSyntax = [];
-    protected $patterColumns;
-    protected $patternQuestion;
-    protected $footer;
-
-
     public $required = false;
     public $input = false;
     /** @var bool if true then the value is not entered, but it could have a value (default value) */
     public $missing = true;
-
     /**
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
@@ -53,7 +44,114 @@ class CliOneParam
     public $inputValue = [];
     public $value;
     public $valueKey;
-    public $history=false;
+    protected $addHistory=false;
+    protected $helpSyntax = [];
+    protected $patterColumns;
+    protected $patternQuestion;
+    protected $footer;
+    protected $history=[];
+    /** @var CliOne */
+    private $parent;
+
+    /**
+     * The constructor. It is used internally
+     * @param CliOne  $parent
+     * @param ?string $key
+     * @param bool    $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param array|string   $alias
+     * @param null    $value
+     * @param null    $valueKey
+     */
+    public function __construct($parent, $key = null, $type = true,$alias=[], $value = null, $valueKey = null)
+    {
+        $this->parent = $parent;
+        $this->key = $key;
+        $this->type = $type;
+        $this->alias = is_array($alias)? $alias : [$alias];
+        /** @noinspection ProperNullCoalescingOperatorUsageInspection */
+        $this->question = $type ?? $key;
+        $this->value = $value;
+        $this->valueKey = $valueKey;
+    }
+
+    /**
+     * It adds an argument but it is not evaluated.
+     * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
+     *                       if true and the argument exists, then it is replaced.
+     * @return void
+     */
+    public function add($override = false): void
+    {
+        if($this->type==='none') {
+            $override=true;
+        }
+        $fail = false;
+        /*if($this->allowEmpty===true && $this->default===false) {
+            $this->parent->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");
+            $fail = true;
+
+        }*/
+        //'number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort
+        switch ($this->inputType) {
+            case 'range':
+                if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
+                    $this->parent->showCheck('ERROR','red',"error in creation of input $this->key inputType for range must be an array");
+                    $fail = true;
+                }
+                break;
+            case 'multiple':
+            case 'multiple2':
+            case 'multiple3':
+            case 'multiple4':
+            case 'option':
+            case 'option2':
+            case 'option3':
+            case 'option4':
+            case 'optionshort':
+                if (!is_array($this->inputValue)) {
+                    $this->parent->showCheck('ERROR','red',"error in creation of input $this->key inputType for $this->inputType must be an array");
+                    $fail = true;
+                }
+                break;
+        }
+        foreach ($this->parent->parameters as $keyParam => $parameter) {
+            if ($parameter->key === $this->key) {
+                if ($override) {
+                    // override
+                    $this->parent->parameters[$keyParam] = $this;
+                    //$this->parent->parameters[$keyParam]->parent=null;
+                    return;
+                }
+                $this->parent->showCheck('ERROR','red',"error in creation of input $this->key, parameter already defined");
+                $fail = true;
+                break;
+            }
+        }
+        if (!$fail) {
+            $this->parent->parameters[] = $this;
+            //$this->parent = null;
+        }
+    }
+
+    public function addHistory($add=true): CliOneParam
+    {
+        $this->addHistory=$add;
+        return $this;
+    }
+
+    /**
+     * It creates an argument and eval the parameter.<br>
+     * It is a macro of add() and CliOne::evalParam()
+     * @param bool $forceInput if false and the value is already digited, then it is not input anymore
+     * @param bool $returnValue If true, then it returns the value obtained.<br>
+     *                          If false (default value), it returns an instance of CliOneParam.
+     * @return CliOneParam|false|mixed
+     */
+    public function evalParam($forceInput = false, $returnValue = false)
+    {
+        $this->add(true);
+        return $this->parent->evalParam($this->key, $forceInput, $returnValue);
+    }
 
     /**
      * It returns the syntax of the help.
@@ -62,11 +160,6 @@ class CliOneParam
     public function getHelpSyntax(): array
     {
         return $this->helpSyntax;
-    }
-    public function addHistory($add=true): CliOneParam
-    {
-        $this->history=$add;
-        return $this;
     }
 
     /**
@@ -78,6 +171,136 @@ class CliOneParam
     public function setHelpSyntax(array $helpSyntax): CliOneParam
     {
         $this->helpSyntax = $helpSyntax;
+        return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getHistory(): array
+    {
+        return $this->history;
+    }
+
+    /**
+     * @param array $history
+     * @return CliOneParam
+     */
+    public function setHistory(array $history): CliOneParam
+    {
+        $this->history = $history;
+        return $this;
+    }
+
+    /**
+     * It gets the pattern, patternquestion and footer
+     * @return array=[pattern,patternquest,footer]
+     */
+    public function getPatterColumns(): array
+    {
+        return [$this->patterColumns, $this->patternQuestion, $this->footer];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isAddHistory(): bool
+    {
+        return $this->addHistory;
+    }
+
+    /**
+     * @param bool $addHistory
+     * @return CliOneParam
+     */
+    public function setAddHistory(bool $addHistory): CliOneParam
+    {
+        $this->addHistory = $addHistory;
+        return $this;
+    }
+
+    /**
+     * It resets the user input and marks the value as missing.
+     * @return CliOneParam
+     * @noinspection PhpUnused
+     */
+    public function resetInput(): CliOneParam
+    {
+        //$this->input=true;
+        $this->value = null;
+        $this->valueKey = null;
+        $this->currentAsDefault = false;
+        $this->missing = true;
+        return $this;
+    }
+
+    /**
+     * It sets to allow empty values.<br>
+     * If true, and the user inputs nothing, then the default value is never used (unless it is an option), and it
+     * returns an empty "".<br> If false, and the user inputs nothing, then the default value is used.<br>
+     * <b>Note</b>: If you are using an option, you are set a default value, and you enter nothing, then the default
+     * value is still used.
+     * @param bool $allowEmpty
+     * @return $this
+     */
+    public function setAllowEmpty($allowEmpty = true): CliOneParam
+    {
+        $this->allowEmpty = $allowEmpty;
+        return $this;
+    }
+
+    /**
+     * if true then it set the current value as the default value but only if the value is not missing.<br>
+     * The default value is assigned every time evalParam() is called.
+     * @param bool $currentAsDefault
+     * @return void
+     */
+    public function setCurrentAsDefault($currentAsDefault = true): void
+    {
+        $this->currentAsDefault = $currentAsDefault;
+    }
+
+    /**
+     * It sets the default value that it is used when the user doesn't input the value<br>
+     * Setting a default value could bypass the option isRequired()
+     * @param mixed $default
+     * @return CliOneParam
+     */
+    public function setDefault($default): CliOneParam
+    {
+        $this->default = $default;
+        return $this;
+    }
+
+    /**
+     * It sets the description
+     * @param string      $description the initial description (used when we show the syntax)
+     * @param null|string $question    The question, it is used in the user input.
+     * @param string[]    $helpSyntax  It adds one or multiple lines of help syntax.
+     * @return CliOneParam
+     */
+    public function setDescription($description, $question = null, $helpSyntax = []): CliOneParam
+    {
+        $this->question = $question ?? "Select the value of $this->key";
+        $this->description = $description;
+        $this->helpSyntax = $helpSyntax;
+        return $this;
+    }
+
+    /**
+     * It sets the input type
+     * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
+     *                          entered as argument.
+     * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
+     * @param mixed  $inputValue
+     * @return CliOneParam
+     */
+    public function setInput($input = true, $inputType = 'string', $inputValue = null,$history=[]): CliOneParam
+    {
+        $this->input = $input;
+        $this->inputType = $inputType;
+        $this->inputValue = $inputValue;
+        $this->history=$history;
         return $this;
     }
 
@@ -114,107 +337,6 @@ class CliOneParam
     }
 
     /**
-     * It gets the pattern, patternquestion and footer
-     * @return array=[pattern,patternquest,footer]
-     */
-    public function getPatterColumns(): array
-    {
-        return [$this->patterColumns, $this->patternQuestion, $this->footer];
-    }
-
-
-    /**
-     * It resets the user input and marks the value as missing.
-     * @return CliOneParam
-     * @noinspection PhpUnused
-     */
-    public function resetInput(): CliOneParam
-    {
-        //$this->input=true;
-        $this->value = null;
-        $this->valueKey = null;
-        $this->currentAsDefault = false;
-        $this->missing = true;
-        return $this;
-    }
-
-    /**
-     * The constructor. It is used internally
-     * @param CliOne  $parent
-     * @param ?string $key
-     * @param bool    $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
-     * @param array|string   $alias
-     * @param null    $value
-     * @param null    $valueKey
-     */
-    public function __construct($parent, $key = null, $type = true,$alias=[], $value = null, $valueKey = null)
-    {
-        $this->parent = $parent;
-        $this->key = $key;
-        $this->type = $type;
-        $this->alias = is_array($alias)? $alias : [$alias];
-        /** @noinspection ProperNullCoalescingOperatorUsageInspection */
-        $this->question = $type ?? $key;
-        $this->value = $value;
-        $this->valueKey = $valueKey;
-    }
-
-
-    /**
-     * It sets the default value that it is used when the user doesn't input the value<br>
-     * Setting a default value could bypass the option isRequired()
-     * @param mixed $default
-     * @return CliOneParam
-     */
-    public function setDefault($default): CliOneParam
-    {
-        $this->default = $default;
-        return $this;
-    }
-
-    /**
-     * if true then it set the current value as the default value but only if the value is not missing.<br>
-     * The default value is assigned every time evalParam() is called.
-     * @param bool $currentAsDefault
-     * @return void
-     */
-    public function setCurrentAsDefault($currentAsDefault = true): void
-    {
-        $this->currentAsDefault = $currentAsDefault;
-    }
-
-    /**
-     * It sets to allow empty values.<br>
-     * If true, and the user inputs nothing, then the default value is never used (unless it is an option), and it
-     * returns an empty "".<br> If false, and the user inputs nothing, then the default value is used.<br>
-     * <b>Note</b>: If you are using an option, you are set a default value, and you enter nothing, then the default
-     * value is still used.
-     * @param bool $allowEmpty
-     * @return $this
-     */
-    public function setAllowEmpty($allowEmpty = true): CliOneParam
-    {
-        $this->allowEmpty = $allowEmpty;
-        return $this;
-    }
-
-    /**
-     * It sets the description
-     * @param string      $description the initial description (used when we show the syntax)
-     * @param null|string $question    The question, it is used in the user input.
-     * @param string[]    $helpSyntax  It adds one or multiple lines of help syntax.
-     * @return CliOneParam
-     */
-    public function setDescription($description, $question = null, $helpSyntax = []): CliOneParam
-    {
-        $this->question = $question ?? "Select the value of $this->key";
-        $this->description = $description;
-        $this->helpSyntax = $helpSyntax;
-        return $this;
-    }
-
-
-    /**
      * It marks the value as required<br>
      * The value could be ignored if it used together with setDefault()
      * @param boolean $required
@@ -224,96 +346,6 @@ class CliOneParam
     {
         $this->required = $required;
         return $this;
-    }
-
-
-    /**
-     * It sets the input type
-     * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
-     *                          entered as argument.
-     * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
-     * @param mixed  $inputValue
-     * @return CliOneParam
-     */
-    public function setInput($input = true, $inputType = 'string', $inputValue = null): CliOneParam
-    {
-        $this->input = $input;
-        $this->inputType = $inputType;
-        $this->inputValue = $inputValue;
-        return $this;
-    }
-
-    /**
-     * It creates an argument and eval the parameter.<br>
-     * It is a macro of add() and CliOne::evalParam()
-     * @param bool $forceInput if false and the value is already digited, then it is not input anymore
-     * @param bool $returnValue If true, then it returns the value obtained.<br>
-     *                          If false (default value), it returns an instance of CliOneParam.
-     * @return CliOneParam|false|mixed
-     */
-    public function evalParam($forceInput = false, $returnValue = false)
-    {
-        $this->add(true);
-        return $this->parent->evalParam($this->key, $forceInput, $returnValue);
-    }
-
-    /**
-     * It adds an argument but it is not evaluated.
-     * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
-     *                       if true and the argument exists, then it is replaced.
-     * @return void
-     */
-    public function add($override = false): void
-    {
-        if($this->type==='none') {
-            $override=true;
-        }
-        $fail = false;
-        /*if($this->allowEmpty===true && $this->default===false) {
-            $this->parent->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");
-            $fail = true;
-
-        }*/
-        //'number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort
-        switch ($this->inputType) {
-            case 'range':
-                if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    $this->parent->showLine("<red>error in creation of input $this->key inputType for range must be an array</red>");
-                    $fail = true;
-                }
-                break;
-            case 'multiple':
-            case 'multiple2':
-            case 'multiple3':
-            case 'multiple4':
-            case 'option':
-            case 'option2':
-            case 'option3':
-            case 'option4':
-            case 'optionshort':
-                if (!is_array($this->inputValue)) {
-                    $this->parent->showLine("<red>error in creation of input $this->key inputType for $this->inputType must be an array</red>");
-                    $fail = true;
-                }
-                break;
-        }
-        foreach ($this->parent->parameters as $keyParam => $parameter) {
-            if ($parameter->key === $this->key) {
-                if ($override) {
-                    // override
-                    $this->parent->parameters[$keyParam] = $this;
-                    //$this->parent->parameters[$keyParam]->parent=null;
-                    return;
-                }
-                $this->parent->showLine("<red>error in creation of input $this->key, parameter already defined</red>");
-                $fail = true;
-                break;
-            }
-        }
-        if (!$fail) {
-            $this->parent->parameters[] = $this;
-            //$this->parent = null;
-        }
     }
 
 

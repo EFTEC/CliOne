@@ -16,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.5.3
+ * @version   1.5.4
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.5.3';
+    public const VERSION = '1.5.4';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
@@ -257,7 +257,7 @@ class CliOne
                 if ($parameter->currentAsDefault && $parameter->value !== null && $parameter->missing === true) {
                     $parameter->value = $parameter->currentAsDefault;
                     $this->assignParamValueKey($parameter);
-                    if($parameter->history) {
+                    if($parameter->isAddHistory()) {
                         $this->addHistory($parameter->value);
                     }
                     return $returnValue === true ? $parameter->value : $parameter;
@@ -305,7 +305,7 @@ class CliOne
         if ($valueK === false || $valueK === null) {
             return false;
         }
-        if($this->parameters[$valueK]->history) {
+        if($this->parameters[$valueK]->isAddHistory()) {
             $this->addHistory($this->parameters[$valueK]->value);
         }
         return $returnValue === true ? $this->parameters[$valueK]->value : $this->parameters[$valueK];
@@ -1617,7 +1617,18 @@ class CliOne
         } else {
             self::$autocomplete = [$parameter->default];
         }
-        return readline("");
+        if(count($parameter->getHistory())>0) {
+            // if the parameter has its own history, then we will use it
+            $prevhistory=$this->listHistory();
+            $this->setHistory($parameter->getHistory());
+        }
+        $r=readline("");
+        if(count($parameter->getHistory())>0) {
+            // if we use a parameter history, then we return to the previous history
+            /** @noinspection PhpUndefinedVariableInspection */
+            $this->setHistory($prevhistory);
+        }
+        return $r;
     }
 
 
@@ -1934,7 +1945,7 @@ class CliOne
                     $cause = 'unknown $parameter->inputType inputtype';
             }
             if (!$ok) {
-                $this->showLine('WARNING','yellow',"The value $parameter->key is not correct, $cause");
+                $this->showCheck('WARNING','yellow',"The value $parameter->key is not correct, $cause");
             }
             if ($askInput === false) {
                 break;
