@@ -31,6 +31,22 @@ class CliOneTest extends TestCase
 
         $this->assertTrue(true);
     }
+    public function testHistory() {
+        global $argv;
+        unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+        $argv = ['program.php', '-dosave','xxxx']; // this value must be ignored
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'bbb','yes'];
+        $t = new CliOne('CliOneTest.php');
+        $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, 'ccc','yes'];
+        $t->createParam('aaa','none')->setInput()->addHistory()->evalParam();
+        $this->assertEquals(['bbb','ccc'],$t->listHistory());
+        $t->clearHistory();
+        $this->assertEquals([],$t->listHistory());
+        $t->setHistory(['bbb','ccc']);
+        $this->assertEquals(['bbb','ccc'],$t->listHistory());
+
+    }
     public function testMisc() {
         $t = new CliOne('CliOneTest.php');
         $this->assertGreaterThan(20,$t->getColSize());

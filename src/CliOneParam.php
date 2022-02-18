@@ -53,6 +53,7 @@ class CliOneParam
     public $inputValue = [];
     public $value;
     public $valueKey;
+    public $history=false;
 
     /**
      * It returns the syntax of the help.
@@ -61,6 +62,11 @@ class CliOneParam
     public function getHelpSyntax(): array
     {
         return $this->helpSyntax;
+    }
+    public function addHistory($add=true): CliOneParam
+    {
+        $this->history=$add;
+        return $this;
     }
 
     /**

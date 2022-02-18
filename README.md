@@ -766,7 +766,8 @@ It adds an argument but it is not evaluated.
 
 ## Changelog
 * 1.5.4 (2022-02-18)
-  * fixed a problem with the default value. 
+  * fixed a problem with the default value.
+  * added history (if available)
 * 1.5.3 (2022-02-18)
   * nothing, just a renumeration
 * 1.5.2 (2022-02-18)

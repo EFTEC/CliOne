@@ -257,6 +257,9 @@ class CliOne
                 if ($parameter->currentAsDefault && $parameter->value !== null && $parameter->missing === true) {
                     $parameter->value = $parameter->currentAsDefault;
                     $this->assignParamValueKey($parameter);
+                    if($parameter->history) {
+                        $this->addHistory($parameter->value);
+                    }
                     return $returnValue === true ? $parameter->value : $parameter;
                 }
                 [$def, $parameter->value] = $this->readParameterArgFlag($parameter);
@@ -302,8 +305,54 @@ class CliOne
         if ($valueK === false || $valueK === null) {
             return false;
         }
+        if($this->parameters[$valueK]->history) {
+            $this->addHistory($this->parameters[$valueK]->value);
+        }
         return $returnValue === true ? $this->parameters[$valueK]->value : $this->parameters[$valueK];
     }
+
+    /**
+     * Add a value to the history
+     * @param string|array $prompt the value(s) of the history to add
+     * @return $this
+     */
+    public function addHistory($prompt): self
+    {
+        if(function_exists('readline_add_history')) {
+            $prompt=is_array($prompt)?$prompt: [$prompt];
+            foreach($prompt as $v) {
+                readline_add_history($v);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * It sets the history (deleting the old history) with the new values
+     * @param string|array $prompt
+     * @return $this
+     */
+    public function setHistory($prompt): self
+    {
+        $this->clearHistory();
+        $this->addHistory($prompt);
+        return $this;
+    }
+    public function clearHistory(): CliOne
+    {
+        if(function_exists('readline_clear_history')) {
+            readline_clear_history();
+        }
+        return $this;
+    }
+    public function listHistory(): array
+    {
+        if(function_exists('readline_list_history')) {
+            return readline_list_history();
+        }
+        return [];
+    }
+
 
     /**
      * It returns an associative array with all the parameters of the form [key=>value]
