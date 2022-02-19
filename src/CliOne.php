@@ -982,8 +982,8 @@ class CliOne
      * </pre>
      *
      *
-     * @param string $content content to display
-     * @param ?CliOneParam   $cliOneParam
+     * @param string       $content content to display
+     * @param ?CliOneParam $cliOneParam
      * @return void
      */
     public function showLine(string $content = '', ?CliOneParam $cliOneParam = null): void
@@ -1395,9 +1395,6 @@ class CliOne
      */
     protected function refreshParamValueKey(CliOneParam $parameter): void
     {
-        if (!is_array($parameter->inputValue)) {
-            return;
-        }
         $parameter->setValue($parameter->value);
     }
 

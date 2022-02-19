@@ -73,7 +73,6 @@ class CliOneParam
         $this->question = $type ?? $key;
         $this->value = $value;
         $this->valueKey = $valueKey;
-
     }
 
     /**
@@ -84,8 +83,8 @@ class CliOneParam
      */
     public function add(bool $override = false): bool
     {
-        if($this->key===null) {
-            if(!$this->parent->isSilentError()) {
+        if ($this->key === null) {
+            if (!$this->parent->isSilentError()) {
                 $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
             }
             return false;
@@ -103,7 +102,7 @@ class CliOneParam
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    if(!$this->parent->isSilentError()) {
+                    if (!$this->parent->isSilentError()) {
                         $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
                     }
                     $fail = true;
@@ -119,7 +118,7 @@ class CliOneParam
             case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
-                    if(!$this->parent->isSilentError()) {
+                    if (!$this->parent->isSilentError()) {
                         $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for $this->inputType must be an array");
                     }
                     $fail = true;
@@ -134,7 +133,7 @@ class CliOneParam
                     //$this->parent->parameters[$keyParam]->parent=null;
                     return true;
                 }
-                if(!$this->parent->isSilentError()) {
+                if (!$this->parent->isSilentError()) {
                     $this->parent->showCheck('ERROR', 'red',
                         "error in creation of input $this->key,parameter already defined");
                 }
@@ -143,21 +142,21 @@ class CliOneParam
             }
             if (in_array($this->key, $parameter->alias, true)) {
                 // we found an alias that matches the parameter.
-                if(!$this->parent->isSilentError()) {
+                if (!$this->parent->isSilentError()) {
                     $this->parent->showCheck('ERROR', 'red',
                         "error in creation of input $this->key,parameter already defined as an alias");
                 }
                 $fail = true;
                 break;
             }
-            foreach($this->alias as $alias) {
-                if(($alias === $parameter->key) && !$this->parent->isSilentError()) {
+            foreach ($this->alias as $alias) {
+                if (($alias === $parameter->key) && !$this->parent->isSilentError()) {
                     $this->parent->showCheck('ERROR', 'red',
                         "error in creation of alias $this->key/$alias,parameter already defined");
                 }
                 if (in_array($alias, $parameter->alias, true)) {
                     // we found an alias that matches the parameter.
-                    if(!$this->parent->isSilentError()) {
+                    if (!$this->parent->isSilentError()) {
                         $this->parent->showCheck('ERROR', 'red',
                             "error in creation of alias $this->key/$alias,parameter already defined as other alias");
                     }
@@ -229,16 +228,20 @@ class CliOneParam
 
     /**
      * We set a new value
-     * @param mixed $newValue it sets a new value
+     * @param mixed $newValue    it sets a new value
      * @param mixed $newValueKey it sets the value-key. If null then the value is asumed using inputvalue.
-     * @param bool $missing by default every time we set a value, we mark missing as false, however you can change it.
+     * @param bool  $missing     by default every time we set a value, we mark missing as false, however you can change
+     *                           it.
      * @return $this
      */
-    public function setValue($newValue, $newValueKey=null,bool $missing=false) : CliOneParam
+    public function setValue($newValue, $newValueKey = null, bool $missing = false): CliOneParam
     {
-        $this->value=$newValue;
-        $this->missing=$missing;
-        if($newValueKey===null) {
+        $this->value = $newValue;
+        $this->missing = $missing;
+        if ($newValueKey === null) {
+            if (!is_array($this->inputValue)) {
+                return $this;
+            }
             if ($this->value !== null && strpos($this->value, $this->parent->emptyValue) === 0) {
                 // the value is of the type __input_*
                 $this->valueKey = str_replace($this->parent->emptyValue, '', $this->value);
@@ -247,9 +250,8 @@ class CliOneParam
             $k = array_search($this->value, $this->inputValue, true);
             $this->valueKey = $k === false ? null : $k;
         } else {
-            $this->valueKey=$newValueKey;
+            $this->valueKey = $newValueKey;
         }
-
         return $this;
     }
 
@@ -283,7 +285,7 @@ class CliOneParam
      */
     public function isValid(): bool
     {
-        return $this->key!==null;
+        return $this->key !== null;
     }
 
     /**
@@ -365,7 +367,7 @@ class CliOneParam
      * </pre>
      *
      * @param bool   $input      if true, then the value could be input via user. If false, the value could only be
-     *                          entered as argument.
+     *                           entered as argument.
      * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
      *                           This value allows string, arrays and associative arrays<br>
