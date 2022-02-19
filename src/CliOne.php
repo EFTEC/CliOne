@@ -267,8 +267,11 @@ class CliOne
                 // the parameter is already read, skipping.
                 //    return $returnValue === true ? $parameter->value : $parameter;
                 //}
-                if ($parameter->currentAsDefault && $parameter->value !== null && $parameter->missing === true) {
-                    $parameter->value = $parameter->currentAsDefault;
+                if ($parameter->value !== null && $parameter->missing === true) {
+                    $parameter->missing=false;
+                }
+                if ($parameter->currentAsDefault && $parameter->value !== null) {
+                    //$parameter->value = $parameter->currentAsDefault; the value hasn't changed
                     $this->assignParamValueKey($parameter);
                     if ($parameter->isAddHistory()) {
                         $this->addHistory($parameter->value);

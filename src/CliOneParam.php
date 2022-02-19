@@ -77,15 +77,6 @@ class CliOneParam
     }
 
     /**
-     * Return the if the parameter is valid (if the key is not null).
-     * @return bool
-     */
-    public function isValid(): bool
-    {
-        return $this->key!==null;
-    }
-
-    /**
      * It adds an argument but it is not evaluated.
      * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
      *                       if true and the argument exists, then it is replaced.
@@ -182,13 +173,6 @@ class CliOneParam
         return !$fail;
     }
 
-    public function setAddHistory($add = true): CliOneParam
-    {
-        $this->addHistory = $add;
-        return $this;
-    }
-
-
     /**
      * It creates an argument and eval the parameter.<br>
      * It is a macro of add() and CliOne::evalParam()
@@ -261,7 +245,20 @@ class CliOneParam
         return $this->addHistory;
     }
 
+    public function setAddHistory($add = true): CliOneParam
+    {
+        $this->addHistory = $add;
+        return $this;
+    }
 
+    /**
+     * Return the if the parameter is valid (if the key is not null).
+     * @return bool
+     */
+    public function isValid(): bool
+    {
+        return $this->key!==null;
+    }
 
     /**
      * It resets the user input and marks the value as missing.

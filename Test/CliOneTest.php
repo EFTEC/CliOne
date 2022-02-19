@@ -191,6 +191,23 @@ class CliOneTest extends TestCase
         $t->getParameter('test1')->setCurrentAsDefault();
         $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
         $this->assertEquals('hello world', $t->evalParam('test1', true)->value);
+
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
+        $t->createParam('test10')->add();
+        $t->setParam('test10','1234');
+        $t->getParameter('test10')->missing=true;
+        $this->assertEquals('1234', $t->getParameter('test10')
+            ->setCurrentAsDefault()
+            ->setDefault('defaultvalue')
+            ->evalParam(true)->value);
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, '', 'xxxx'];         // we use this line to simulate the user input
+        $t->createParam('test11')->add();
+        $t->getParameter('test11')->missing=true;
+        $this->assertEquals('defaultvalue', $t->setParam('test11','setvalue')
+            ->setDefault('defaultvalue')
+            ->setCurrentAsDefault(false)
+            ->evalParam(true)
+            ->value);
     }
     public function testcurrentAsDefault() {
         global $argv;

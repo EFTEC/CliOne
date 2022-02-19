@@ -788,6 +788,8 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.6.1 (2022-02-18)
+  * **[fix]** fixed a small bug with the value is set manually, so it is still marked as missing. 
 * 1.6 (2022-02-18)
   * **[new]** new method isParameterPresent() 
 * 1.5.5 (2022-02-18)
