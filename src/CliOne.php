@@ -12,12 +12,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.6
+ * @version   1.7
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.6';
+    public const VERSION = '1.7';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
@@ -28,6 +28,7 @@ class CliOne
     /** @var CliOneParam[] */
     public $parameters = [];
     protected $colSize = 80;
+    protected $rowSize = 25;
     protected $bread = [];
     /** @var bool if true then mb_string library is loaded, otherwise it is false. it is calculated in the constructor */
     protected $multibyte = false;
@@ -39,7 +40,7 @@ class CliOne
     protected $patternSeparatorStack;
     protected $patternContentStack;
     protected $wait = 0;
-    protected $silentError=false;
+    protected $silentError = false;
 
     /**
      * @return bool
@@ -58,6 +59,7 @@ class CliOne
         $this->silentError = $silentError;
         return $this;
     }
+
     protected $waitPrev = '';
     /**
      * the arguments as a couple key/value. If the value is missing, then it is ''
@@ -94,15 +96,35 @@ class CliOne
      * @param ?string $origin you can specify the origin file. If you specify the origin file, then isCli will only
      *                        return true if the file is called directly.
      */
-    public function __construct($origin = null)
+    public function __construct(?string $origin = null)
     {
-        global $argv;
+        $this->colSize = $this->calculateColSize();
+        $this->rowSize = $this->calculateRowSize();
+        $this->readingArgv();
         if (getenv('NO_COLOR')) {
             $this->noColor = true;
         }
         $t = floor($this->colSize / 6);
         $this->columnEscape = ["\e[000G", "\e[" . sprintf('%03d', $t) . "G", "\e[" . sprintf('%03d', $t * 2) . "G",
             "\e[" . sprintf('%03d', $t * 3) . "G", "\e[" . sprintf('%03d', $t * 4) . "G", "\e[" . sprintf('%03d', $t * 5) . "G"];
+        $this->origin = $origin;
+        $this->multibyte = function_exists('mb_strlen');
+        // it is used by readline
+        readline_completion_function(static function ($input) {
+            // Filter Matches
+            $matches = array();
+            foreach (CliOne::$autocomplete as $cmd) {
+                if (stripos($cmd, $input) === 0) {
+                    $matches[] = $cmd;
+                }
+            }
+            return $matches;
+        });
+    }
+
+    protected function readingArgv(): void
+    {
+        global $argv;
         $this->argv = [];
         $c = count($argv);
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
@@ -138,29 +160,16 @@ class CliOne
                 }
             }
         }
-        $this->origin = $origin;
-        $this->colSize = $this->calculateColSize();
-        $this->multibyte = function_exists('mb_strlen');
-        // it is used by readline
-        readline_completion_function(static function ($input) {
-            // Filter Matches
-            $matches = array();
-            foreach (CliOne::$autocomplete as $cmd) {
-                if (stripos($cmd, $input) === 0) {
-                    $matches[] = $cmd;
-                }
-            }
-            return $matches;
-        });
     }
 
     /**
      * It finds the vendor path starting from a route. The route must be inside the application path.
-     * @param string $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then __DIR__
+     * @param string|null $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then
+     *                              __DIR__
      * @return string It returns the relative path to where is the vendor path. If not found then it returns the
-     *                         initial path
+     *                              initial path
      */
-    public static function findVendorPath($initPath = null): string
+    public static function findVendorPath(?string $initPath = null): string
     {
         $initPath = $initPath ?: __DIR__;
         $prefix = '';
@@ -182,7 +191,7 @@ class CliOne
      * @return string
      * @noinspection PhpUnused
      */
-    protected static function removeTrailSlash($txt): string
+    protected static function removeTrailSlash(string $txt): string
     {
         return rtrim($txt, '/\\');
     }
@@ -216,7 +225,7 @@ class CliOne
      *                            if the type is a double flag, then the alias is a flag.
      * @return CliOneParam
      */
-    public function createParam($key, $type = 'flag', $alias = []): CliOneParam
+    public function createParam(string $key, string $type = 'flag', $alias = []): CliOneParam
     {
         return new CliOneParam($this, $key, $type, $alias);
     }
@@ -227,7 +236,7 @@ class CliOne
      * @param int $number number of levels to down.
      * @return CliOne
      */
-    public function downLevel($number = 1): CliOne
+    public function downLevel(int $number = 1): CliOne
     {
         for ($i = 0; $i < $number; $i++) {
             array_pop($this->bread);
@@ -255,7 +264,7 @@ class CliOne
      *                            If false (default value), it returns an instance of CliOneParam.
      * @return mixed Returns false if not value is found.
      */
-    public function evalParam($key = '*', $forceInput = false, $returnValue = false)
+    public function evalParam(string $key = '*', bool $forceInput = false, bool $returnValue = false)
     {
         $valueK = null;
         $notfound = true;
@@ -268,11 +277,11 @@ class CliOne
                 //    return $returnValue === true ? $parameter->value : $parameter;
                 //}
                 if ($parameter->value !== null && $parameter->missing === true) {
-                    $parameter->missing=false;
+                    $parameter->missing = false;
                 }
                 if ($parameter->currentAsDefault && $parameter->value !== null) {
                     //$parameter->value = $parameter->currentAsDefault; the value hasn't changed
-                    $this->assignParamValueKey($parameter);
+                    $this->refreshParamValueKey($parameter);
                     if ($parameter->isAddHistory()) {
                         $this->addHistory($parameter->value);
                     }
@@ -289,7 +298,7 @@ class CliOne
                 if ($def === false && $currentValue !== null && $forceInput === false) {
                     $def = true;
                     $parameter->value = $currentValue;
-                    $this->assignParamValueKey($parameter);
+                    $this->refreshParamValueKey($parameter);
                 }
                 if ($def === false) {
                     // the value is not defined as an argument
@@ -300,7 +309,7 @@ class CliOne
                     if ($def === false || $parameter->value === false) {
                         $parameter->value = $parameter->default;
                         if ($parameter->required && $parameter->value === false) {
-                            if(!$this->isSilentError()) {
+                            if (!$this->isSilentError()) {
                                 $this->showCheck('ERROR', 'red', "Field $parameter->key is missing");
                             }
                             $parameter->value = false;
@@ -382,7 +391,7 @@ class CliOne
      * @param array $excludeKeys you can add a key that you want to exclude.
      * @return array
      */
-    public function getArrayParams($excludeKeys = []): array
+    public function getArrayParams(array $excludeKeys = []): array
     {
         $array = [];
         foreach ($this->parameters as $parameter) {
@@ -408,14 +417,14 @@ class CliOne
      * @param string $key the key of the parameter
      * @return CliOneParam
      */
-    public function getParameter($key): CliOneParam
+    public function getParameter(string $key): CliOneParam
     {
         foreach ($this->parameters as $v) {
             if ($v->key === $key) {
                 return $v;
             }
         }
-        return new CliOneParam($this,null);
+        return new CliOneParam($this, null);
     }
 
     /**
@@ -430,7 +439,7 @@ class CliOne
      * @param string $key the key of the parameter to read the value
      * @return mixed|null It returns the value of the parameter or null if not found.
      */
-    public function getValue($key)
+    public function getValue(string $key)
     {
         $parameter = $this->getParameter($key);
         if (!$parameter->isValid()) {
@@ -438,6 +447,7 @@ class CliOne
         }
         return $parameter->value;
     }
+
     public function readParameterArgFlag($parameter): array
     {
         //
@@ -530,7 +540,7 @@ class CliOne
      * @return mixed|null It returns the value of the parameter or null if not found.
      *
      */
-    public function getValueKey($key)
+    public function getValueKey(string $key)
     {
         $parameter = $this->getParameter($key);
         if (!$parameter->isValid()) {
@@ -573,7 +583,7 @@ class CliOne
      *                         In error, it returns [false,"error message"]<br>
      *                         In success, it returns [true,values de-serialized]<br>
      */
-    public function readData($filename): ?array
+    public function readData(string $filename): ?array
     {
         $path = pathinfo($filename, PATHINFO_EXTENSION);
         if ($path === '') {
@@ -603,10 +613,10 @@ class CliOne
      * @param string $key
      * @return string=['none','empty','value']
      */
-    public function isParameterPresent($key): string
+    public function isParameterPresent(string $key): string
     {
-        $parameter=$this->getParameter($key);
-        if(!$parameter->isValid()) {
+        $parameter = $this->getParameter($key);
+        if (!$parameter->isValid()) {
             return 'none';
         }
         //
@@ -676,7 +686,7 @@ class CliOne
             }
             return 'none';
         }
-        return $value?'value':'empty';
+        return $value ? 'value' : 'empty';
     }
 
     /**
@@ -685,7 +695,7 @@ class CliOne
      * @param mixed  $content  The content to save. It will be serialized.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public function saveData($filename, $content): string
+    public function saveData(string $filename, $content): string
     {
         $path = pathinfo($filename, PATHINFO_EXTENSION);
         if ($path === '') {
@@ -715,7 +725,7 @@ class CliOne
      * @param string $contentNumeric =['left','right','middle'][$i] the alignment of the content (numeric)
      * @return $this
      */
-    public function setAlign($title = 'middle', $content = 'middle', $contentNumeric = 'middle'): self
+    public function setAlign(string $title = 'middle', string $content = 'middle', string $contentNumeric = 'middle'): self
     {
         $this->alignStack = [$title, $content, $contentNumeric];
         return $this;
@@ -728,14 +738,14 @@ class CliOne
      * @param array $excludeKeys you can add a key that you want to exclude.
      * @return void
      */
-    public function setArrayParam($array, $excludeKeys = []): void
+    public function setArrayParam(array $array, array $excludeKeys = []): void
     {
         foreach ($this->parameters as $parameter) {
             if (!in_array($parameter->key, $excludeKeys, true)) {
                 foreach ($array as $k => $v) {
                     if ($parameter->key === $k) {
                         $parameter->value = $v;
-                        $this->assignParamValueKey($parameter);
+                        $this->refreshParamValueKey($parameter);
                         $parameter->missing = false;
                         break;
                     }
@@ -749,7 +759,7 @@ class CliOne
      * @param array $colors =['black','green','yellow','cyan','magenta','blue'][$i]
      * @return $this
      */
-    public function setColor($colors): self
+    public function setColor(array $colors): self
     {
         $this->colorStack = $colors;
         return $this;
@@ -764,26 +774,26 @@ class CliOne
      * @param mixed  $value the value to assign.
      * @return CliOneParam true if the parameter is set, otherwise false
      */
-    public function setParam($key, $value): CliOneParam
+    public function setParam(string $key, $value): CliOneParam
     {
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
                 $parameter->value = $value;
                 $parameter->valueKey = null;
-                $this->assignParamValueKey($parameter);
+                $this->refreshParamValueKey($parameter);
                 $parameter->missing = false;
                 return $parameter;
             }
         }
-        return new CliOneParam($this,null);
+        return new CliOneParam($this, null);
     }
 
     /**
      * {value} {type}
-     * @param string|null string $pattern1Stack if null then it will use the default value.
+     * @param string|null $pattern1Stack if null then it will use the default value.
      * @return $this
      */
-    public function setPatternTitle($pattern1Stack = null): CliOne
+    public function setPatternTitle(?string $pattern1Stack = null): CliOne
     {
         $this->patternTitleStack = $pattern1Stack;
         return $this;
@@ -794,7 +804,7 @@ class CliOne
      * @param string|null $pattern2Stack if null then it will use the default value.
      * @return $this
      */
-    public function setPatternCurrent($pattern2Stack = null): CliOne
+    public function setPatternCurrent(?string $pattern2Stack = null): CliOne
     {
         $this->patternCurrentStack = $pattern2Stack;
         return $this;
@@ -805,7 +815,7 @@ class CliOne
      * @param string|null $pattern3Stack if null then it will use the default value.
      * @return $this
      */
-    public function setPatternSeparator($pattern3Stack = null): CliOne
+    public function setPatternSeparator(?string $pattern3Stack = null): CliOne
     {
         $this->patternSeparatorStack = $pattern3Stack;
         return $this;
@@ -813,11 +823,11 @@ class CliOne
 
     /**
      * Not used yet.
-     * @param null|string $pattern4Stack if null then it will use the default value.
+     * @param string|null $pattern4Stack if null then it will use the default value.
      * @return $this
      * @noinspection PhpUnused
      */
-    public function setPatternContent($pattern4Stack = null): CliOne
+    public function setPatternContent(?string $pattern4Stack = null): CliOne
     {
         $this->patternContentStack = $pattern4Stack;
         return $this;
@@ -828,7 +838,7 @@ class CliOne
      * @param string $style =['mysql','simple','double','minimal'][$i]
      * @return $this
      */
-    public function setStyle($style = 'simple'): self
+    public function setStyle(string $style = 'simple'): self
     {
         $this->styleStack = $style;
         return $this;
@@ -841,7 +851,7 @@ class CliOne
      * @return void
      * @see \eftec\CliOne\CliOne::showLine
      */
-    public function show($content): void
+    public function show(string $content): void
     {
         echo $this->colorText($content);
     }
@@ -862,7 +872,7 @@ class CliOne
      *                          if false (default) then it doesn't show the breadcrumb if it is empty.
      * @return $this
      */
-    public function showBread($showIfEmpty = false): CliOne
+    public function showBread(bool $showIfEmpty = false): CliOne
     {
         $this->initStack();
         if ($showIfEmpty === false && count($this->bread) === 0) {
@@ -901,7 +911,7 @@ class CliOne
      * @param string $content
      * @return void
      */
-    public function showCheck($label, $color, $content): void
+    public function showCheck(string $label, string $color, string $content): void
     {
         echo $this->colorText("<$color>[$label]</$color> $content") . "\n";
     }
@@ -973,10 +983,10 @@ class CliOne
      *
      *
      * @param string $content content to display
-     * @param null   $cliOneParam
+     * @param ?CliOneParam   $cliOneParam
      * @return void
      */
-    public function showLine($content = '', $cliOneParam = null): void
+    public function showLine(string $content = '', ?CliOneParam $cliOneParam = null): void
     {
         echo $this->colorText($content, $cliOneParam) . "\n";
     }
@@ -1059,7 +1069,7 @@ class CliOne
      * @param array  $excludeKey the keys to exclude. It must be an indexed array with the keys to skip.
      * @return void
      */
-    public function showParamSyntax($key, $tab = 0, $tab2 = 1, $excludeKey = []): void
+    public function showParamSyntax(string $key, int $tab = 0, int $tab2 = 1, array $excludeKey = []): void
     {
         if ($key === '*') {
             foreach ($this->parameters as $parameter) {
@@ -1073,7 +1083,7 @@ class CliOne
         $paramprefix = $parameter->type === 'longflag' ? '--' : '-';
         $paramprefixalias = $parameter->type === 'longflag' ? '-' : '--';
         if (!$parameter->isValid()) {
-            if(!$this->isSilentError()) {
+            if (!$this->isSilentError()) {
                 $this->showCheck('ERROR', 'red', "Parameter $key not defined");
             }
             return;
@@ -1098,7 +1108,7 @@ class CliOne
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showProgressBar($currentValue, $max, $columnWidth, $currentValueText = null): void
+    public function showProgressBar($currentValue, $max, int $columnWidth, ?string $currentValueText = null): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -1115,7 +1125,7 @@ class CliOne
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showTable($assocArray): void
+    public function showTable(array $assocArray): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -1209,10 +1219,10 @@ class CliOne
      * It shows the values as columns.
      * @param array       $values        the values to show. It could be an associative array or an indexed array.
      * @param string      $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
-     * @param null|string $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
+     * @param string|null $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
      * @return void
      */
-    public function showValuesColumn($values, $type, $patternColumn = null): void
+    public function showValuesColumn(array $values, string $type, ?string $patternColumn = null): void
     {
         $p = new CliOneParam($this, 'dummy', false, null, null);
         $p->setPattern($patternColumn);
@@ -1228,7 +1238,7 @@ class CliOne
      * @param string $postfixValue if you want to set a profix value such as percentage, advance, etc.
      * @return void
      */
-    public function showWaitCursor($init = true, $postfixValue = ''): void
+    public function showWaitCursor(bool $init = true, string $postfixValue = ''): void
     {
         if ($init) {
             $this->wait = 0;
@@ -1274,7 +1284,7 @@ class CliOne
             try {
                 $this->showLine("$parameter->key = [" .
                     json_encode($parameter->default) . "] value:" .
-                    $this->showParamValue($parameter->value));
+                    $this->showParamValue($parameter));
             } catch (Exception $e) {
             }
         }
@@ -1284,7 +1294,7 @@ class CliOne
      * @param CliOneParam $parameter
      * @return string
      */
-    public function showParamValue($parameter): string
+    public function showParamValue(CliOneParam $parameter): string
     {
         if ($parameter->inputType === 'password') {
             return '*****';
@@ -1304,7 +1314,7 @@ class CliOne
      * @param bool $visual visual means that it considers the visual lenght, false means it considers characters.
      * @return false|int
      */
-    public function strlen($content, $visual = true)
+    public function strlen($content, bool $visual = true)
     {
         $contentClear = $this->colorLess($content);
         if ($this->multibyte && $visual) {
@@ -1319,7 +1329,7 @@ class CliOne
      * @param int    $numchar
      * @return string
      */
-    public function removechar($content, $numchar): string
+    public function removechar(string $content, int $numchar): string
     {
         $contentMask = $this->colorMask($content);
         $l = strlen($content);
@@ -1342,7 +1352,7 @@ class CliOne
      * @param string $type    the type of the content (optional)
      * @return CliOne
      */
-    public function upLevel($content, $type = ''): CliOne
+    public function upLevel(string $content, string $type = ''): CliOne
     {
         $this->bread[] = [$content, $type];
         return $this;
@@ -1354,7 +1364,7 @@ class CliOne
      * @param string $align =['left','right','middle'][$i]
      * @return mixed|string
      */
-    protected function alignText($text, $width, $align)
+    protected function alignText(string $text, int $width, string $align)
     {
         $len = $this->strlen($text);
         if ($len > $width) {
@@ -1383,17 +1393,12 @@ class CliOne
      * @param CliOneParam $parameter
      * @return void
      */
-    protected function assignParamValueKey($parameter): void
+    protected function refreshParamValueKey(CliOneParam $parameter): void
     {
         if (!is_array($parameter->inputValue)) {
             return;
         }
-        if ($parameter->value !== null && strpos($parameter->value, $this->emptyValue) === 0) {
-            $parameter->valueKey = str_replace($this->emptyValue, '', $parameter->value);
-            return;
-        }
-        $k = array_search($parameter->value, $parameter->inputValue, true);
-        $parameter->valueKey = $k === false ? null : $k;
+        $parameter->setValue($parameter->value);
     }
 
     /**
@@ -1404,7 +1409,7 @@ class CliOne
      * @param string $style =['mysql','simple','double']
      * @return string[]
      */
-    protected function border($style): array
+    protected function border(string $style): array
     {
         switch ($style) {
             case 'mysql':
@@ -1441,7 +1446,7 @@ class CliOne
      * @param string $style =['mysql','simple','double']
      * @return string[]
      */
-    protected function borderCut($style): array
+    protected function borderCut(string $style): array
     {
         switch ($style) {
             case 'mysql':
@@ -1486,6 +1491,21 @@ class CliOne
         return $col < $min ? $min : $col;
     }
 
+    protected function calculateRowSize($min = 5)
+    {
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                //$row = shell_exec('$Host.UI.RawUI.WindowSize.height'); however it chances the screen of the shell
+                $row = 30; // cmd.exe by default (modern windows) uses 120x30.
+            } else {
+                $row = trim(exec('tput rows'));
+            }
+        } catch (Exception $ex) {
+            $row = 25;
+        }
+        return max($row, $min);
+    }
+
     protected function ellipsis($text, $lenght)
     {
         $l = $this->strlen($text);
@@ -1505,11 +1525,11 @@ class CliOne
     /**
      * It shows the listing of options
      *
-     * @param CliOneParam $parameter
-     * @param array       $result used by multiple
+     * @param CliOneParam  $parameter
+     * @param array|string $result used by multiple
      * @return void
      */
-    protected function internalShowOptions($parameter, $result): void
+    protected function internalShowOptions(CliOneParam $parameter, $result): void
     {
         // pattern
         switch ($parameter->inputType) {
@@ -1618,7 +1638,7 @@ class CliOne
      * @param CliOneParam $parameter
      * @return array|string|null
      */
-    protected function readParameterInput($parameter)
+    protected function readParameterInput(CliOneParam $parameter)
     {
         $result = '';
         if (strpos($parameter->inputType, 'multiple') === 0) {
@@ -1662,7 +1682,7 @@ class CliOne
                         $pos = array_search($input, $parameter->inputValue, true);
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
-                        } else if(!$this->isSilentError()) {
+                        } else if (!$this->isSilentError()) {
                             $this->showCheck('ERROR', 'red,', "unknow selection $input");
                         }
                 }
@@ -1681,7 +1701,7 @@ class CliOne
      * @param CliOneParam $parameter
      * @return false|mixed|string returns the user input.
      */
-    protected function readline($content, $parameter)
+    protected function readline(string $content, CliOneParam $parameter)
     {
         echo $this->colorText($content);
         // globals is used for phpunit.
@@ -1755,7 +1775,7 @@ class CliOne
      * @param CliOneParam|null $cliOneParam
      * @return array|string|string[]
      */
-    public function colorText($content, $cliOneParam = null)
+    public function colorText($content, ?CliOneParam $cliOneParam = null)
     {
         if ($cliOneParam !== null) {
             if (is_array($cliOneParam->inputValue)) {
@@ -1775,7 +1795,7 @@ class CliOne
      * @param string $content
      * @return string
      */
-    public function colorLess($content): string
+    public function colorLess(string $content): string
     {
         $content = str_replace($this->colorEscape, array_fill(0, count($this->colorEscape), ''), $content);
         $content = str_replace($this->styleTextEscape, array_fill(0, count($this->styleTextEscape), ''), $content);
@@ -1818,7 +1838,7 @@ class CliOne
      * @param string $style =['mysql','simple','double']
      * @return array|string[]
      */
-    protected function shadow($style = 'simple'): array
+    protected function shadow(string $style = 'simple'): array
     {
         switch ($style) {
             case 'mysql':
@@ -1845,7 +1865,7 @@ class CliOne
      * @param string      $pattern   the pattern to use.
      * @return string
      */
-    protected function showPattern($parameter, $key, $value, $selection, $colW, $prefix, $pattern): string
+    protected function showPattern(CliOneParam $parameter, string $key, $value, string $selection, int $colW, string $prefix, string $pattern): string
     {
         $desc = $parameter->question ?: $parameter->description;
         $def = (is_array($parameter->default) ? implode(',', $parameter->default) : $parameter->default);
@@ -1875,7 +1895,7 @@ class CliOne
      * @param bool        $askInput
      * @return bool
      */
-    protected function validate($parameter, $askInput = true): bool
+    protected function validate(CliOneParam $parameter, bool $askInput = true): bool
     {
         $ok = false;
         $cause = 'no cause found';
@@ -1907,7 +1927,7 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 $origInput = $this->readline($txt, $parameter);
                 $parameter->value = $origInput;
-                $this->assignParamValueKey($parameter);
+                $this->refreshParamValueKey($parameter);
                 $parameter->missing = false;
                 //if($parameter->value==='' && $parameter->allowEmpty===true) {
                 //}
@@ -1921,7 +1941,7 @@ class CliOne
                     } else {
                         $parameter->value = $parameter->default;
                     }
-                    $this->assignParamValueKey($parameter);
+                    $this->refreshParamValueKey($parameter);
                 }
                 switch ($parameter->inputType) {
                     case 'multiple':
@@ -1936,7 +1956,7 @@ class CliOne
                         if (!$assoc) {
                             if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                                 $parameter->value = $this->emptyValue . ($parameter->value ?? '');
-                                $this->assignParamValueKey($parameter);
+                                $this->refreshParamValueKey($parameter);
                             } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
                                 $parameter->valueKey = $parameter->value;
                                 $parameter->value = $parameter->inputValue[$parameter->value - 1] ?? null;
@@ -2067,7 +2087,7 @@ class CliOne
      * @return string|string[]|null
      * @noinspection PhpUnused
      */
-    public static function replaceCurlyVariable($string, $values, $notFoundThenKeep = false)
+    public static function replaceCurlyVariable(string $string, array $values, bool $notFoundThenKeep = false)
     {
         if (strpos($string, '{{') === false) {
             return $string;

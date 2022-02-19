@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.6
+ * @version   1.7
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -59,21 +59,21 @@ class CliOneParam
      * The constructor. It is used internally
      * @param CliOne       $parent
      * @param ?string      $key
-     * @param bool         $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param string       $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
      * @param array|string $alias
-     * @param null         $value
-     * @param null         $valueKey
+     * @param mixed        $value
+     * @param mixed        $valueKey
      */
-    public function __construct($parent, $key = null, $type = true, $alias = [], $value = null, $valueKey = null)
+    public function __construct(CliOne $parent, ?string $key = null, string $type = 'flag', $alias = [], $value = null, $valueKey = null)
     {
         $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
         $this->alias = is_array($alias) ? $alias : [$alias];
-        /** @noinspection ProperNullCoalescingOperatorUsageInspection */
         $this->question = $type ?? $key;
         $this->value = $value;
         $this->valueKey = $valueKey;
+
     }
 
     /**
@@ -82,7 +82,7 @@ class CliOneParam
      *                       if true and the argument exists, then it is replaced.
      * @return bool
      */
-    public function add($override = false): bool
+    public function add(bool $override = false): bool
     {
         if($this->key===null) {
             if(!$this->parent->isSilentError()) {
@@ -181,7 +181,7 @@ class CliOneParam
      *                          If false (default value), it returns an instance of CliOneParam.
      * @return mixed
      */
-    public function evalParam($forceInput = false, $returnValue = false)
+    public function evalParam(bool $forceInput = false, bool $returnValue = false)
     {
         $this->add(true);
         return $this->parent->evalParam($this->key, $forceInput, $returnValue);
@@ -217,13 +217,39 @@ class CliOneParam
     }
 
     /**
-     * It sets the local history. It could be used to autocomplete.
+     * It sets the whole local history. It could be used to autocomplete using the key arrows up and down.
      * @param array $history
      * @return CliOneParam
      */
     public function setHistory(array $history): CliOneParam
     {
         $this->history = $history;
+        return $this;
+    }
+
+    /**
+     * We set a new value
+     * @param mixed $newValue it sets a new value
+     * @param mixed $newValueKey it sets the value-key. If null then the value is asumed using inputvalue.
+     * @param bool $missing by default every time we set a value, we mark missing as false, however you can change it.
+     * @return $this
+     */
+    public function setValue($newValue, $newValueKey=null,bool $missing=false) : CliOneParam
+    {
+        $this->value=$newValue;
+        $this->missing=$missing;
+        if($newValueKey===null) {
+            if ($this->value !== null && strpos($this->value, $this->parent->emptyValue) === 0) {
+                // the value is of the type __input_*
+                $this->valueKey = str_replace($this->parent->emptyValue, '', $this->value);
+                return $this;
+            }
+            $k = array_search($this->value, $this->inputValue, true);
+            $this->valueKey = $k === false ? null : $k;
+        } else {
+            $this->valueKey=$newValueKey;
+        }
+
         return $this;
     }
 
@@ -284,7 +310,7 @@ class CliOneParam
      * @param bool $allowEmpty
      * @return $this
      */
-    public function setAllowEmpty($allowEmpty = true): CliOneParam
+    public function setAllowEmpty(bool $allowEmpty = true): CliOneParam
     {
         $this->allowEmpty = $allowEmpty;
         return $this;
@@ -296,7 +322,7 @@ class CliOneParam
      * @param bool $currentAsDefault
      * @return CliOneParam
      */
-    public function setCurrentAsDefault($currentAsDefault = true): CliOneParam
+    public function setCurrentAsDefault(bool $currentAsDefault = true): CliOneParam
     {
         $this->currentAsDefault = $currentAsDefault;
         return $this;
@@ -317,11 +343,11 @@ class CliOneParam
     /**
      * It sets the description
      * @param string      $description the initial description (used when we show the syntax)
-     * @param null|string $question    The question, it is used in the user input.
+     * @param string|null $question    The question, it is used in the user input.
      * @param string[]    $helpSyntax  It adds one or multiple lines of help syntax.
      * @return CliOneParam
      */
-    public function setDescription($description, $question = null, $helpSyntax = []): CliOneParam
+    public function setDescription(string $description, ?string $question = null, array $helpSyntax = []): CliOneParam
     {
         $this->question = $question ?? "Select the value of $this->key";
         $this->description = $description;
@@ -338,17 +364,17 @@ class CliOneParam
      * $this->createParam('many')->setInput(true,'multiple3',['op1','op2,'op3'])->add();
      * </pre>
      *
-     * @param bool   $input     if true, then the value could be input via user. If false, the value could only be
+     * @param bool   $input      if true, then the value could be input via user. If false, the value could only be
      *                          entered as argument.
-     * @param string $inputType =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
+     * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
      *                           This value allows string, arrays and associative arrays<br>
      *                           The values indicated here are used for input and validation<br>
      *                           The library also uses this value for the auto-complete feature (tab-key).
-     * @param array  $history   you can add a custom history for this parameter
+     * @param array  $history    you can add a custom history for this parameter
      * @return CliOneParam
      */
-    public function setInput($input = true, $inputType = 'string', $inputValue = null, $history = []): CliOneParam
+    public function setInput(bool $input = true, string $inputType = 'string', $inputValue = null, array $history = []): CliOneParam
     {
         $this->input = $input;
         $this->inputType = $inputType;
@@ -381,7 +407,7 @@ class CliOneParam
      * @param ?string $footer         the footer line (if any)
      * @return $this
      */
-    public function setPattern($patterColumns = null, $patterQuestion = null, $footer = null): CliOneParam
+    public function setPattern(?string $patterColumns = null, ?string $patterQuestion = null, ?string $footer = null): CliOneParam
     {
         $this->patterColumns = $patterColumns;
         $this->patternQuestion = $patterQuestion;
@@ -395,7 +421,7 @@ class CliOneParam
      * @param boolean $required
      * @return CliOneParam
      */
-    public function setRequired($required = true): CliOneParam
+    public function setRequired(bool $required = true): CliOneParam
     {
         $this->required = $required;
         return $this;

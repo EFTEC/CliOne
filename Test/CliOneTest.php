@@ -99,9 +99,9 @@ class CliOneTest extends TestCase
     {
         global $argv;
         unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
-        $argv = ['program.php', '--test1', 'hello', '-test2', '"hello world"'];
+        $argv = ['program.php', '--test1b', 'hello', '-test2', '"hello world"'];
         $t = new CliOne('CliOneTest.php');
-        $t->createParam('test1', 'flag', ['test1'])->add();
+        $t->createParam('test1', 'flag', ['test1b'])->add();
         $this->assertEquals('hello', $t->evalParam('test1')->value);
     }
 
