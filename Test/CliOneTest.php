@@ -176,6 +176,32 @@ class CliOneTest extends TestCase
         $p = $t->evalParam('test1');
         $this->assertEquals('hello world', $p->value);
     }
+    public function testInputDefault2()
+    {
+        global $argv;
+        $argv = ['program.php',];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
+        $t->createParam('test1')
+            ->setValue('defvalue')
+            ->setDefault('def')
+            ->setInput()
+            ->setCurrentAsDefault()
+            ->add();
+        $this->assertEquals('defvalue', $t->evalParam('test1', true)->value);
+
+
+        $argv = ['program.php',];
+        $t = new CliOne('CliOneTest.php');
+        $GLOBALS['PHPUNIT_FAKE_READLINE'] = [0, ''];         // we use this line to simulate the user input
+        $t->createParam('test1')
+            ->setValue(null)
+            ->setDefault('def')
+            ->setInput()
+            ->setCurrentAsDefault()
+            ->add();
+        $this->assertEquals('def', $t->evalParam('test1', true)->value);
+    }
 
     public function testInputDefault()
     {

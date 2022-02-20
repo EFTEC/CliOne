@@ -48,6 +48,15 @@ class CliOneParam
     public $valueKey;
     protected $addHistory = false;
     protected $helpSyntax = [];
+    protected $nameArg='';
+
+    /**
+     * @return string
+     */
+    public function getNameArg(): string
+    {
+        return $this->nameArg;
+    }
     protected $patterColumns;
     protected $patternQuestion;
     protected $footer;
@@ -319,8 +328,15 @@ class CliOneParam
     }
 
     /**
-     * if true then it set the current value as the default value but only if the value is not missing.<br>
-     * The default value is assigned every time evalParam() is called.
+     * if true then it set the current value as the default value but only if the value is not missing or null.<br>
+     * if the current value is null, then it uses the regular default value assigned by setDefault()<br>
+     * The default value is assigned every time evalParam() is called.<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->createParam('test1')->setDefault('def')->setInput()->setCurrentAsDefault()->add();
+     * // the if the param has a value (not null), then the default is the value
+     * // otherwise, the default value is "def".
+     * </pre>
      * @param bool $currentAsDefault
      * @return CliOneParam
      */
@@ -343,17 +359,26 @@ class CliOneParam
     }
 
     /**
-     * It sets the description
+     * It sets the description of a parameter<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->setDescription('It shows the help','do you want help?',['usage -help'],'typehelp');
+     * </pre>
      * @param string      $description the initial description (used when we show the syntax)
      * @param string|null $question    The question, it is used in the user input.
-     * @param string[]    $helpSyntax  It adds one or multiple lines of help syntax.
+     * @param string[]    $helpSyntax  (optional) It adds one or multiple lines of help syntax.
+     * @param string      $nameArg     (optional) The name of the argument (used for help).
      * @return CliOneParam
      */
-    public function setDescription(string $description, ?string $question = null, array $helpSyntax = []): CliOneParam
+    public function setDescription(string $description,
+                                   ?string $question = null,
+                                   array $helpSyntax = [],
+                                   string $nameArg=''): CliOneParam
     {
         $this->question = $question ?? "Select the value of $this->key";
         $this->description = $description;
         $this->helpSyntax = $helpSyntax;
+        $this->nameArg=$nameArg;
         return $this;
     }
 

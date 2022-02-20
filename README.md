@@ -788,6 +788,10 @@ It adds an argument but it is not evaluated.
 
 
 ## Changelog
+* 1.8 (2022-02-20)
+  * **[new]** setParam() throw an exception if the parameter is not defined.
+  * **[new]** showParamSyntax2()
+  * **[new]** CliOneParam::$nameArg name of the argument (used in help)
 * 1.7 (2022-02-18)
   * **[fix]** added type hinting for most fields and methods. 
   * **[new]** new setValue() for CliOneParam.
