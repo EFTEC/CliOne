@@ -14,21 +14,31 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.8
+ * @version   1.9
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.8';
+    public const VERSION = '1.9';
     public static $autocomplete = [];
     /**
-     * @var string it is the empty value, but it is also used to mark values that aren't selected directly "a" all, "n"
-     *      nothing, "" enter exit
+     * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
+     *             directly "a" all, "n" nothing, "" enter exit
      */
     public $emptyValue = '__INPUT_';
     public $origin;
     /** @var CliOneParam[] */
     public $parameters = [];
+    /**
+     * If <b>true</b> (default value), then the values are echo automatically on the screen.<br>
+     * If <b>false</b>, then the values are stored into the memory.<br>
+     * You can access to the memory using getMemory(), setMemory()<br>
+     * @var bool
+     * @see \eftec\CliOne\CliOne::getMemory
+     * @see \eftec\CliOne\CliOne::setMemory
+     */
+    public $echo = true;
+    protected $memory = '';
     protected $colSize = 80;
     protected $rowSize = 25;
     protected $bread = [];
@@ -50,6 +60,50 @@ class CliOne
     public function isSilentError(): bool
     {
         return $this->silentError;
+    }
+
+    public function getMemory($autoflush = false): string
+    {
+        $r = $this->memory;
+        if ($autoflush) {
+            $this->memory = '';
+        }
+        return $r;
+    }
+
+    /**
+     * It is used for testing. You can simulate arguments using this function<br>
+     * This function must be called before the creation of the instance
+     * @param array $arguments
+     * @return void
+     */
+    public static function testArguments(array $arguments): void
+    {
+        global $argv;
+        $argv = $arguments;
+    }
+
+    /**
+     * It is used for testing. You can simulate user-input using this function<br>
+     * This function must be called before every interactivity<br>
+     * This function is not resetted automatically, to reset it, set $userInput=null<br>
+     * @param ?array $userInput
+     * @return void
+     */
+    public static function testUserInput(?array $userInput): void
+    {
+        if ($userInput === null) {
+            unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+        } else {
+            array_unshift($userInput, 0);
+            $GLOBALS['PHPUNIT_FAKE_READLINE'] = $userInput;
+        }
+    }
+
+    public function setMemory(string $memory): CliOne
+    {
+        $this->memory = $memory;
+        return $this;
     }
 
     /**
@@ -166,7 +220,7 @@ class CliOne
 
     /**
      * It finds the vendor path starting from a route. The route must be inside the application path.
-     * @param string|null $initPath the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then
+     * @param ?string $initPath     the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then
      *                              __DIR__
      * @return string It returns the relative path to where is the vendor path. If not found then it returns the
      *                              initial path
@@ -206,30 +260,38 @@ class CliOne
      * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3
      * <val>
      * </pre>
-     * @param string       $key   The key or the parameter. It must be unique.
-     * @param string       $type  =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
-     *                            <b>flag</b>: (default) it reads a flag "php program.php -thisflag value"<br>
-     *                            <b>first</b>: it reads the first argument "php program.php thisarg" (without
-     *                            value)<br>
-     *                            <b>second</b>: it reads the second argument "php program.php sc1 thisarg" (without
-     *                            value)<br>
-     *                            <b>last</b>: it reads the second argument "php program.php ... thisarg" (without
-     *                            value)<br>
-     *                            <b>longflag</b>: it reads a longflag "php program --thislongflag value<br>
-     *                            <b>last</b>: it reads the second argument "php program.php ... thisvalue" (without
-     *                            value)<br>
-     *                            <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
-     *                            <b>none</b>: the value it is not captured via argument, so it could be user-input,
-     *                            but it is not stored<br> none parameters could always be overridden, and they are
-     *                            used to "temporary" input such as validations (y/n).
-     * @param array|string $alias A simple array with the name of the arguments to read (without - or --)<br>
-     *                            if the type is a flag, then the alias is a double flag "--".<br>
-     *                            if the type is a double flag, then the alias is a flag.
+     * @param string       $key                The key or the parameter. It must be unique.
+     * @param array|string $alias              A simple array with the name of the arguments to read (without - or
+     *                                         <b>flag</b>: (default) it reads a flag "php program.php -thisflag
+     *                                         value"<br>
+     *                                         <b>first</b>: it reads the first argument "php program.php thisarg"
+     *                                         (without value)<br>
+     *                                         <b>second</b>: it reads the second argument "php program.php sc1
+     *                                         thisarg" (without value)<br>
+     *                                         <b>last</b>: it reads the second argument "php program.php ... thisarg"
+     *                                         (without value)<br>
+     *                                         <b>longflag</b>: it reads a longflag "php program --thislongflag
+     *                                         value<br>
+     *                                         <b>last</b>: it reads the second argument "php program.php ...
+     *                                         thisvalue" (without value)<br>
+     *                                         <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
+     *                                         <b>none</b>: the value it is not captured via argument, so it could be
+     *                                         user-input, but it is not stored<br> none parameters could always be
+     *                                         overridden, and they are used to "temporary" input such as validations
+     *                                         (y/n).
+     * @param string       $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
+     *                                         --)<br> if the type is a flag, then the alias is a double flag "--".<br>
+     *                                         if the type is a double flag, then the alias is a flag.
+     * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
+     *                                         <b>false</b> (default) the argument is a value
      * @return CliOneParam
      */
-    public function createParam(string $key, string $type = 'flag', $alias = []): CliOneParam
+    public function createParam(string $key,
+                                       $alias = [],
+                                string $type = 'flag',
+                                bool   $argumentIsValueKey = false): CliOneParam
     {
-        return new CliOneParam($this, $key, $type, $alias);
+        return new CliOneParam($this, $key, $type, $alias, null, null, $argumentIsValueKey);
     }
 
     /**
@@ -289,8 +351,16 @@ class CliOne
                     }
                     return $returnValue === true ? $parameter->value : $parameter;
                 }
-                [$def, $parameter->value] = $this->readParameterArgFlag($parameter);
-
+                if (!$parameter->argumentIsValueKey) {
+                    [$def, $parameter->value] = $this->readParameterArgFlag($parameter);
+                } else {
+                    [$def, $parameter->valueKey] = $this->readParameterArgFlag($parameter);
+                    if ($def && isset($parameter->inputValue[$parameter->valueKey])) {
+                        $parameter->value = $parameter->inputValue[$parameter->valueKey];
+                    } else {
+                        $parameter->value = null;
+                    }
+                }
                 if ($key === '*' && $def === false) {
                     // value not found, not asking for input.
                     continue;
@@ -390,7 +460,8 @@ class CliOne
 
 
     /**
-     * It returns an associative array with all the parameters of the form [key=>value]
+     * It returns an associative array with all the parameters of the form [key=>value]<br>
+     * Parameters of the type "none" are ignored<br>
      * @param array $excludeKeys you can add a key that you want to exclude.
      * @return array
      */
@@ -398,7 +469,7 @@ class CliOne
     {
         $array = [];
         foreach ($this->parameters as $parameter) {
-            if (!in_array($parameter->key, $excludeKeys, true)) {
+            if ($parameter->type !== 'none' && !in_array($parameter->key, $excludeKeys, true)) {
                 $array[$parameter->key] = $parameter->value;
             }
         }
@@ -461,7 +532,7 @@ class CliOne
      */
     protected function prefixByType(string $type): array
     {
-        $position=false;
+        $position = false;
         switch ($type) {
             case 'last':
             case 'second':
@@ -479,10 +550,10 @@ class CliOne
                 $prefixAlias = '-';
                 break;
             default:
-                $prefix='';
-                $prefixAlias='';
+                $prefix = '';
+                $prefixAlias = '';
         }
-        return [$prefix,$prefixAlias,$position];
+        return [$prefix, $prefixAlias, $position];
     }
 
     /**
@@ -490,14 +561,14 @@ class CliOne
      * @param CliOneParam $parameter
      * @return array
      */
-    public function readParameterArgFlag(CliOneParam $parameter) :array
+    public function readParameterArgFlag(CliOneParam $parameter): array
     {
         /** @noinspection DuplicatedCode */
-        [$prefix,$prefixAlias,$position]=$this->prefixByType($parameter->type);
-        $trueName=$prefix.$parameter->key;
-        if($prefix==='' && $prefixAlias==='') {
+        [$prefix, $prefixAlias, $position] = $this->prefixByType($parameter->type);
+        $trueName = $prefix . $parameter->key;
+        if ($prefix === '' && $prefixAlias === '') {
             // this type of parameter is not readable.
-            return [false,null];
+            return [false, null];
         }
         /** @noinspection DuplicatedCode */
         if ($position === false) {
@@ -546,6 +617,7 @@ class CliOne
                 $value = $this->argv[$prefixAlias . $ali] ?? null;
                 if ($value !== null) {
                     $parameter->missing = false;
+                    $parameter->origin='argument';
                     return [true, $value];
                 }
             }
@@ -553,6 +625,7 @@ class CliOne
         }
         // the value is found and we return the value.
         $parameter->missing = false;
+        $parameter->origin='argument';
         return [true, $value];
     }
 
@@ -650,13 +723,12 @@ class CliOne
         }
         //
         /** @noinspection DuplicatedCode */
-        [$prefix,$prefixAlias,$position]=$this->prefixByType($parameter->type);
-        if($prefix==='' && $prefixAlias==='') {
+        [$prefix, $prefixAlias, $position] = $this->prefixByType($parameter->type);
+        if ($prefix === '' && $prefixAlias === '') {
             // this type of parameter is not readable.
             return 'none';
         }
-        $trueName=$prefix.$parameter->key;
-
+        $trueName = $prefix . $parameter->key;
         if ($position === false) {
             $value = $this->argv[$trueName] ?? null;
         } else {
@@ -750,21 +822,31 @@ class CliOne
     /**
      * It sets the parameters using an array of the form [key=>value]<br>
      * It also marks the parameters as missing=false
-     * @param array $array       the associative array to use to set the parameters.
-     * @param array $excludeKeys you can add a key that you want to exclude.
+     * @param array      $array       the associative array to use to set the parameters.
+     * @param array      $excludeKeys you can add a key that you want to exclude.<br>
+     *                                If the key is in the array and in this list, then it is excluded
+     * @param array|null $includeKeys the whitelist of elements that only could be included.<br>
+     *                                Only keys that are in this list are added.
      * @return void
      */
-    public function setArrayParam(array $array, array $excludeKeys = []): void
+    public function setArrayParam(array $array, array $excludeKeys = [], ?array $includeKeys = null): void
     {
-        foreach ($this->parameters as $parameter) {
-            if (!in_array($parameter->key, $excludeKeys, true)) {
-                foreach ($array as $k => $v) {
+        foreach ($array as $k => $v) {
+            $found = false;
+            if (!in_array($k, $excludeKeys, true) && ($includeKeys === null ||  in_array($k, $includeKeys, true))) {
+                foreach ($this->parameters as $parameter) {
                     if ($parameter->key === $k) {
                         $parameter->value = $v;
+                        $parameter->origin = 'set';
                         $this->refreshParamValueKey($parameter);
                         $parameter->missing = false;
+                        $found = true;
                         break;
                     }
+                }
+                if (!$found && !$this->isSilentError()) {
+                    $this->showCheck('ERROR', 'red', "Parameter $k not defined");
+                    return;
                 }
             }
         }
@@ -796,6 +878,7 @@ class CliOne
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
                 $parameter->value = $value;
+                $parameter->origin = 'set';
                 $parameter->valueKey = null;
                 $this->refreshParamValueKey($parameter);
                 $parameter->missing = false;
@@ -808,7 +891,7 @@ class CliOne
 
     /**
      * {value} {type}
-     * @param string|null $pattern1Stack if null then it will use the default value.
+     * @param ?string $pattern1Stack if null then it will use the default value.
      * @return $this
      */
     public function setPatternTitle(?string $pattern1Stack = null): CliOne
@@ -819,7 +902,7 @@ class CliOne
 
     /**
      * <bold>{value}{type}</bold>
-     * @param string|null $pattern2Stack if null then it will use the default value.
+     * @param ?string $pattern2Stack if null then it will use the default value.
      * @return $this
      */
     public function setPatternCurrent(?string $pattern2Stack = null): CliOne
@@ -830,7 +913,7 @@ class CliOne
 
     /**
      * ">"
-     * @param string|null $pattern3Stack if null then it will use the default value.
+     * @param ?string $pattern3Stack if null then it will use the default value.
      * @return $this
      */
     public function setPatternSeparator(?string $pattern3Stack = null): CliOne
@@ -841,7 +924,7 @@ class CliOne
 
     /**
      * Not used yet.
-     * @param string|null $pattern4Stack if null then it will use the default value.
+     * @param ?string $pattern4Stack if null then it will use the default value.
      * @return $this
      * @noinspection PhpUnused
      */
@@ -871,7 +954,12 @@ class CliOne
      */
     public function show(string $content): void
     {
-        echo $this->colorText($content);
+        $r = $this->colorText($content);
+        if ($this->echo) {
+            echo $r;
+        } else {
+            $this->memory .= $r;
+        }
     }
 
     /**
@@ -931,7 +1019,12 @@ class CliOne
      */
     public function showCheck(string $label, string $color, string $content): void
     {
-        echo $this->colorText("<$color>[$label]</$color> $content") . "\n";
+        $r = $this->colorText("<$color>[$label]</$color> $content") . "\n";
+        if ($this->echo) {
+            echo $r;
+        } else {
+            $this->memory .= $r;
+        }
     }
 
     /**
@@ -1006,7 +1099,12 @@ class CliOne
      */
     public function showLine(string $content = '', ?CliOneParam $cliOneParam = null): void
     {
-        echo $this->colorText($content, $cliOneParam) . "\n";
+        $r = $this->colorText($content, $cliOneParam) . "\n";
+        if ($this->echo) {
+            echo $r;
+        } else {
+            $this->memory .= $r;
+        }
     }
 
     /**
@@ -1099,7 +1197,7 @@ class CliOne
         }
         $parameter = $this->getParameter($key);
         /** @noinspection PhpUnusedLocalVariableInspection */
-        [$paramprefix,$paramprefixalias,$position]=$this->prefixByType($parameter->type);
+        [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
         if (!$parameter->isValid()) {
             if (!$this->isSilentError()) {
                 $this->showCheck('ERROR', 'red', "Parameter $key not defined");
@@ -1119,77 +1217,73 @@ class CliOne
 
     /**
      * It shows the syntax of the parameters.
-     * @param ?string $title A title (optional)
-     * @param array  $typeParam=['first','last','second','flag','longflag','onlyinput','none'][$i] the type of parameter
-     * @param array  $excludeKey the keys to exclude
-     * @param ?int   $size the minimum size of the first column
+     * @param ?string $title      A title (optional)
+     * @param array   $typeParam  =['first','last','second','flag','longflag','onlyinput','none'][$i] the type of
+     *                            parameter
+     * @param array   $excludeKey the keys to exclude
+     * @param ?int    $size       the minimum size of the first column
      * @return void
      */
-    public function showParamSyntax2(?string $title='',
-                                     array $typeParam = ['flag','longflag','first'],
-                                     array $excludeKey = [],
-                                     ?int $size=null): void
+    public function showParamSyntax2(?string $title = '',
+                                     array   $typeParam = ['flag', 'longflag', 'first'],
+                                     array   $excludeKey = [],
+                                     ?int    $size = null): void
     {
-        $col1=[];
-        $col2=[];
-        if($title) {
+        $col1 = [];
+        $col2 = [];
+        if ($title) {
             $this->showLine("<yellow>$title</yellow>");
         }
         foreach ($this->parameters as $parameter) {
-            if ((in_array($parameter->type,$typeParam,true)) && !in_array($parameter->key, $excludeKey, true) && $parameter->isValid()) {
+            if ((in_array($parameter->type, $typeParam, true)) && !in_array($parameter->key, $excludeKey, true) && $parameter->isValid()) {
                 /** @noinspection PhpUnusedLocalVariableInspection */
-                [$paramprefix,$paramprefixalias,$position] = $this->prefixByType($parameter->type);
+                [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
                 $v = $this->showParamValue($parameter);
-                $key=$paramprefix.$parameter->key;
-                if($parameter->getNameArg()) {
-                    if($parameter->required) {
-                        $key .= ' <cyan>'.$parameter->getNameArg().'</cyan><green> ';
+                $key = $paramprefix . $parameter->key;
+                if ($parameter->getNameArg()) {
+                    if ($parameter->required) {
+                        $key .= ' <cyan>' . $parameter->getNameArg() . '</cyan><green> ';
                     } else {
-                        $key .= ' <cyan><'.$parameter->getNameArg().'></cyan><green> ';
+                        $key .= ' <cyan><' . $parameter->getNameArg() . '></cyan><green> ';
                     }
                 }
                 if (count($parameter->alias) > 0) {
-                    $key.=', ';
-                    $key.=$paramprefixalias.implode(', '.$paramprefixalias, $parameter->alias);
+                    $key .= ', ';
+                    $key .= $paramprefixalias . implode(', ' . $paramprefixalias, $parameter->alias);
                 }
-
-                $col1[]=$this->colorText("<green>$key</green>");
-                $col2[]=$this->colorText("$parameter->description <bold><cyan>[$v]</cyan></bold>");
-
+                $col1[] = $this->colorText("<green>$key</green>");
+                $col2[] = $this->colorText("$parameter->description <bold><cyan>[$v]</cyan></bold>");
                 foreach ($parameter->getHelpSyntax() as $help) {
-                    $col1[]='';
-                    $col2[]=$help;
+                    $col1[] = '';
+                    $col2[] = $help;
                 }
             }
         }
-        $wm=$size??0;
-        foreach($col1 as $c1) {
-            if($wm<$this->strlen($c1)) {
-                $wm=$this->strlen($c1);
+        $wm = $size ?? 0;
+        foreach ($col1 as $c1) {
+            if ($wm < $this->strlen($c1)) {
+                $wm = $this->strlen($c1);
             }
         }
         // wrap lines.
-        $col2Corrected=[];
-        $col1Corrected=[];
-        foreach($col2 as $k=>$v) {
-            $newlines=$this->wrapLine($this->colorText($v),$this->colSize-$wm-1);
-            foreach($newlines as $k2=>$ne) {
-                if($k2 === 0) {
+        $col2Corrected = [];
+        $col1Corrected = [];
+        foreach ($col2 as $k => $v) {
+            $newlines = $this->wrapLine($this->colorText($v), $this->colSize - $wm - 1);
+            foreach ($newlines as $k2 => $ne) {
+                if ($k2 === 0) {
                     $col1Corrected[] = $col1[$k];
                 } else {
                     $col1Corrected[] = '';
                 }
-                $col2Corrected[]=$ne;
+                $col2Corrected[] = $ne;
             }
         }
-        $col2=$col2Corrected;
-        $col1=$col1Corrected;
-
-
-
-        foreach($col1 as $k=>$c1) {
-            $c1=$this->alignText($c1,$wm,'left');
-            $this->showLine($c1.' '.$col2[$k]);
+        $col2 = $col2Corrected;
+        $col1 = $col1Corrected;
+        foreach ($col1 as $k => $c1) {
+            $c1 = $this->alignText($c1, $wm, 'left');
+            $this->showLine($c1 . ' ' . $col2[$k]);
         }
     }
 
@@ -1201,33 +1295,33 @@ class CliOne
      * @return array
      * @noinspection PhpRedundantVariableDocTypeInspection
      */
-    public function wrapLine(string $text, int $width) : array
+    public function wrapLine(string $text, int $width): array
     {
-        if($text==='') {
+        if ($text === '') {
             return [''];
         }
-        $result=[];
-        $masked=$this->colorMask($text);
-        $tl=strlen($text);
-        $counter=0;
-        $position0=0;
+        $result = [];
+        $masked = $this->colorMask($text);
+        $tl = strlen($text);
+        $counter = 0;
+        $position0 = 0;
         /** @var int $positionSpace we store the position of the last space (or other character) */
-        $positionSpace=0;
-        $space=' /.,';
-        for($i=0;$i<$tl;$i++) {
-            if(strpos($space,$masked[$i])!==false) {
-                $positionSpace=$i;
+        $positionSpace = 0;
+        $space = ' /.,';
+        for ($i = 0; $i < $tl; $i++) {
+            if (strpos($space, $masked[$i]) !== false) {
+                $positionSpace = $i;
             }
-            if($masked[$i]!==chr(250)) {
+            if ($masked[$i] !== chr(250)) {
                 $counter++;
-                if($counter>$width) {
-                    $result[]=trim(substr($text,$position0,$positionSpace-$position0));
-                    $position0=$positionSpace;
-                    $counter=0;
+                if ($counter > $width) {
+                    $result[] = trim(substr($text, $position0, $positionSpace - $position0));
+                    $position0 = $positionSpace;
+                    $counter = 0;
                 }
             }
         }
-        if($position0!==$tl-1) {
+        if ($position0 !== $tl - 1) {
             // wrap the last line
             $result[] = trim(substr($text, $position0));
         }
@@ -1235,10 +1329,10 @@ class CliOne
     }
 
     /**
-     * @param numeric     $currentValue     the current value
-     * @param numeric     $max              the max value to fill the bar.
-     * @param int         $columnWidth      the size of the bar (in columns)
-     * @param string|null $currentValueText the current value to display at the left.<br>
+     * @param numeric $currentValue         the current value
+     * @param numeric $max                  the max value to fill the bar.
+     * @param int     $columnWidth          the size of the bar (in columns)
+     * @param ?string $currentValueText     the current value to display at the left.<br>
      *                                      if null then it will show the current value (with a space in between)
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
@@ -1352,9 +1446,9 @@ class CliOne
 
     /**
      * It shows the values as columns.
-     * @param array       $values        the values to show. It could be an associative array or an indexed array.
-     * @param string      $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
-     * @param string|null $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
+     * @param array   $values        the values to show. It could be an associative array or an indexed array.
+     * @param string  $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
+     * @param ?string $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
      * @return void
      */
     public function showValuesColumn(array $values, string $type, ?string $patternColumn = null): void
@@ -1768,7 +1862,7 @@ class CliOne
 
     /**
      * @param CliOneParam $parameter
-     * @return array|string|null
+     * @return array|?string
      */
     protected function readParameterInput(CliOneParam $parameter)
     {
@@ -1835,7 +1929,12 @@ class CliOne
      */
     protected function readline(string $content, CliOneParam $parameter)
     {
-        echo $this->colorText($content);
+        $r = $this->colorText($content);
+        if ($this->echo) {
+            echo $r;
+        } else {
+            $this->memory .= $r;
+        }
         // globals is used for phpunit.
         if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
             $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
@@ -1903,11 +2002,11 @@ class CliOne
      * <option/> it shows all the options available (if the input has some options)
      * </pre>
      *
-     * @param                  $content
-     * @param CliOneParam|null $cliOneParam
+     * @param string       $content
+     * @param ?CliOneParam $cliOneParam
      * @return array|string|string[]
      */
-    public function colorText($content, ?CliOneParam $cliOneParam = null)
+    public function colorText(string $content, ?CliOneParam $cliOneParam = null)
     {
         if ($cliOneParam !== null) {
             if (is_array($cliOneParam->inputValue)) {
@@ -2059,6 +2158,7 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 $origInput = $this->readline($txt, $parameter);
                 $parameter->value = $origInput;
+                $parameter->origin = 'input';
                 $this->refreshParamValueKey($parameter);
                 $parameter->missing = false;
                 //if($parameter->value==='' && $parameter->allowEmpty===true) {

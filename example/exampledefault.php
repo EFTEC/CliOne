@@ -6,7 +6,7 @@ include __DIR__.'/../src/CliOneParam.php';
 
 $cli=new CliOne();
 if($cli->isCli()) {
-    $cli->createParam('param1','onlyinput')
+    $cli->createParam('param1', [], 'onlyinput')
         ->setDescription('This field is called param1 and it is required')
         ->setInput(true,'string')
         ->setRequired(true)

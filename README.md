@@ -32,55 +32,6 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 
 
-# Table of contents
-
-- [CliOne](#clione)
-  - [Features](#features)
-  - [Getting started](#getting-started)
-  - [Example using arguments](#example-using-arguments)
-  - [Example using user input](#example-using-user-input)
-  - [Showing colors](#showing-colors)
-  - [Reading arguments](#reading-arguments)
-  - [Types of user input](#types-of-user-input)
-  - [Types of colors](#types-of-colors)
-  - [Methods CliOne](#methods-clione)
-    - [Method __construct()](#method-__construct)
-    - [Method findVendorPath()](#method-findvendorpath)
-    - [Method getColSize()](#method-getcolsize)
-    - [Method evalParam()](#method-evalparam)
-    - [Method readParameterCli()](#method-readparametercli)
-    - [Method show()](#method-show)
-    - [Method showLine()](#method-showline)
-    - [Method showParamSyntax()](#method-showparamsyntax)
-    - [Method getParameter()](#method-getparameter)
-    - [Method setParam()](#method-setparam)
-    - [Method showCheck()](#method-showcheck)
-    - [Method getValue()](#method-getvalue)
-    - [Method getValueKey()](#method-getvaluekey)
-    - [Method showparams()](#method-showparams)
-    - [Method isCli()](#method-iscli)
-    - [Method saveData()](#method-savedata)
-    - [Method getArrayParams()](#method-getarrayparams)
-    - [Method setArrayParam()](#method-setarrayparam)
-    - [Method readData()](#method-readdata)
-    - [Method createParam()](#method-createparam)
-  - [Methods CliOneParam](#methods-clioneparam)
-    - [Method getHelpSyntax()](#method-gethelpsyntax)
-    - [Method setHelpSyntax()](#method-sethelpsyntax)
-    - [Method setPattern()](#method-setpattern)
-    - [Method getPatterColumns()](#method-getpattercolumns)
-    - [Method resetInput()](#method-resetinput)
-    - [Method __construct()](#method-__construct)
-    - [Method setDefault()](#method-setdefault)
-    - [Method setCurrentAsDefault()](#method-setcurrentasdefault)
-    - [Method setAllowEmpty()](#method-setallowempty)
-    - [Method setDescription()](#method-setdescription)
-    - [Method setRequired()](#method-setrequired)
-    - [Method setInput()](#method-setinput)
-    - [Method evalParam()](#method-evalparam)
-    - [Method add()](#method-add)
-  - [Changelog](#changelog)
-
 
 
 
@@ -96,6 +47,168 @@ And create a new instance of the library
 ```php
 $cli=new CliOne(); // instance of the library
 ```
+
+## Usage
+
+For example, let's say we need to create a CLI code to read an information and save into a file.
+
+```shell
+>php basic.php read -o result.json
+```
+
+We have two arguments, the first (read) is in the first position and it doesn't have any "-".  The second is "-o" that it is our flag with a value.
+
+So we could create our arguments.
+
+```php
+$cli=new CliOne();
+$cli->createParam('read',[],'first')->add(); // a positional argument (the first one) value-less
+$cli->createParam('o',[],'flag')->add(); // a simple flag "-o"
+```
+
+And we could evaluate as
+
+```php
+$cli->evalParam('read');
+$cli->evalParam('o');
+// So we could obtain our values as:
+var_dump($cli->getParameter('read')->value); 
+var_dump($cli->getParameter('o')->value);
+// or as
+var_dump($cli->getValue('read'));
+var_dump($cli->getValue('o'));
+```
+
+It will return **false** if we don't set a value and it will return the value it we set it.
+
+```shell
+>php basic.php read -o result.json
+string(4) "read"
+string(11) "result.json"
+```
+
+> **The parameters are create and evaluated separately because it allows to do more powerful operations with it.**
+>
+> For example, sometimes we want to show the help (the list of parameters available) without evaluating the parameters.
+
+Ok, but now what if we want to create an alias of "-o"
+
+```php
+var_dump($cli->getParameter('o',['output','outputresult'])->value);
+```
+
+So we could call using this line
+
+```shell
+php basic.php read --output result.json
+# or also
+php basic.php read --outputresult result.json
+# or also
+php basic.php read -o=result.json
+```
+
+> **If the parameter is a flag, then the alias is a longflag ("--"). If the parameter is a longflag then the alias is a flag.**
+
+But let's say we need to ask for a password, however we want to be entered interactively.
+
+```php
+$cli->createParam('pwd',[],'flag') // we create the parameter
+    ->setInput(true,'password') // and we ask (if the parameter is not entered as flag) 
+                                //for user input of the type password (however the password is not hidden visually)
+    ->add();
+$cli->evalParam('pwd');   // and don't forget to evaluate the parameter
+```
+
+So it will look like:
+
+```shell
+> php .\basic.php read -o result.json
+Select the value of pwd [*****] :123
+```
+
+Now, let's say something more advanced, multiple options, we want to select the type of file: json, csv, html and xml
+
+Our code
+
+```php
+$cli->createParam('type',[],'flag')
+    ->setInput(true,'option',['json','csv','xml','html'])
+    ->add();
+```
+
+And the result:
+
+```shell
+PS > php .\basic.php read -o result.json
+Select the value of pwd [*****] :111
+[1] json                     
+[2] csv                      
+[3] xml                      
+[4] html                     
+Select the value of type [] :2 #you could use TAB key for autocomplete, cool!
+```
+
+> **List of values are divided in two values, the visual value (simply called value), and the key-value.**. In this example, "csv" is a value and its key-value is "2".
+>
+> The list of values allows associative arrays and indexed arrays.  Indexed arrays are renumbered to start in 1.
+
+You could also enter 
+
+> php .\basic.php read -o result.json -pwd 123 -type json
+
+Now, you can shows the parameters ("show the syntax help") as follows:
+
+```php
+$cli->showParamSyntax2('parameters:');
+```
+
+But it will looks plain.
+
+It is because you can add a description, change the question and add more help information
+
+```php
+$cli->createParam('type',[],'flag')
+    ->setDescription('it is the type of output','what is the option?',['it is the help1','example: -option xml'])
+    ->setInput(true,'option',['json','csv','xml','html'])
+    ->add();
+```
+
+So it will look like: (in colors)
+
+```shell
+parameters:
+read                         The command [read]
+-o, --output, --outputresult The output file without extension [result.json]
+                             example: -o file
+-pwd                         It is the password [*****]
+-type                        it is the type of output [csv]
+                             it is the help1
+                             example: -option xml
+```
+
+There are more operations available but the basic is there.
+
+# Table of contents
+
+- [CliOne](#clione)
+  - [Features](#features)
+  - [Getting started](#getting-started)
+  - [Usage](#usage)
+  - [Types of arguments](#types-of-arguments)
+  - [Flow](#flow)
+  - [Examples](#examples)
+    - [Example using arguments](#example-using-arguments)
+    - [Example using user input](#example-using-user-input)
+    - [Example with a game](#example-with-a-game)
+    - [Example colors](#example-colors)
+  - [](#)
+    - [Example tables](#example-tables)
+  - [Types of user input](#types-of-user-input)
+  - [Types of colors](#types-of-colors)
+  - [Definitions](#definitions)
+  - [Changelog](#changelog)
+
+
 
 ## Types of arguments
 
@@ -321,473 +434,18 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
 | <bred>red</bred>                           | background color red          |
 | <byellow><bblue>..                         | background color              |
 
+## Definitions
 
+You can find the definition of the classes, methods and fields at:
 
-## Methods CliOne
-
-* Method __construct()
-
-  The constructor
-  #### Parameters:
-  * **$origin** you can specify the origin file. If you specify the origin file, then isCli will only
-  return true if the file is called directly. (?string)
-
-  ### Method findVendorPath()
-  It finds the vendor path starting from a route. The route must be inside the application path.
-  #### Parameters:
-  * **$initPath** the initial path, example __DIR__, getcwd(), 'folder1/folder2'. If null, then __DIR__ (string)
-
-  ### Method createParam()
-  It creates a new parameter to be read from the command line and/or to be input manually by the user<br>
-  <b>Example:</b><br>
-  <pre>
-  $this->createParam('k1','first'); // php program.php thissubcommand
-  $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3 <val>
-  </pre>
-  #### Parameters:
-  * **$key** The key or the parameter. It must be unique. (string)
-  * **$type** =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
-  <b>flag</b>: (default) it reads a flag "php program.php -thisflag value"<br>
-  <b>first</b>: it reads the first argument "php program.php thisarg" (without value)<br>
-  <b>second</b>: it reads the second argument "php program.php sc1 thisarg" (without value)<br>
-  <b>last</b>: it reads the second argument "php program.php ... thisarg" (without value)<br>
-  <b>longflag</b>: it reads a longflag "php program --thislongflag value<br>
-  <b>last</b>: it reads the second argument "php program.php ... thisvalue" (without value)<br>
-  <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
-  <b>none</b>: the value it is not captured via argument, so it could be user-input, but it is
-  not stored<br>
-  none parameters could always be overridden, and they are used to "temporary" input such as
-  validations (y/n). (string)
-  * **$alias** A simple array with the name of the arguments to read (without - or --)<br>
-  if the type is a flag, then the alias is a double flag "--".<br>
-  if the type is a double flag, then the alias is a flag. (array)
-
-  ### Method downLevel()
-  Down a level in the breadcrub.
-
-  ### Method evalParam()
-  It evaluates the parameters obtained from the syntax of the command.<br>
-  The parameters must be defined before call this method<br>
-  <b>Example:</b><br>
-  <pre>
-  // shell:
-  php mycode.php -argument1 hello -argument2 world
-  // php code:
-  $t=new CliOne('mycode.php');
-  $t->createParam('argument1')->add();
-  $result=$t->evalParam('argument1'); // an object ClieOneParam where value is "hello"
-  </pre>
-  #### Parameters:
-  * **$key** the key to read.<br>
-  If $key='*' then it reads the first flag and returns its value (if any). (string)
-  * **$forceInput** it forces input no matter if the value is already inserted. (bool)
-  * **$returnValue** If true, then it returns the value obtained.<br>
-  If false (default value), it returns an instance of CliOneParam. (bool)
-
-  ### Method getArrayParams()
-  It returns an associative array with all the parameters of the form [key=>value]
-  #### Parameters:
-  * **$excludeKeys** you can add a key that you want to exclude. (array)
-
-  ### Method getColSize()
-  It returns the number of columns present on the screen. The columns are calculated in the constructor.
-
-  ### Method getParameter()
-  It gets the parameter by the key or false if not found.
-  #### Parameters:
-  * **$key** the key of the parameter (string)
-
-  ### Method getValue()
-  It reads a value of a parameter.
-  <b>Example:</b><bt>
-  <pre>
-  // [1] option1
-  // [2] option2
-  // select a value [] 2
-  $v=$this->getValueKey('idparam'); // it will return "option2".
-  </pre>
-  #### Parameters:
-  * **$key** the key of the parameter to read the value (string)
-
-  ### Method getValueKey()
-  It reads the value-key of a parameter selected. It is useful for a list of elements.<br>
-  <b>Example:</b><br>
-  <pre>
-  // [1] option1
-  // [2] option2
-  // select a value [] 2
-  $v=$this->getValueKey('idparam'); // it will return 2 instead of "option2"
-  </pre>
-  #### Parameters:
-  * **$key** the key of the parameter to read the value-key (string)
-
-  ### Method isCli()
-  It will return true if the PHP is running on CLI<br>
-  If the constructor specified a file, then it is also used for validation.
-  <b>Example:</b><br>
-  <pre>
-  // page.php:
-  $inst=new CliOne('page.php'); // this security avoid calling the cli when this file is called by others.
-  if($inst->isCli()) {
-  echo "Is CLI and the current page is page.php";
-  }
-  </pre>
-
-  ### Method readData()
-  It reads information from a file. The information will be de-serialized.
-  #### Parameters:
-  * **$filename** the filename with or without extension. (string)
-
-  ### Method readParameterArgFlag()
-
-  #### Parameters:
-  * **$parameter** param CliOneParam $parameter (CliOneParam)
-
-  ### Method saveData()
-  It saves the information into a file. The content will be serialized.
-  #### Parameters:
-  * **$filename** the filename (without extension) to where the value will be saved. (string)
-  * **$content** The content to save. It will be serialized. (mixed)
-
-  ### Method setAlign()
-
-  #### Parameters:
-  * **$title** =['left','right','middle'][$i] (string)
-  * **$content** =['left','right','middle'][$i] (string)
-  * **$contentNumeric** =['left','right','middle'][$i] (string)
-
-  ### Method setArrayParam()
-  It sets the parameters using an array of the form [key=>value]<br>
-  It also marks the parameters as missing=false
-  #### Parameters:
-  * **$array** the associative array to use to set the parameters. (array)
-  * **$excludeKeys** you can add a key that you want to exclude. (array)
-
-  ### Method setColor()
-
-
-  ### Method setParam()
-  It sets the value of a parameter manually.<br>
-  Once the value is set, then the system skips to read the values from the command line or ask for input.
-  #### Parameters:
-  * **$key** the key of the parameter (string)
-  * **$value** the value to assign. (mixed)
-
-  ### Method setPatternTitle()
-  {value} {type}
-  #### Parameters:
-  * **** string $pattern1Stack if null then it will use the default value. (string|null)
-
-  ### Method setPatternCurrent()
-  <bold>{value}{type}</bold>
-  #### Parameters:
-  * **$pattern2Stack** if null then it will use the default value. (string|null)
-
-  ### Method setPatternSeparator()
-  ">"
-  #### Parameters:
-  * **$pattern3Stack** if null then it will use the default value. (string|null)
-
-  ### Method setPatternContent()
-  Not used yet.
-  #### Parameters:
-  * **$pattern4Stack** if null then it will use the default value. (null|string)
-
-  ### Method setStyle()
-
-  #### Parameters:
-  * **$style** =['mysql','simple','double','minimal'][$i] (string)
-
-  ### Method show()
-  It's similar to showLine, but it keeps in the current line.
-  #### Parameters:
-  * **$content** param string $content (string)
-
-  ### Method showBread()
-  It shows a breadcrumb.<br>
-  To add values you could use the method uplevel()<br>
-  To remove a value (going down a level) you could use the method downlevel()<br>
-  You can also change the style using setPattern1(),setPattern2(),setPattern3()<br>
-  <pre>
-  $cli->setPattern1('{value}{type}') // the level
-  ->setPattern2('<bred>{value}</bred>{type}') // the current level
-  ->setPattern3(' -> ') // the separator
-  ->showBread();
-  </pre>
-  It shows the current BreadCrumb if any.
-
-  ### Method showCheck()
-  It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
-  #### Parameters:
-  * **$label** param string $label (string)
-  * **$color** =['black','green','yellow','cyan','magenta','blue'][$i] (string)
-  * **$content** param string $content (string)
-
-  ### Method showFrame()
-  It shows a border frame.
-  #### Parameters:
-  * **$lines** the content. (string|string[])
-  * **$titles** if null then no title. (string|string[]|null)
-
-  ### Method showLine()
-  It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br>
-  <pre>
-  <red>error</red> (color red)
-  <yellow>warning</yellow> (color yellow)
-  <blue>information</blue> (blue)
-  <yellow>yellow</yellow> (yellow)
-  <green>green</green> <green>success</green> (color green)
-  <italic>italic</italic>
-  <bold>bold</bold>
-  <dim>dim</dim>
-  <underline>underline</underline>
-  <cyan>cyan</cyan> (color light cyan)
-  <magenta>magenta</magenta> (color magenta)
-  <col0/><col1/><col2/><col3/><col4/><col5/>  columns. col0=0 (left),col1--col5 every column of the page.
-  <option/> it shows all the options available (if the input has some options)
-  </pre>
-  #### Parameters:
-  * **$content** content to display (string)
-  * **$cliOneParam** param null $cliOneParam (null)
-
-  ### Method showMessageBox()
-
-  #### Parameters:
-  * **$lines** param string|string[] $lines (string|string[])
-  * **$titles** param string|string[] $titles (string|string[])
-
-  ### Method showParamSyntax()
-  It shows the syntax of a parameter.
-  #### Parameters:
-  * **$key** the key to show. "*" means all keys. (string)
-  * **$tab** the first separation. Values are between 0 and 5. (int)
-  * **$tab2** the second separation. Values are between 0 and 5. (int)
-  * **$excludeKey** the keys to exclude. It must be an indexed array with the keys to skip. (array)
-
-  ### Method showProgressBar()
-
-  #### Parameters:
-  * **$currentValue** the current value (numeric)
-  * **$max** the max value to fill the bar. (numeric)
-  * **$columnWidth** the size of the bar (in columns) (int)
-  * **$currentValueText** the current value to display at the left.<br>
-  if null then it will show the current value (with a space in between) (string|null)
-
-  ### Method showTable()
-
-  #### Parameters:
-  * **$assocArray** An associative array with the values to show. The key is used for the index. (array)
-
-  ### Method showValuesColumn()
-  It shows the values as columns.
-  #### Parameters:
-  * **$values** the values to show. It could be an associative array or an indexed array. (array)
-  * **$type** ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i] (string)
-  * **$patternColumn** the pattern to be used, example: "<cyan>[{key}]</cyan> {value}" (null|string)
-
-  ### Method showWaitCursor()
-
-
-  ### Method showparams()
-  It will show all the parameters by showing the key, the default value and the value<br>
-  It is used for debugging and testing.
-
-  ### Method strlen()
-  It determines the size of a string
-  #### Parameters:
-  * **$content** param $content ()
-  * **$visual** visual means that it considers the visual lenght, false means it considers characters. (bool)
-
-  ### Method removechar()
-  remove visible characters at the end of the string. It ignores invisible (such as colors) characters.
-  #### Parameters:
-  * **$content** param string $content (string)
-  * **$numchar** param int $numchar (int)
-
-  ### Method substr()
-
-
-  ### Method upLevel()
-  Up a level in the breadcrumb
-  #### Parameters:
-  * **$content** the content of the new line (string)
-  * **$type** the type of the content (optional) (string)
-
-  ### Method replaceColor()
-  It sets the color of the cli<br>
-  <pre>
-  <red>error</red> (color red)
-  <yellow>warning</yellow> (color yellow)
-  <blue>information</blue> (blue)
-  <yellow>yellow</yellow> (yellow)
-  <green>green</green>  (color green)
-  <italic>italic</italic>
-  <bold>bold</bold>
-  <underline>underline</underline>
-  <strikethrough>strikethrough</strikethrough>
-  <cyan>cyan</cyan> (color light cyan)
-  <magenta>magenta</magenta> (color magenta)
-  <col0/><col1/><col2/><col3/><col4/><col5/>  columns. col0=0 (left),col1--col5 every column of the page.
-  <option/> it shows all the options available (if the input has some options)
-  </pre>
-  #### Parameters:
-  * **$content** param $content ()
-  * **$cliOneParam** param CliOneParam|null $cliOneParam (CliOneParam|null)
-
-  ### Method replaceCurlyVariable()
-  Replaces all variables defined between {{ }} by a variable inside the dictionary of values.<br>
-  Example:<br>
-  replaceCurlyVariable('hello={{var}}',['var'=>'world']) // hello=world<br>
-  replaceCurlyVariable('hello={{var}}',['varx'=>'world']) // hello=<br>
-  replaceCurlyVariable('hello={{var}}',['varx'=>'world'],true) // hello={{var}}<br>
-  #### Parameters:
-  * **$string** The input value. It could contain variables defined as {{namevar}} (string)
-  * **$values** The dictionary of values. (array)
-  * **$notFoundThenKeep** [false] If true and the value is not found, then it keeps the value.
-  Otherwise, it is replaced by an empty value (bool)
-
-## Methods CliOneParam
-
-### Method getHelpSyntax()
-
-It returns the syntax of the help.
-
-### Method setHelpSyntax()
-
-It sets the syntax of help.
-
-#### Parameters:
-
-* **$helpSyntax** param array $helpSyntax (array)
-
-### Method setPattern()
-
-It sets the visual pattern<br>
-
-<ul>
-<li><b>{selection}</b> (for table) used by "multiple", it shows if the value is selected or not</li>
-<li><b>{key}</b> (for table)it shows the current key</li>
-<li><b>{value}</b> (for table)it shows the current value. If the value is an array then it is "json"</li>
-<li><b>{valueinit}</b> (for table)if the value is an array then it shows the first value</li>
-<li><b>{valuenext}</b> (for table)if the value is an array then it shows the next value (it could be the same,
-the second or the last one)</li>
-<li><b>{valueend}</b> (for table)if the value is an array then it shows the last value</li>
-<li><b>{desc}</b> it shows the description</li>
-<li><b>{def}</b> it shows the default value</li>
-<li><b>{prefix}</b> it shows a prefix</li>
-</ul>
-
-<b>Example:</b><br>
-
-<pre>
-$this->setPattern('<c>[{key}]</c> {value}','{desc} <c>[{def}]</c> {prefix}:','it is the footer');
-</pre>
-
-#### Parameters:
-
-* **$patterColumns** if null then it will use the default value. (?string)
-* **$patterQuestion** the pattern of the question. (?string)
-* **$footer** the footer line (if any) (?string)
-
-### Method getPatterColumns()
-
-It gets the pattern, patternquestion and footer
-
-### Method resetInput()
-
-It resets the user input and marks the value as missing.
-
-### Method __construct()
-
-The constructor. It is used internally
-
-#### Parameters:
-
-* **$parent** param CliOne $parent (CliOne)
-* **$key** param ?string $key (?string)
-* **$isOperator** param bool $isOperator (bool)
-
-### Method setDefault()
-
-It sets the default value that it is used when the user doesn't input the value<br>
-Setting a default value could bypass the option isRequired()
-
-#### Parameters:
-
-* **$default** param mixed $default (mixed)
-
-### Method setCurrentAsDefault()
-
-if true then it set the current value as the default value but only if the value is not missing.<br>
-The default value is assigned every time evalParam() is called.
-
-#### Parameters:
-
-* **$currentAsDefault** param bool $currentAsDefault (bool)
-
-### Method setAllowEmpty()
-
-It sets to allow empty values.<br>
-If true, and the user inputs nothing, then the default value is never used (unless it is an option), and it
-returns an empty "".<br> If false, and the user inputs nothing, then the default value is used.<br>
-<b>Note</b>: If you are using an option, you are set a default value, and you enter nothing, then the default
-value is still used.
-
-#### Parameters:
-
-* **$allowEmpty** param bool $allowEmpty (bool)
-
-### Method setDescription()
-
-It sets the description
-
-#### Parameters:
-
-* **$description** the initial description (used when we show the syntax) (string)
-* **$question** The question, it is used in the user input. (null|string)
-* **$helpSyntax** It adds one or multiple lines of help syntax. (string[])
-
-### Method setRequired()
-
-It marks the value as required<br>
-The value could be ignored if it used together with setDefault()
-
-#### Parameters:
-
-* **$required** param boolean $required (boolean)
-
-### Method setInput()
-
-It sets the input type
-
-#### Parameters:
-
-* **$input** if true, then the value could be input via user. If false, the value could only be
-  entered as argument. (bool)
-* **$inputType** =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionsimple'][$i] (string)
-* **$inputValue** param mixed $inputValue (mixed)
-
-### Method evalParam()
-
-It creates an argument and eval the parameter.<br>
-It is a macro of add() and CliOne::evalParam()
-
-#### Parameters:
-
-* **$forceInput** if false and the value is already digited, then it is not input anymore (bool)
-
-### Method add()
-
-It adds an argument but it is not evaluated.
-
-#### Parameters:
-
-* **$override** if false (default) and the argument exists, then it trigger an exception.<br>
-  if true and the argument exists, then it is replaced. (bool)
+[definitions.md](definitions.md)
 
 
 
 ## Changelog
+* 1.9 (2022-02-20)
+  * **[new]** argumentIsValueKey and memory 
+  * **[changed]** **Changed the signature of createParam(), switched the second and third argument**
 * 1.8 (2022-02-20)
   * **[new]** setParam() throw an exception if the parameter is not defined.
   * **[new]** showParamSyntax2()

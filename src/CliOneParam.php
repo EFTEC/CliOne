@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.7
+ * @version   1.9
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -39,6 +39,8 @@ class CliOneParam
     public $input = false;
     /** @var bool if true then the value is not entered, but it could have a value (default value) */
     public $missing = true;
+    /** @var string=['none','argument','input','set'][$i] indicates the origin of the value of the argument */
+    public $origin = 'none';
     /**
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
@@ -46,17 +48,14 @@ class CliOneParam
     public $inputValue = [];
     public $value;
     public $valueKey;
+    /**
+     * @var boolean <b>true</b> the argument is value-key<br>
+     *                                 <b>false</b> (default) the argument is a value
+     */
+    public $argumentIsValueKey = false;
     protected $addHistory = false;
     protected $helpSyntax = [];
-    protected $nameArg='';
-
-    /**
-     * @return string
-     */
-    public function getNameArg(): string
-    {
-        return $this->nameArg;
-    }
+    protected $nameArg = '';
     protected $patterColumns;
     protected $patternQuestion;
     protected $footer;
@@ -68,20 +67,29 @@ class CliOneParam
      * The constructor. It is used internally
      * @param CliOne       $parent
      * @param ?string      $key
-     * @param string       $type =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param string       $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]
      * @param array|string $alias
      * @param mixed        $value
      * @param mixed        $valueKey
+     * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
+     *                                         <b>false</b> (default) the argument is a value
      */
-    public function __construct(CliOne $parent, ?string $key = null, string $type = 'flag', $alias = [], $value = null, $valueKey = null)
+    public function __construct(CliOne  $parent,
+                                ?string $key = null,
+                                string  $type = 'flag',
+                                        $alias = [],
+                                        $value = null,
+                                        $valueKey = null,
+                                bool    $argumentIsValueKey = false)
     {
         $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
         $this->alias = is_array($alias) ? $alias : [$alias];
-        $this->question = $type ?? $key;
+        $this->question = 'Select the value of '.$key;
         $this->value = $value;
         $this->valueKey = $valueKey;
+        $this->argumentIsValueKey = $argumentIsValueKey;
     }
 
     /**
@@ -236,32 +244,11 @@ class CliOneParam
     }
 
     /**
-     * We set a new value
-     * @param mixed $newValue    it sets a new value
-     * @param mixed $newValueKey it sets the value-key. If null then the value is asumed using inputvalue.
-     * @param bool  $missing     by default every time we set a value, we mark missing as false, however you can change
-     *                           it.
-     * @return $this
+     * @return string
      */
-    public function setValue($newValue, $newValueKey = null, bool $missing = false): CliOneParam
+    public function getNameArg(): string
     {
-        $this->value = $newValue;
-        $this->missing = $missing;
-        if ($newValueKey === null) {
-            if (!is_array($this->inputValue)) {
-                return $this;
-            }
-            if ($this->value !== null && strpos($this->value, $this->parent->emptyValue) === 0) {
-                // the value is of the type __input_*
-                $this->valueKey = str_replace($this->parent->emptyValue, '', $this->value);
-                return $this;
-            }
-            $k = array_search($this->value, $this->inputValue, true);
-            $this->valueKey = $k === false ? null : $k;
-        } else {
-            $this->valueKey = $newValueKey;
-        }
-        return $this;
+        return $this->nameArg;
     }
 
     /**
@@ -306,6 +293,7 @@ class CliOneParam
     {
         //$this->input=true;
         $this->value = null;
+        $this->origin = 'none';
         $this->valueKey = null;
         $this->currentAsDefault = false;
         $this->missing = true;
@@ -324,6 +312,31 @@ class CliOneParam
     public function setAllowEmpty(bool $allowEmpty = true): CliOneParam
     {
         $this->allowEmpty = $allowEmpty;
+        return $this;
+    }
+
+    /**
+     * @param string $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param bool   $argumentIsValueKey <b>true</b> the argument is value-key<br>
+     *                                   <b>false</b> (default) the argument is a value
+     * @return CliOneParam
+     */
+    public function setArgument(string $type = 'flag', bool $argumentIsValueKey = false): CliOneParam
+    {
+        $this->type = $type;
+        $this->argumentIsValueKey = $argumentIsValueKey;
+        return $this;
+    }
+
+    /**
+     * Determine if the value via argument is a value or a value-key.
+     * @param bool $argumentIsValueKey <b>true</b> the argument is value-key<br>
+     *                                 <b>false</b> (default) the argument is a value
+     * @return CliOneParam
+     */
+    public function setArgumentIsValueKey(bool $argumentIsValueKey = true): CliOneParam
+    {
+        $this->argumentIsValueKey = $argumentIsValueKey;
         return $this;
     }
 
@@ -370,15 +383,15 @@ class CliOneParam
      * @param string      $nameArg     (optional) The name of the argument (used for help).
      * @return CliOneParam
      */
-    public function setDescription(string $description,
+    public function setDescription(string  $description,
                                    ?string $question = null,
-                                   array $helpSyntax = [],
-                                   string $nameArg=''): CliOneParam
+                                   array   $helpSyntax = [],
+                                   string  $nameArg = ''): CliOneParam
     {
         $this->question = $question ?? "Select the value of $this->key";
         $this->description = $description;
         $this->helpSyntax = $helpSyntax;
-        $this->nameArg=$nameArg;
+        $this->nameArg = $nameArg;
         return $this;
     }
 
@@ -451,6 +464,36 @@ class CliOneParam
     public function setRequired(bool $required = true): CliOneParam
     {
         $this->required = $required;
+        return $this;
+    }
+
+    /**
+     * We set a new value
+     * @param mixed $newValue    it sets a new value
+     * @param mixed $newValueKey it sets the value-key. If null then the value is asumed using inputvalue.
+     * @param bool  $missing     by default every time we set a value, we mark missing as false, however you can change
+     *                           it.
+     * @return $this
+     */
+    public function setValue($newValue, $newValueKey = null, bool $missing = false): CliOneParam
+    {
+        $this->value = $newValue;
+        $this->origin = 'set';
+        $this->missing = $missing;
+        if ($newValueKey === null) {
+            if (!is_array($this->inputValue)) {
+                return $this;
+            }
+            if ($this->value !== null && strpos($this->value, $this->parent->emptyValue) === 0) {
+                // the value is of the type __input_*
+                $this->valueKey = str_replace($this->parent->emptyValue, '', $this->value);
+                return $this;
+            }
+            $k = array_search($this->value, $this->inputValue, true);
+            $this->valueKey = $k === false ? null : $k;
+        } else {
+            $this->valueKey = $newValueKey;
+        }
         return $this;
     }
 

@@ -6,7 +6,7 @@ include __DIR__.'/../src/CliOneParam.php';
 
 $cli=new CliOne(); // we create an instance
 
-$cli->createParam('p1','flag',['param2','param3']) // we create a parameter called "param1"
+$cli->createParam('p1', ['param2', 'param3'], 'flag') // we create a parameter called "param1"
 
 ->setDescription('This field is called param1 and it is required','?',
     [
@@ -15,12 +15,12 @@ $cli->createParam('p1','flag',['param2','param3']) // we create a parameter call
     'arg2') // we add a description
 ->setRequired(true) // the mark the value as required
 ->add(); // and finally we add the argument
-$cli->createParam('param4','longflag',['p5','p6']) // we create a parameter called "param1"
+$cli->createParam('param4', ['p5', 'p6'], 'longflag') // we create a parameter called "param1"
 ->setDescription('This field is called param4 and it is required','?',['help1','help2'],'arg1') // we add a description
 ->setRequired(false) // the mark the value as required
 ->add(); // and finally we add the argument
 
-$cli->createParam('op1','first') // we create a parameter called "param1"
+$cli->createParam('op1', [], 'first') // we create a parameter called "param1"
 ->setDescription('This field is called param4 and it is required','?',['help1','help2']) // we add a description
 ->setRequired(false) // the mark the value as required
 ->add(); // and finally we add the argument
