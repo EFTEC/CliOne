@@ -5,6 +5,7 @@
 namespace eftec\CliOne;
 
 use Exception;
+use mysql_xdevapi\BaseResult;
 use RuntimeException;
 
 /**
@@ -14,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.10
+ * @version   1.11
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.10';
+    public const VERSION = '1.11';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -38,7 +39,7 @@ class CliOne
      * @see \eftec\CliOne\CliOne::setMemory
      */
     public $echo = true;
-    public $stream;
+    public $MEMORY;
     protected $memory = '';
     protected $colSize = 80;
     protected $rowSize = 25;
@@ -65,9 +66,10 @@ class CliOne
 
     public function getMemory($autoflush = false): string
     {
-        $r = $this->memory;
+        fseek($this->MEMORY, 0);
+        $r = stream_get_contents($this->MEMORY);
         if ($autoflush) {
-            $this->memory = '';
+            @ftruncate($this->MEMORY, 0);
         }
         return $r;
     }
@@ -83,18 +85,18 @@ class CliOne
         }
         if (PHP_OS_FAMILY === 'Windows') {
             return (function_exists('sapi_windows_vt100_support')
-                    && @sapi_windows_vt100_support($this->stream))
+                    && @sapi_windows_vt100_support(STDOUT))
                 || false !== getenv('ANSICON')
                 || 'ON' === getenv('ConEmuANSI')
                 || 'xterm' === getenv('TERM');
         }
         if (function_exists('stream_isatty')) {
-            return @stream_isatty($this->stream);
+            return @stream_isatty(STDOUT);
         }
         if (function_exists('posix_isatty')) {
-            return @posix_isatty($this->stream);
+            return @posix_isatty(STDOUT);
         }
-        $stat = @fstat($this->stream);
+        $stat = @fstat(STDOUT);
         return $stat && 0020000 === ($stat['mode'] & 0170000);
     }
 
@@ -130,7 +132,8 @@ class CliOne
 
     public function setMemory(string $memory): CliOne
     {
-        $this->memory = $memory;
+        ftruncate($this->MEMORY,0);
+        fwrite($this->MEMORY, $memory);
         return $this;
     }
 
@@ -185,7 +188,11 @@ class CliOne
      */
     public function __construct(?string $origin = null)
     {
-        $this->stream = STDOUT; // fopen('php://memory', 'rwb');
+        if(!$this->isCli()) {
+            die("you are not running a CLI");
+        }
+        $this->origin = $origin;
+        $this->MEMORY=fopen('php://memory', 'rwb');
         $this->readingArgv();
         if (getenv('NO_COLOR')) {
             $this->noColor = true;
@@ -203,7 +210,6 @@ class CliOne
             "\e[" . sprintf('%03d', $t * 3) . "G", "\e[" . sprintf('%03d', $t * 4) . "G", "\e[" . sprintf('%03d', $t * 5) . "G"];
         $this->columnEscapeCmd = ['', str_repeat(' ', $t), str_repeat(' ', $t * 2),
             str_repeat(' ', $t * 3), str_repeat(' ', $t * 4), str_repeat(' ', $t * 5)];
-        $this->origin = $origin;
         $this->multibyte = function_exists('mb_strlen');
         // it is used by readline
         readline_completion_function(static function ($input) {
@@ -222,7 +228,7 @@ class CliOne
     {
         global $argv;
         $this->argv = [];
-        $c = count($argv);
+        $c =$argv===null?0: count($argv);
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
         for ($i = 1; $i < $c; $i++) {
             $x = explode('=', $argv[$i], 2);
@@ -423,7 +429,7 @@ class CliOne
                         $parameter->value = $parameter->default;
                         if ($parameter->required && $parameter->value === false) {
                             if (!$this->isSilentError()) {
-                                $this->showCheck('ERROR', 'red', "Field $parameter->key is missing");
+                                $this->showCheck('ERROR', 'red', "Field $parameter->key is missing",'stderr');
                             }
                             $parameter->value = false;
                         }
@@ -443,7 +449,7 @@ class CliOne
             }
         }
         if ($notfound && !$this->isSilentError()) {
-            $this->showCheck('ERROR', 'red', "parameter $key not defined");
+            $this->showCheck('ERROR', 'red', "parameter $key not defined",'stderr');
         }
         if ($valueK === false || $valueK === null) {
             return false;
@@ -715,7 +721,20 @@ class CliOne
             return false;
         }
         // false if it is running a web.
-        return !http_response_code();
+        return !http_response_code()  && defined('STDIN');
+    }
+
+    /**
+     * It gets the STDIN exclusively if the value is passed by pipes. If not, it returns null;
+     * @return ?string
+     */
+    public function getSTDIN(): ?string
+    {
+        if (@fstat(STDIN)['size']===0) {
+            return null;
+        }
+        $r=stream_get_contents(STDIN);
+        return ($r===false)?null:$r;
     }
 
     /**
@@ -885,7 +904,7 @@ class CliOne
                     }
                 }
                 if (!$found && !$this->isSilentError()) {
-                    $this->showCheck('ERROR', 'red', "Parameter $k not defined");
+                    $this->showCheck('ERROR', 'red', "Parameter $k not defined",'stderr');
                     return;
                 }
             }
@@ -989,16 +1008,28 @@ class CliOne
      * It's similar to showLine, but it keeps in the current line.
      *
      * @param string $content
+     * @param string $stream =['stdout','stderr','memory'][$i]
      * @return void
      * @see \eftec\CliOne\CliOne::showLine
      */
-    public function show(string $content): void
+    public function show(string $content, string $stream='stdout'): void
     {
+        switch ($stream) {
+            case 'stderr':
+                $str=STDERR;
+                break;
+            case 'memory':
+                $str=$this->MEMORY;
+                break;
+            default:
+                $str=STDOUT;
+                break;
+        }
         $r = $this->colorText($content);
         if ($this->echo) {
-            echo $r;
+            fwrite($str,$r);
         } else {
-            $this->memory .= $r;
+            fwrite($this->MEMORY,$r);
         }
     }
 
@@ -1055,16 +1086,13 @@ class CliOne
      * @param string $label
      * @param string $color =['black','green','yellow','cyan','magenta','blue'][$i]
      * @param string $content
+     * @param string $stream=['stdout','stderr','memory'][$i]
      * @return void
      */
-    public function showCheck(string $label, string $color, string $content): void
+    public function showCheck(string $label, string $color, string $content,string $stream='stdout'): void
     {
         $r = $this->colorText("<$color>[$label]</$color> $content") . "\n";
-        if ($this->echo) {
-            echo $r;
-        } else {
-            $this->memory .= $r;
-        }
+        $this->show($r,$stream);
     }
 
     /**
@@ -1135,16 +1163,13 @@ class CliOne
      *
      * @param string       $content content to display
      * @param ?CliOneParam $cliOneParam
+     * @param string       $stream=['stdout','stderr','memory'][$i]
      * @return void
      */
-    public function showLine(string $content = '', ?CliOneParam $cliOneParam = null): void
+    public function showLine(string $content = '', ?CliOneParam $cliOneParam = null,string $stream='stdout'): void
     {
         $r = $this->colorText($content, $cliOneParam) . "\n";
-        if ($this->echo) {
-            echo $r;
-        } else {
-            $this->memory .= $r;
-        }
+        $this->show($r,$stream);
     }
 
     /**
@@ -1240,7 +1265,7 @@ class CliOne
         [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
         if (!$parameter->isValid()) {
             if (!$this->isSilentError()) {
-                $this->showCheck('ERROR', 'red', "Parameter $key not defined");
+                $this->showCheck('ERROR', 'red', "Parameter $key not defined",'stderr');
             }
             return;
         }
@@ -2014,7 +2039,7 @@ class CliOne
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
                         } else if (!$this->isSilentError()) {
-                            $this->showCheck('ERROR', 'red,', "unknow selection $input");
+                            $this->showCheck('ERROR', 'red,', "unknow selection $input",'stderr');
                         }
                 }
             } else {
@@ -2034,12 +2059,7 @@ class CliOne
      */
     protected function readline(string $content, CliOneParam $parameter)
     {
-        $r = $this->colorText($content);
-        if ($this->echo) {
-            echo $r;
-        } else {
-            $this->memory .= $r;
-        }
+        $this->show($content);
         // globals is used for phpunit.
         if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
             $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;

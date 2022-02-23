@@ -23,7 +23,7 @@ if($cli->isCli()) {
         ->setDefault('param1')
         ->add();
     $cli->setHistory(['op1','op2','op3']);
-    $param1 = $cli->evalParam('param2');
+    $param2 = $cli->evalParam('param2');
 
     var_dump($param2->value);
 }

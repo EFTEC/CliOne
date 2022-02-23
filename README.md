@@ -18,6 +18,8 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 ✅ Arguments & user input
 
+✅ This library was aimed to (optionally) fallback to user-input if the argument is missing. 
+
 ✅ Colors available
 
 ✅ The design is mostly fluent (it adjusts to the width of the screen)
@@ -450,6 +452,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.11 (2022-02-22)
+  * Added supports for STDIN, STDOUT, and STDERR. 
 * 1.10 (2022-02-21)
   * **[new]** support for the old command line (cmd.exe). It is activated automatically.
     * It degraded the colors to b&w and changes the utf-8 characters to be compatible.

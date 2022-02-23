@@ -39,8 +39,10 @@ class CliOneTest extends TestCase
         CliOne::testUserInput(['bbb','yes']);
         $t = new CliOne('CliOneTest.php');
         $t->echo=false;
-        $t->showLine('<red>hello world</red>');
-        $this->assertEquals("\e[31mhello world\e[39m\n",$t->getMemory(true));
+        $t->showLine('<red>1)hello world</red>');
+        $this->assertEquals("\e[31m1)hello world\e[39m\n",$t->getMemory());
+        $t->showLine('<red>2)hello world</red>');
+        $this->assertEquals("\e[31m1)hello world\e[39m\n\e[31m2)hello world\e[39m\n",$t->getMemory(true));
         $t->noColor=true;
         $t->showLine('<red>hello world</red>');
         $this->assertEquals("hello world\n",$t->getMemory(true));
