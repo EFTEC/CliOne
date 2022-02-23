@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.9
+ * @version   1.10
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.9';
+    public const VERSION = '1.10';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -38,6 +38,7 @@ class CliOne
      * @see \eftec\CliOne\CliOne::setMemory
      */
     public $echo = true;
+    public $stream;
     protected $memory = '';
     protected $colSize = 80;
     protected $rowSize = 25;
@@ -70,6 +71,33 @@ class CliOne
         }
         return $r;
     }
+
+    /**
+     * This function is based in Symfony
+     * @return bool
+     */
+    public function hasColorSupport(): bool
+    {
+        if ('Hyper' === getenv('TERM_PROGRAM')) {
+            return true;
+        }
+        if (PHP_OS_FAMILY === 'Windows') {
+            return (function_exists('sapi_windows_vt100_support')
+                    && @sapi_windows_vt100_support($this->stream))
+                || false !== getenv('ANSICON')
+                || 'ON' === getenv('ConEmuANSI')
+                || 'xterm' === getenv('TERM');
+        }
+        if (function_exists('stream_isatty')) {
+            return @stream_isatty($this->stream);
+        }
+        if (function_exists('posix_isatty')) {
+            return @posix_isatty($this->stream);
+        }
+        $stat = @fstat($this->stream);
+        return $stat && 0020000 === ($stat['mode'] & 0170000);
+    }
+
 
     /**
      * It is used for testing. You can simulate arguments using this function<br>
@@ -124,6 +152,8 @@ class CliOne
     protected $argv = [];
     /** @var bool if true then it will not show colors */
     public $noColor = false;
+    /** @var bool if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc. */
+    public $cmdMode = false;
 
     public $colorTags = ['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
         '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
@@ -146,6 +176,7 @@ class CliOne
     public $styleTextEscape = ["\e[03m", "\e[23m", "\e[01m", "\e[22m", "\e[02m", "\e[22m",
         "\e[04m", "\e[24m", "\e[09m", "\e[29m"];
     public $columnEscape = [];
+    protected $columnEscapeCmd = [];
 
     /**
      * The constructor
@@ -154,15 +185,24 @@ class CliOne
      */
     public function __construct(?string $origin = null)
     {
-        $this->colSize = $this->calculateColSize();
-        $this->rowSize = $this->calculateRowSize();
+        $this->stream = STDOUT; // fopen('php://memory', 'rwb');
         $this->readingArgv();
         if (getenv('NO_COLOR')) {
             $this->noColor = true;
         }
+        if (!$this->hasColorSupport()) {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $this->cmdMode = true;
+            }
+            $this->noColor = true;
+        }
+        $this->colSize = $this->calculateColSize();
+        $this->rowSize = $this->calculateRowSize();
         $t = floor($this->colSize / 6);
         $this->columnEscape = ["\e[000G", "\e[" . sprintf('%03d', $t) . "G", "\e[" . sprintf('%03d', $t * 2) . "G",
             "\e[" . sprintf('%03d', $t * 3) . "G", "\e[" . sprintf('%03d', $t * 4) . "G", "\e[" . sprintf('%03d', $t * 5) . "G"];
+        $this->columnEscapeCmd = ['', str_repeat(' ', $t), str_repeat(' ', $t * 2),
+            str_repeat(' ', $t * 3), str_repeat(' ', $t * 4), str_repeat(' ', $t * 5)];
         $this->origin = $origin;
         $this->multibyte = function_exists('mb_strlen');
         // it is used by readline
@@ -617,7 +657,7 @@ class CliOne
                 $value = $this->argv[$prefixAlias . $ali] ?? null;
                 if ($value !== null) {
                     $parameter->missing = false;
-                    $parameter->origin='argument';
+                    $parameter->origin = 'argument';
                     return [true, $value];
                 }
             }
@@ -625,7 +665,7 @@ class CliOne
         }
         // the value is found and we return the value.
         $parameter->missing = false;
-        $parameter->origin='argument';
+        $parameter->origin = 'argument';
         return [true, $value];
     }
 
@@ -833,7 +873,7 @@ class CliOne
     {
         foreach ($array as $k => $v) {
             $found = false;
-            if (!in_array($k, $excludeKeys, true) && ($includeKeys === null ||  in_array($k, $includeKeys, true))) {
+            if (!in_array($k, $excludeKeys, true) && ($includeKeys === null || in_array($k, $includeKeys, true))) {
                 foreach ($this->parameters as $parameter) {
                     if ($parameter->key === $k) {
                         $parameter->value = $v;
@@ -1339,6 +1379,10 @@ class CliOne
      */
     public function showProgressBar($currentValue, $max, int $columnWidth, ?string $currentValueText = null): void
     {
+        if (!$this->cmdMode) {
+            // progress bar is not compatible in old-cmd mode.
+            return;
+        }
         $this->initstack();
         $style = $this->styleStack;
         [$alignTitle, $alignContentText, $alignContentNumber] = $this->alignStack;
@@ -1469,6 +1513,10 @@ class CliOne
      */
     public function showWaitCursor(bool $init = true, string $postfixValue = ''): void
     {
+        if (!$this->cmdMode) {
+            // progress bar is not compatible in old-cmd mode.
+            return;
+        }
         if ($init) {
             $this->wait = 0;
         }
@@ -1626,6 +1674,7 @@ class CliOne
     {
         $parameter->setValue($parameter->value);
     }
+    //
 
     /**
      * <pre>
@@ -1644,15 +1693,44 @@ class CliOne
                     '|', '-', '|',
                     '+', '-', '+', '|'];
             case 'double':
-                return [
-                    '╔', '═', '╗',
-                    '║', '═', '║',
-                    '╚', '═', '╝', '║'];
+                //Notepad: ┌┬┐ ├┼┤ └┴┘ ─ │
+                //cmd.exe: ÚÂ¿ ÃÅ´ ÀÁÙ Ä ³
+                //
+                //Notepad: ╔╦╗ ╠╬╣ ╚╩╝ ═ ║
+                //cmd.exe: ÉË» ÌÎ¹ ÈÊ¼ Í º
+                $r = $this->cmdMode ? [
+                    'É', 'Í', '»',
+                    'º', 'Í', 'º',
+                    'È', 'Í', '¼', 'º'
+                ]
+                    : [
+                        '╔', '═', '╗',
+                        '║', '═', '║',
+                        '╚', '═', '╝', '║'];
+                if ($this->cmdMode) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'simple':
-                return [
-                    '┌', '─', '┐',
-                    '│', '─', '│',
-                    '└', '─', '┘', '│'];
+                //Notepad: ┌┬┐ ├┼┤ └┴┘ ─ │
+                //cmd.exe: ÚÂ¿ ÃÅ´ ÀÁÙ Ä ³
+                $r = $this->cmdMode ? [
+                    'Ú', 'Ä', '¿',
+                    '³', 'Ä', '³',
+                    'À', 'Ä', 'Ù', '³'
+                ]
+                    : [
+                        '┌', '─', '┐',
+                        '│', '─', '│',
+                        '└', '─', '┘', '│'];
+                if ($this->cmdMode) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'minimal':
                 return [
                     '', '', '',
@@ -1678,9 +1756,29 @@ class CliOne
             case 'mysql':
                 return ['+', '+', '+', '+', '+'];
             case 'double':
-                return ['╠', '╦', '╣', '╩', '╬'];
+                //Notepad: ╔╦╗ ╠╬╣ ╚╩╝ ═ ║
+                //cmd.exe: ÉË» ÌÎ¹ ÈÊ¼ Í º
+                $r = $this->cmdMode ?
+                    ['Ì', 'Ë', '¹', 'Ê', 'Î'] :
+                    ['╠', '╦', '╣', '╩', '╬'];
+                if ($this->cmdMode) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'simple':
-                return ['├', '┬', '┤', '┴', '┼'];
+                //Notepad: ┌┬┐ ├┼┤ └┴┘ ─ │
+                //cmd.exe: ÚÂ¿ ÃÅ´ ÀÁÙ Ä ³
+                $r = $this->cmdMode ?
+                    ['Ã', 'Â', '´', 'Á', 'Å'] :
+                    ['├', '┬', '┤', '┴', '┼'];
+                if ($this->cmdMode) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'minimal':
                 return ['', '', '', '', ' '];
             default:
@@ -1705,6 +1803,9 @@ class CliOne
                  */
                 $arr = explode("\n", $a1);
                 $col = trim(explode(':', $arr[4])[1]);
+                if ($this->noColor) {
+                    $col--;
+                }
             } else {
                 $col = exec('tput cols');
                 /*
@@ -1849,7 +1950,11 @@ class CliOne
                         $v = $ivalues[$i + $shift];
                         $txt = $this->showPattern($parameter, $keydisplay, $v, $selection, $colW, '', $pattern);
                         $col = ($kcol - 1) * $colW;
-                        $this->show("\e[" . ($col) . "G" . $txt);
+                        if ($this->cmdMode) {
+                            $this->show($txt);
+                        } else {
+                            $this->show("\e[" . ($col) . "G" . $txt);
+                        }
                     }
                 }
             }
@@ -2016,9 +2121,14 @@ class CliOne
             }
             $content = str_replace('<option/>', $v, $content);
         }
-        $content = str_replace($this->colorTags, $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape, $content);
-        $content = str_replace($this->styleTextTags, $this->styleTextEscape, $content);
-        return str_replace($this->columnTags, $this->columnEscape, $content);
+        $content = str_replace($this->colorTags,
+            $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
+            $content);
+        $content = str_replace($this->styleTextTags,
+            $this->noColor ? array_fill(0, count($this->styleTextEscape), '') : $this->styleTextEscape, $content);
+        return str_replace($this->columnTags,
+            $this->noColor ? $this->columnEscapeCmd : $this->columnEscape,
+            $content);
     }
 
     /**
@@ -2075,9 +2185,25 @@ class CliOne
             case 'mysql':
                 return ['#', ' ', '-', '='];
             case 'simple':
-                return ['█', ' ', '░', '▓'];
+                $r = $this->noColor ?
+                    ['Û', ' ', '°', '²'] :
+                    ['█', ' ', '░', '▓'];
+                if ($this->noColor) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'double':
-                return ['█', '░', '▒', '▓'];
+                $r = $this->noColor ?
+                    ['Û', '°', '±', '²'] :
+                    ['█', '░', '▒', '▓'];
+                if ($this->noColor) {
+                    foreach ($r as $k => $v) {
+                        $r[$k] = iconv("UTF-8", "Windows-1252", $v);
+                    }
+                }
+                return $r;
             case 'minimal':
                 return ['*', ' ', ' ', ' '];
             default:

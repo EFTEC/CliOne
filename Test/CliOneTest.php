@@ -133,6 +133,12 @@ class CliOneTest extends TestCase
         $t->setArrayParam($rd[1],[],['test2']);
         $this->assertEquals('xxxxxxx', $t->getParameter('test1')->value);
     }
+    public function testhasColor() {
+        CliOne::testUserInput(null);
+        CliOne::testArguments( ['program.php', '--test1b', 'hello', '-test2', '"hello world"']);
+        $t = new CliOne('CliOneTest.php');
+        $this->assertEquals(true,$t->hasColorSupport());
+    }
 
     public function testEvalAlias()
     {

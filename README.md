@@ -14,7 +14,7 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 ✅ Windows, Linux and Mac Compatible.
 
-✅ This library is simple, it only consists of 2 classes and nothing more and no external dependency.
+✅ This library truly minimalist and simple, it only consists of 2 classes and nothing more and no external dependency.
 
 ✅ Arguments & user input
 
@@ -25,6 +25,7 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 ✅ Validation of values
 
 ✅ Support NO_COLOR environment variable. See https://no-color.org/
+
 
 
 
@@ -201,7 +202,6 @@ There are more operations available but the basic is there.
     - [Example using user input](#example-using-user-input)
     - [Example with a game](#example-with-a-game)
     - [Example colors](#example-colors)
-  - [](#)
     - [Example tables](#example-tables)
   - [Types of user input](#types-of-user-input)
   - [Types of colors](#types-of-colors)
@@ -382,7 +382,6 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
 
 ![](docs/examplecolor.jpg)
 
-## 
 
 ### Example tables
 
@@ -417,7 +416,7 @@ $cli->showLine("The parameters of option are: <option/>",$cli->getParameter('tes
 ## Types of colors
 
 | tag                                        | description                   |
-| ------------------------------------------ | ----------------------------- |
+|--------------------------------------------|-------------------------------|
 | <red>error</red>                           | color red                     |
 | <yellow>warning</yellow>                   | color yellow                  |
 | <blue>information</blue>                   | blue                          |
@@ -440,9 +439,23 @@ You can find the definition of the classes, methods and fields at:
 
 [definitions.md](definitions.md)
 
+## Compatibility
 
+* It must supports all moderns interface that are compatibles with Virtual Terminal.
+* Since Windows TH2 (v1511, 2015), cmd.exe and powershell.exe has supports or VT but it must be enabled.
+  * REG ADD HKCU\CONSOLE /f /v VirtualTerminalLevel /t REG_DWORD /d 1
+* Since Windows 10 Anniversary Edition (v1607, 2016), cmd.exe and powershell.exe has default supports of VT (AFAIK)
+* Windows 2019 (LTS, 2018) supports this library by default.
+* Windows Terminal supports all features.
+* The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.10 (2022-02-21)
+  * **[new]** support for the old command line (cmd.exe). It is activated automatically.
+    * It degraded the colors to b&w and changes the utf-8 characters to be compatible.
+    * Also, the scroll bar and the waiting cursor is not displayed in this mode. 
+    * See compatibility for more information.
+
 * 1.9 (2022-02-20)
   * **[new]** argumentIsValueKey and memory 
   * **[changed]** **Changed the signature of createParam(), switched the second and third argument**
