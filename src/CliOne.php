@@ -5,7 +5,6 @@
 namespace eftec\CliOne;
 
 use Exception;
-use mysql_xdevapi\BaseResult;
 use RuntimeException;
 
 /**
@@ -28,6 +27,8 @@ class CliOne
      */
     public $emptyValue = '__INPUT_';
     public $origin;
+    /** @var string $error it stores the latest error */
+    public $error;
     /** @var CliOneParam[] */
     public $parameters = [];
     /**
@@ -40,6 +41,7 @@ class CliOne
      */
     public $echo = true;
     public $MEMORY;
+    protected $defaultStream = 'stdout';
     protected $memory = '';
     protected $colSize = 80;
     protected $rowSize = 25;
@@ -47,6 +49,7 @@ class CliOne
     /** @var bool if true then mb_string library is loaded, otherwise it is false. it is calculated in the constructor */
     protected $multibyte = false;
     protected $styleStack = 'simple';
+    /** @var string[] [$alignTitle, $alignContent, $alignContentNumeric] */
     protected $alignStack = ['middle', 'middle', 'middle'];
     protected $colorStack = [];
     protected $patternTitleStack;
@@ -132,7 +135,7 @@ class CliOne
 
     public function setMemory(string $memory): CliOne
     {
-        ftruncate($this->MEMORY,0);
+        ftruncate($this->MEMORY, 0);
         fwrite($this->MEMORY, $memory);
         return $this;
     }
@@ -154,9 +157,11 @@ class CliOne
      */
     protected $argv = [];
     /** @var bool if true then it will not show colors */
-    public $noColor = false;
-    /** @var bool if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc. */
-    public $cmdMode = false;
+    protected $noColor = false;
+
+
+    /** @var bool if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc.) */
+    protected $noANSI = false;
 
     public $colorTags = ['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
         '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
@@ -188,18 +193,18 @@ class CliOne
      */
     public function __construct(?string $origin = null)
     {
-        if(!$this->isCli()) {
-            die("you are not running a CLI");
-        }
         $this->origin = $origin;
-        $this->MEMORY=fopen('php://memory', 'rwb');
+        if (!$this->isCli()) {
+            die("you are not running a CLI: " . $this->error);
+        }
+        $this->MEMORY = fopen('php://memory', 'rwb');
         $this->readingArgv();
         if (getenv('NO_COLOR')) {
             $this->noColor = true;
         }
         if (!$this->hasColorSupport()) {
             if (PHP_OS_FAMILY === 'Windows') {
-                $this->cmdMode = true;
+                $this->noANSI = true;
             }
             $this->noColor = true;
         }
@@ -228,7 +233,7 @@ class CliOne
     {
         global $argv;
         $this->argv = [];
-        $c =$argv===null?0: count($argv);
+        $c = $argv === null ? 0 : count($argv);
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
         for ($i = 1; $i < $c; $i++) {
             $x = explode('=', $argv[$i], 2);
@@ -325,7 +330,7 @@ class CliOne
      *                                         user-input, but it is not stored<br> none parameters could always be
      *                                         overridden, and they are used to "temporary" input such as validations
      *                                         (y/n).
-     * @param string       $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]<br>
+     * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]<br>
      *                                         --)<br> if the type is a flag, then the alias is a double flag "--".<br>
      *                                         if the type is a double flag, then the alias is a flag.
      * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
@@ -398,9 +403,9 @@ class CliOne
                     return $returnValue === true ? $parameter->value : $parameter;
                 }
                 if (!$parameter->argumentIsValueKey) {
-                    [$def, $parameter->value] = $this->readParameterArgFlag($parameter);
+                    [$def, $parameter->value] = $this->readArgument($parameter);
                 } else {
-                    [$def, $parameter->valueKey] = $this->readParameterArgFlag($parameter);
+                    [$def, $parameter->valueKey] = $this->readArgument($parameter);
                     if ($def && isset($parameter->inputValue[$parameter->valueKey])) {
                         $parameter->value = $parameter->inputValue[$parameter->valueKey];
                     } else {
@@ -429,7 +434,7 @@ class CliOne
                         $parameter->value = $parameter->default;
                         if ($parameter->required && $parameter->value === false) {
                             if (!$this->isSilentError()) {
-                                $this->showCheck('ERROR', 'red', "Field $parameter->key is missing",'stderr');
+                                $this->showCheck('ERROR', 'red', "Field $parameter->key is missing", 'stderr');
                             }
                             $parameter->value = false;
                         }
@@ -449,7 +454,7 @@ class CliOne
             }
         }
         if ($notfound && !$this->isSilentError()) {
-            $this->showCheck('ERROR', 'red', "parameter $key not defined",'stderr');
+            $this->showCheck('ERROR', 'red', "parameter $key not defined", 'stderr');
         }
         if ($valueK === false || $valueK === null) {
             return false;
@@ -582,6 +587,7 @@ class CliOne
         switch ($type) {
             case 'last':
             case 'second':
+            case 'command':
             case 'first':
                 $position = true;
                 $prefix = '';
@@ -607,7 +613,7 @@ class CliOne
      * @param CliOneParam $parameter
      * @return array
      */
-    public function readParameterArgFlag(CliOneParam $parameter): array
+    public function readArgument(CliOneParam $parameter): array
     {
         /** @noinspection DuplicatedCode */
         [$prefix, $prefixAlias, $position] = $this->prefixByType($parameter->type);
@@ -625,6 +631,7 @@ class CliOne
             /** @noinspection DuplicatedCode */
             switch ($parameter->type) {
                 case 'first':
+                case 'command':
                     if (count($this->argv) >= 1) {
                         $keyP = $keys[0];
                         $value = $keyP;
@@ -650,8 +657,8 @@ class CliOne
                     break;
             }
             /** @noinspection PhpUndefinedVariableInspection */
-            if ($value !== null && $keyP[0] === '-') {
-                // positional argument exists however it is a flag.
+            if (($value !== null && $keyP[0] === '-') || (!isset($this->argv[$trueName]) && $parameter->type !== 'command')) {
+                // positional argument exists however it is a flag or the argument does not exists
                 $value = null;
             }
         }
@@ -673,6 +680,2242 @@ class CliOne
         $parameter->missing = false;
         $parameter->origin = 'argument';
         return [true, $value];
+    }
+
+    public function showHelp(CliOneParam $parameter): void
+    {
+        $this->showLine("<yellow>Help : $parameter->key </yellow>");
+        $this->showLine("  " . $parameter->description);
+        foreach ($parameter->getHelpSyntax() as $help) {
+            $this->showLine("  " . $help);
+        }
+    }
+
+    /**
+     * @param string  $word the words to display.
+     * @param string  $font =['atr','znaki'][$i]
+     * @param bool    $trim if true then if the first line and/or the last line is empty, then it is removed.
+     * @param ?string $bit1 the visible character, if null then it will use a block code
+     * @param string  $bit0 the invisible character
+     * @return array
+     */
+    public function makeBigWords(string $word, string $font, bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
+    {
+        $bf = $this->shadow('simple', 'full');
+        /** @noinspection CallableParameterUseCaseInTypeContextInspection */
+        $bit1 = $bit1 ?? $bf;
+        $result = [];
+        $words = str_split($word);
+        foreach ($words as $k => $letter) {
+            switch ($font) {
+                case 'znaki':
+                    $result[$k] = $this->fontZnaki($letter, $bit1, $bit0);
+                    break;
+                default:
+                case 'atr':
+                    $result[$k] = $this->fontAtr($letter, $bit1, $bit0);
+                    break;
+            }
+        }
+        $final = [];
+        for ($i = 0; $i < 8; $i++) {
+            $m = '';
+            foreach ($result as $rows) {
+                $m .= $rows[$i];
+            }
+            $final[] = $m;
+        }
+        if ($trim) {
+            $to = count($final) - 1;
+            if (trim($final[$to], $bit0) === '') {
+                array_splice($final, $to, 1);
+            }
+            if (trim($final[0], $bit0) === '') {
+                array_splice($final, 0, 1);
+            }
+        }
+        return $final;
+    }
+
+    protected function fontZnaki($letter, $bit1 = null, $bit2 = ' '): array
+    {
+        switch ($letter) {
+            case ' ':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                ];
+                break;
+            case '!':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b00111100,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000,
+                    0b00011000,
+                    0b00000000,
+                ];
+                break;
+            case '"':
+                $r = [
+                    0b00000000,
+                    0b00110011,
+                    0b00110011,
+                    0b01100110,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                ];
+                break;
+            case '#':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b11111111,
+                    0b01100110,
+                    0b01100110,
+                    0b11111111,
+                    0b01100110,
+                    0b00000000,
+                ];
+                break;
+            case '$':
+                $r = [
+                    0b01111110,
+                    0b11000011,
+                    0b10011101,
+                    0b10110001,
+                    0b10110001,
+                    0b10011101,
+                    0b11000011,
+                    0b01111110,
+                ];
+                break;
+            case '%':
+                $r = [
+                    0b00000000,
+                    0b00000011,
+                    0b00111110,
+                    0b01100000,
+                    0b00111110,
+                    0b00000011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case '&':
+                $r = [
+                    0b00000011,
+                    0b00111110,
+                    0b01100000,
+                    0b00111110,
+                    0b00000011,
+                    0b00000011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case '\'':
+                $r = [
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00111000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                ];
+                break;
+            case '(':
+                $r = [
+                    0b00000000,
+                    0b00011110,
+                    0b00111100,
+                    0b00111000,
+                    0b00111000,
+                    0b00111100,
+                    0b00011110,
+                    0b00000000,
+                ];
+                break;
+            case ')':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b00011110,
+                    0b00001110,
+                    0b00001110,
+                    0b00011110,
+                    0b00111100,
+                    0b00000000,
+                ];
+                break;
+            case '+':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111110,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                ];
+                break;
+            case ',':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00111000,
+                ];
+                break;
+            case '-':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b01111110,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                ];
+                break;
+            case '.':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                ];
+                break;
+            case '/':
+                $r = [
+                    0b00000000,
+                    0b00000111,
+                    0b00001110,
+                    0b00011100,
+                    0b00111000,
+                    0b01110000,
+                    0b01100000,
+                    0b00000000,
+                ];
+                break;
+            case '0':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01101111,
+                    0b01111011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '1':
+                $r = [
+                    0b00000000,
+                    0b00001100,
+                    0b00011100,
+                    0b00111100,
+                    0b00011100,
+                    0b00011100,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '2':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b00000011,
+                    0b00111111,
+                    0b01100000,
+                    0b01100000,
+                    0b01111111,
+                    0b00000000,
+                ];
+                break;
+            case '3':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b00001110,
+                    0b00000011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '4':
+                $r = [
+                    0b00000000,
+                    0b00011110,
+                    0b00110110,
+                    0b01100110,
+                    0b01111111,
+                    0b00000110,
+                    0b00001111,
+                    0b00000000,
+                ];
+                break;
+            case '5':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b01100000,
+                    0b01111110,
+                    0b00000011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '6':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100000,
+                    0b01111110,
+                    0b01100011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '7':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b01100011,
+                    0b00000110,
+                    0b00001100,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                ];
+                break;
+            case '8':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case '9':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case ':':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                ];
+                break;
+            case ';':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                    0b00011100,
+                    0b00011100,
+                    0b00111000,
+                ];
+                break;
+            case '<':
+                $r = [
+                    0b00000000,
+                    0b00011110,
+                    0b00111100,
+                    0b01110000,
+                    0b01110000,
+                    0b00111100,
+                    0b00011110,
+                    0b00000000,
+                ];
+                break;
+            case '=':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b01111110,
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case '>':
+                $r = [
+                    0b00000000,
+                    0b01111000,
+                    0b00111100,
+                    0b00011110,
+                    0b00001110,
+                    0b00111100,
+                    0b01111000,
+                    0b00000000,
+                ];
+                break;
+            case '?':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01101110,
+                    0b00001110,
+                    0b00011100,
+                    0b00000000,
+                    0b00011000,
+                    0b00000000,
+                ];
+                break;
+            case '@':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01111111,
+                    0b01100011,
+                    0b00000110,
+                ];
+                break;
+            case 'A':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01111111,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'B':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00111110,
+                    0b00110011,
+                    0b00110011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 'C':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100000,
+                    0b01100000,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'D':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00110011,
+                    0b00110011,
+                    0b00110011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 'E':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b00110001,
+                    0b00111100,
+                    0b00110000,
+                    0b00110001,
+                    0b01111111,
+                    0b00000000,
+                ];
+                break;
+            case 'F':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b00110001,
+                    0b00111100,
+                    0b00110000,
+                    0b00110000,
+                    0b01111000,
+                    0b00000000,
+                ];
+                break;
+            case 'G':
+                $r = [
+                    0b00000000,
+                    0b00111111,
+                    0b01100011,
+                    0b01100000,
+                    0b01100111,
+                    0b01100011,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'H':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01111111,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'I':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 'J':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b01100011,
+                    0b00000011,
+                    0b00000011,
+                    0b00000011,
+                    0b01100011,
+                    0b00111110,
+                ];
+                break;
+            case 'K':
+                $r = [
+                    0b00000000,
+                    0b01100111,
+                    0b01101110,
+                    0b01111100,
+                    0b01101100,
+                    0b01100110,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'L':
+                $r = [
+                    0b00000000,
+                    0b01111000,
+                    0b00110000,
+                    0b00110000,
+                    0b00110000,
+                    0b00110011,
+                    0b01111111,
+                    0b00000000,
+                ];
+                break;
+            case 'M':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01110111,
+                    0b01111111,
+                    0b01101011,
+                    0b01100011,
+                    0b01110111,
+                    0b00000000,
+                ];
+                break;
+            case 'N':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01110011,
+                    0b01111011,
+                    0b01101111,
+                    0b01100111,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'O':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'P':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00110011,
+                    0b00111110,
+                    0b00110000,
+                    0b01111000,
+                    0b00000000,
+                ];
+                break;
+            case 'Q':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01101011,
+                    0b01100110,
+                    0b00111011,
+                    0b00000000,
+                ];
+                break;
+            case 'R':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00110011,
+                    0b00111110,
+                    0b00110011,
+                    0b01111011,
+                    0b00000000,
+                ];
+                break;
+            case 'S':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100000,
+                    0b00111110,
+                    0b00000011,
+                    0b00000011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 'T':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b01011101,
+                    0b00011100,
+                    0b00011100,
+                    0b00011100,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'U':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'V':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00110110,
+                    0b00011100,
+                    0b00001000,
+                    0b00000000,
+                ];
+                break;
+            case 'W':
+                $r = [
+                    0b00000000,
+                    0b01110111,
+                    0b01100011,
+                    0b01101011,
+                    0b01111111,
+                    0b01110111,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'X':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b00110110,
+                    0b00011100,
+                    0b00011100,
+                    0b00110110,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'Y':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b00110110,
+                    0b00011100,
+                    0b00011100,
+                    0b00011100,
+                    0b00000000,
+                ];
+                break;
+            case 'Z':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b01100110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110011,
+                    0b01111111,
+                    0b00000000,
+                ];
+                break;
+            case '[':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b00000011,
+                    0b00111111,
+                    0b01100011,
+                    0b00111111,
+                    0b00000110,
+                ];
+                break;
+            case '\\':
+                $r = [
+                    0b00000000,
+                    0b00000011,
+                    0b00111110,
+                    0b01100011,
+                    0b01100000,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case ']':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01111110,
+                    0b01100000,
+                    0b00111111,
+                    0b00000110,
+                ];
+                break;
+            case '^':
+                $r = [
+                    0b00000000,
+                    0b01111111,
+                    0b00000110,
+                    0b00111110,
+                    0b00011000,
+                    0b00110000,
+                    0b01111111,
+                    0b00000000,
+                ];
+                break;
+            case '_':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b11111111,
+                ];
+                break;
+            case 'a':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b00000011,
+                    0b00111111,
+                    0b01100011,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'b':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 'c':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100000,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'd':
+                $r = [
+                    0b00000000,
+                    0b00000011,
+                    0b00111111,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'e':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01111110,
+                    0b01100000,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'f':
+                $r = [
+                    0b00000000,
+                    0b00011100,
+                    0b00110110,
+                    0b00110000,
+                    0b01111000,
+                    0b00110000,
+                    0b00110000,
+                    0b00110000,
+                ];
+                break;
+            case 'g':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111111,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000011,
+                    0b01111110,
+                ];
+                break;
+            case 'h':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'i':
+                $r = [
+                    0b00000000,
+                    0b00011100,
+                    0b00000000,
+                    0b00111100,
+                    0b00011100,
+                    0b00011100,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'j':
+                $r = [
+                    0b00000000,
+                    0b00000011,
+                    0b00000000,
+                    0b00000011,
+                    0b00000011,
+                    0b00000011,
+                    0b00110011,
+                    0b00011110,
+                ];
+                break;
+            case 'k':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01101110,
+                    0b01111000,
+                    0b01101100,
+                    0b01100110,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'l':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b00011100,
+                    0b00011100,
+                    0b00011100,
+                    0b00011100,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'm':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01110111,
+                    0b01111111,
+                    0b01101011,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'n':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'o':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111110,
+                    0b00000000,
+                ];
+                break;
+            case 'p':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00110011,
+                    0b00111110,
+                    0b00110000,
+                    0b01111000,
+                ];
+                break;
+            case 'q':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111111,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000110,
+                    0b00001111,
+                ];
+                break;
+            case 'r':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00110011,
+                    0b00110000,
+                    0b00110000,
+                    0b01111000,
+                    0b00000000,
+                ];
+                break;
+            case 's':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100000,
+                    0b00111110,
+                    0b00000011,
+                    0b01111110,
+                    0b00000000,
+                ];
+                break;
+            case 't':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011011,
+                    0b00001110,
+                    0b00000000,
+                ];
+                break;
+            case 'u':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000000,
+                ];
+                break;
+            case 'v':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b00110110,
+                    0b00011100,
+                    0b00001000,
+                    0b00000000,
+                ];
+                break;
+            case 'w':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01101011,
+                    0b01111111,
+                    0b01110111,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'x':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b00110110,
+                    0b00011100,
+                    0b00110110,
+                    0b01100011,
+                    0b00000000,
+                ];
+                break;
+            case 'y':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01100011,
+                    0b00111111,
+                    0b00000011,
+                    0b01111110,
+                ];
+                break;
+            case 'z':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b01001100,
+                    0b00011000,
+                    0b00110001,
+                    0b01111111,
+                ];
+                break;
+            default:
+                $r = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,];
+                break;
+        }
+        $result = [];
+        foreach ($r as $row) {
+            $bin = str_pad(decbin($row), 8, '0', STR_PAD_LEFT);
+            $bin = str_replace(array('1', '0'), array($bit1, $bit2), $bin);
+            $result[] = $bin;
+        }
+        return $result;
+    }
+
+    protected function fontAtr($letter, $bit1 = null, $bit2 = ' '): array
+    {
+        $bit1 = $bit1 ?? $letter;
+        switch ($letter) {
+            case '!':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case '"':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '#':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b11111111,
+                    0b01100110,
+                    0b01100110,
+                    0b11111111,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case '$':
+                $r = [
+                    0b00011000,
+                    0b00111110,
+                    0b01100000,
+                    0b00111100,
+                    0b00000110,
+                    0b01111100,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case '%':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01101100,
+                    0b00011000,
+                    0b00110000,
+                    0b01100110,
+                    0b01000110,
+                    0b00000000
+                ];
+                break;
+            case '&':
+                $r = [
+                    0b00011100,
+                    0b00110110,
+                    0b00011100,
+                    0b00111000,
+                    0b01101111,
+                    0b01100110,
+                    0b00111011,
+                    0b00000000
+                ];
+                break;
+            case '\'':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '(':
+                $r = [
+                    0b00000000,
+                    0b00001110,
+                    0b00011100,
+                    0b00011000,
+                    0b00011000,
+                    0b00011100,
+                    0b00001110,
+                    0b00000000
+                ];
+                break;
+            case ')':
+                $r = [
+                    0b00000000,
+                    0b01110000,
+                    0b00111000,
+                    0b00011000,
+                    0b00011000,
+                    0b00111000,
+                    0b01110000,
+                    0b00000000
+                ];
+                break;
+            case '*':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b00111100,
+                    0b11111111,
+                    0b00111100,
+                    0b01100110,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '+':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case ',
+':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00110000
+                ];
+                break;
+            case '-':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '.':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case '/':
+                $r = [
+                    0b00000000,
+                    0b00000110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b01100000,
+                    0b01000000,
+                    0b00000000
+                ];
+                break;
+            case '0':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01101110,
+                    0b01110110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case '1':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00111000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case '2':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case '3':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00001100,
+                    0b00011000,
+                    0b00001100,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case '4':
+                $r = [
+                    0b00000000,
+                    0b00001100,
+                    0b00011100,
+                    0b00111100,
+                    0b01101100,
+                    0b01111110,
+                    0b00001100,
+                    0b00000000
+                ];
+                break;
+            case '5':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b01100000,
+                    0b01111100,
+                    0b00000110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case '6':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case '7':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00000110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b00110000,
+                    0b00000000
+                ];
+                break;
+            case '8':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case '9':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b00111110,
+                    0b00000110,
+                    0b00001100,
+                    0b00111000,
+                    0b00000000
+                ];
+                break;
+            case ':':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case ';':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000,
+                    0b00011000,
+                    0b00011000,
+                    0b00110000
+                ];
+                break;
+            case '<':
+                $r = [
+                    0b00000110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b00011000,
+                    0b00001100,
+                    0b00000110,
+                    0b00000000
+                ];
+                break;
+            case '=':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '>':
+                $r = [
+                    0b01100000,
+                    0b00110000,
+                    0b00011000,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b01100000,
+                    0b00000000
+                ];
+                break;
+            case '?':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b00001100,
+                    0b00011000,
+                    0b00000000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case '@':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01101110,
+                    0b01101110,
+                    0b01100000,
+                    0b00111110,
+                    0b00000000
+                ];
+                break;
+            case 'A':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'B':
+                $r = [
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111100,
+                    0b00000000
+                ];
+                break;
+            case 'C':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01100000,
+                    0b01100000,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'D':
+                $r = [
+                    0b00000000,
+                    0b01111000,
+                    0b01101100,
+                    0b01100110,
+                    0b01100110,
+                    0b01101100,
+                    0b01111000,
+                    0b00000000
+                ];
+                break;
+            case 'E':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b01100000,
+                    0b01111100,
+                    0b01100000,
+                    0b01100000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case 'F':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b01100000,
+                    0b01111100,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b00000000
+                ];
+                break;
+            case 'G':
+                $r = [
+                    0b00000000,
+                    0b00111110,
+                    0b01100000,
+                    0b01100000,
+                    0b01101110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000000
+                ];
+                break;
+            case 'H':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01111110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'I':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case 'J':
+                $r = [
+                    0b00000000,
+                    0b00000110,
+                    0b00000110,
+                    0b00000110,
+                    0b00000110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'K':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01101100,
+                    0b01111000,
+                    0b01111000,
+                    0b01101100,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'L':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case 'M':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01110111,
+                    0b01111111,
+                    0b01101011,
+                    0b01100011,
+                    0b01100011,
+                    0b00000000
+                ];
+                break;
+            case 'N':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01110110,
+                    0b01111110,
+                    0b01111110,
+                    0b01101110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'O':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'P':
+                $r = [
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111100,
+                    0b01100000,
+                    0b01100000,
+                    0b00000000
+                ];
+                break;
+            case 'Q':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01101100,
+                    0b00110110,
+                    0b00000000
+                ];
+                break;
+            case 'R':
+                $r = [
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111100,
+                    0b01101100,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'S':
+                $r = [
+                    0b00000000,
+                    0b00111100,
+                    0b01100000,
+                    0b00111100,
+                    0b00000110,
+                    0b00000110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'T':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case 'U':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case 'V':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case 'W':
+                $r = [
+                    0b00000000,
+                    0b01100011,
+                    0b01100011,
+                    0b01101011,
+                    0b01111111,
+                    0b01110111,
+                    0b01100011,
+                    0b00000000
+                ];
+                break;
+            case 'X':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'Y':
+                $r = [
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case 'Z':
+                $r = [
+                    0b00000000,
+                    0b01111110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b01100000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case '[
+':
+                $r = [
+                    0b00000000,
+                    0b00011110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011110,
+                    0b00000000
+                ];
+                break;
+            case '\\':
+                $r = [
+                    0b00000000,
+                    0b01000000,
+                    0b01100000,
+                    0b00110000,
+                    0b00011000,
+                    0b00001100,
+                    0b00000110,
+                    0b00000000
+                ];
+                break;
+            case '
+]':
+                $r = [
+                    0b00000000,
+                    0b01111000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b01111000,
+                    0b00000000
+                ];
+                break;
+            case '^':
+                $r = [
+                    0b00000000,
+                    0b00001000,
+                    0b00011100,
+                    0b00110110,
+                    0b01100011,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+            case '_':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b11111111,
+                    0b00000000
+                ];
+                break;
+            case 'a':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111100,
+                    0b00000110,
+                    0b00111110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000000
+                ];
+                break;
+            case 'b':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01100000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111100,
+                    0b00000000
+                ];
+                break;
+            case 'c':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111100,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'd':
+                $r = [
+                    0b00000000,
+                    0b00000110,
+                    0b00000110,
+                    0b00111110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000000
+                ];
+                break;
+            case 'e':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01111110,
+                    0b01100000,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'f':
+                $r = [
+                    0b00000000,
+                    0b00001110,
+                    0b00011000,
+                    0b00111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case 'g':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000110,
+                    0b01111100
+                ];
+                break;
+            case 'h':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01100000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'i':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b00000000,
+                    0b00111000,
+                    0b00011000,
+                    0b00011000,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'j':
+                $r = [
+                    0b00000000,
+                    0b00000110,
+                    0b00000000,
+                    0b00000110,
+                    0b00000110,
+                    0b00000110,
+                    0b00000110,
+                    0b00111100
+                ];
+                break;
+            case 'k':
+                $r = [
+                    0b00000000,
+                    0b01100000,
+                    0b01100000,
+                    0b01101100,
+                    0b01111000,
+                    0b01101100,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'l':
+                $r = [
+                    0b00000000,
+                    0b00111000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'm':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100110,
+                    0b01111111,
+                    0b01111111,
+                    0b01101011,
+                    0b01100011,
+                    0b00000000
+                ];
+                break;
+            case 'n':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'o':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00000000
+                ];
+                break;
+            case 'p':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100110,
+                    0b01111100,
+                    0b01100000,
+                    0b01100000
+                ];
+                break;
+            case 'q':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000110,
+                    0b00000110
+                ];
+                break;
+            case 'r':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111100,
+                    0b01100110,
+                    0b01100000,
+                    0b01100000,
+                    0b01100000,
+                    0b00000000
+                ];
+                break;
+            case 's':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00111110,
+                    0b01100000,
+                    0b00111100,
+                    0b00000110,
+                    0b01111100,
+                    0b00000000
+                ];
+                break;
+            case 't':
+                $r = [
+                    0b00000000,
+                    0b00011000,
+                    0b01111110,
+                    0b00011000,
+                    0b00011000,
+                    0b00011000,
+                    0b00001110,
+                    0b00000000
+                ];
+                break;
+            case 'u':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00000000
+                ];
+                break;
+            case 'v':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000
+                ];
+                break;
+            case 'w':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100011,
+                    0b01101011,
+                    0b01111111,
+                    0b00111110,
+                    0b00110110,
+                    0b00000000
+                ];
+                break;
+            case 'x':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100110,
+                    0b00111100,
+                    0b00011000,
+                    0b00111100,
+                    0b01100110,
+                    0b00000000
+                ];
+                break;
+            case 'y':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01100110,
+                    0b01100110,
+                    0b01100110,
+                    0b00111110,
+                    0b00001100,
+                    0b01111000
+                ];
+                break;
+            case 'z':
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b01111110,
+                    0b00001100,
+                    0b00011000,
+                    0b00110000,
+                    0b01111110,
+                    0b00000000
+                ];
+                break;
+            case ' ':
+            default:
+                $r = [
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ];
+                break;
+        }
+        $result = [];
+        foreach ($r as $row) {
+            $bin = str_pad(decbin($row), 8, '0', STR_PAD_LEFT);
+            $bin = str_replace(array('1', '0'), array($bit1, $bit2), $bin);
+            $result[] = $bin;
+        }
+        return $result;
     }
 
     /**
@@ -712,16 +2955,22 @@ class CliOne
      */
     public function isCli(): bool
     {
-        if (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__')) {
+        /*if (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__')) {
             // phpunit is running
-            return false;
-        }
+            return true;
+        }*/
         if ($this->origin !== null && isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) !== $this->origin) {
             // it is not running the right file.
+            $this->error = 'You are not the right file in the whitelist ' . basename($_SERVER['PHP_SELF']);
             return false;
         }
         // false if it is running a web.
-        return !http_response_code()  && defined('STDIN');
+        if (defined('STDIN') && !http_response_code()) {
+            $this->error = '';
+            return true;
+        }
+        $this->error = 'HTTP response found or not STDIN';
+        return false;
     }
 
     /**
@@ -730,11 +2979,11 @@ class CliOne
      */
     public function getSTDIN(): ?string
     {
-        if (@fstat(STDIN)['size']===0) {
+        if (@fstat(STDIN)['size'] === 0) {
             return null;
         }
-        $r=stream_get_contents(STDIN);
-        return ($r===false)?null:$r;
+        $r = stream_get_contents(STDIN);
+        return ($r === false) ? null : $r;
     }
 
     /**
@@ -794,6 +3043,7 @@ class CliOne
             $keys = array_keys($this->argv);
             switch ($parameter->type) {
                 case 'first':
+                case 'command':
                     if (count($this->argv) >= 1) {
                         $keyP = $keys[0];
                         $value = $keyP;
@@ -819,8 +3069,8 @@ class CliOne
                     break;
             }
             /** @noinspection PhpUndefinedVariableInspection */
-            if ($value !== null && $keyP[0] === '-') {
-                // positional argument exists however it is a flag.
+            if (($value !== null && $keyP[0] === '-') || (!isset($this->argv[$trueName]) && $parameter->type !== 'command')) {
+                // positional argument exists however it is a flag, or the argument does not exist
                 $value = null;
             }
         }
@@ -904,7 +3154,7 @@ class CliOne
                     }
                 }
                 if (!$found && !$this->isSilentError()) {
-                    $this->showCheck('ERROR', 'red', "Parameter $k not defined",'stderr');
+                    $this->showCheck('ERROR', 'red', "Parameter $k not defined", 'stderr');
                     return;
                 }
             }
@@ -1007,29 +3257,29 @@ class CliOne
     /**
      * It's similar to showLine, but it keeps in the current line.
      *
-     * @param string $content
-     * @param string $stream =['stdout','stderr','memory'][$i]
+     * @param string  $content
+     * @param ?string $stream =['stdout','stderr','memory'][$i]
      * @return void
      * @see \eftec\CliOne\CliOne::showLine
      */
-    public function show(string $content, string $stream='stdout'): void
+    public function show(string $content, ?string $stream = null): void
     {
-        switch ($stream) {
+        switch ($stream ?? $this->defaultStream) {
             case 'stderr':
-                $str=STDERR;
+                $str = STDERR;
                 break;
             case 'memory':
-                $str=$this->MEMORY;
+                $str = $this->MEMORY;
                 break;
             default:
-                $str=STDOUT;
+                $str = STDOUT;
                 break;
         }
         $r = $this->colorText($content);
         if ($this->echo) {
-            fwrite($str,$r);
+            fwrite($str, $r);
         } else {
-            fwrite($this->MEMORY,$r);
+            fwrite($this->MEMORY, $r);
         }
     }
 
@@ -1083,16 +3333,26 @@ class CliOne
 
     /**
      * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
-     * @param string $label
-     * @param string $color =['black','green','yellow','cyan','magenta','blue'][$i]
-     * @param string $content
-     * @param string $stream=['stdout','stderr','memory'][$i]
+     * @param string|array $label
+     * @param string       $color  =['black','green','yellow','cyan','magenta','blue'][$i]
+     * @param string|array $content
+     * @param string       $stream =['stdout','stderr','memory'][$i]
      * @return void
      */
-    public function showCheck(string $label, string $color, string $content,string $stream='stdout'): void
+    public function showCheck($label, string $color, $content, string $stream = 'stdout'): void
     {
-        $r = $this->colorText("<$color>[$label]</$color> $content") . "\n";
-        $this->show($r,$stream);
+        $label = !is_array($label) ? ['[' . $label . ']'] : $label;
+        $content = !is_array($content) ? [$content] : $content;
+        $numLines = max(count($label), count($content));
+        $label = $this->alignLinesVertically($label, $numLines);
+        $content = $this->alignLinesVertically($content, $numLines);
+        $maxWidth = $this->maxWidth($label);
+        $label = $this->alignText($label, $maxWidth, 'middle');
+        $label = !is_array($label) ? [$label] : $label;
+        foreach ($label as $k => $l) {
+            $r = $this->colorText("<$color>$l</$color> " . $content[$k]) . "\n";
+            $this->show($r, $stream);
+        }
     }
 
     /**
@@ -1161,15 +3421,18 @@ class CliOne
      * </pre>
      *
      *
-     * @param string       $content content to display
-     * @param ?CliOneParam $cliOneParam
-     * @param string       $stream=['stdout','stderr','memory'][$i]
+     * @param string|string[] $content content to display
+     * @param ?CliOneParam    $cliOneParam
+     * @param ?string         $stream  =['stdout','stderr','memory'][$i]
      * @return void
      */
-    public function showLine(string $content = '', ?CliOneParam $cliOneParam = null,string $stream='stdout'): void
+    public function showLine($content = '', ?CliOneParam $cliOneParam = null, ?string $stream = null): void
     {
-        $r = $this->colorText($content, $cliOneParam) . "\n";
-        $this->show($r,$stream);
+        $content = !is_array($content) ? [$content] : $content;
+        foreach ($content as $c) {
+            $r = $this->colorText($c, $cliOneParam) . "\n";
+            $this->show($r, $stream ?? $this->defaultStream);
+        }
     }
 
     /**
@@ -1198,11 +3461,11 @@ class CliOne
             $titles = [$titles];
         }
         if (count($titles) > count($lines)) {
-            $lines = $this->alignLinesMiddle($lines, count($titles));
+            $lines = $this->alignLinesVertically($lines, count($titles));
         }
         if (count($titles) < count($lines)) {
             // align to the center by adding the missing lines at the top and bottom.
-            $titles = $this->alignLinesMiddle($titles, count($lines));
+            $titles = $this->alignLinesVertically($titles, count($lines));
         }
         $maxTitleL = 0;
         // max title width
@@ -1224,13 +3487,34 @@ class CliOne
         $this->showLine();
     }
 
-    public function alignLinesMiddle($lines, $numberLines): array
+    /**
+     * @param string[] $lines       The lines to align
+     * @param int      $numberLines the number of lines vertically to use to align the text.
+     * @param string   $align       =['middle','top','bottom'][$i]
+     * @return array
+     */
+    public function alignLinesVertically(array $lines, int $numberLines, string $align = 'middle'): array
     {
         $dif = $numberLines - count($lines);
-        $dtop = floor($dif / 2);
-        $dbottom = ceil($dif / 2);
         $tmp = [];
-        for ($i = 0; $i < $dtop; $i++) {
+        switch ($align) {
+            case 'top':
+                $dtop = 0;
+                $dbottom = $dif;
+                break;
+            case 'bottom':
+                $dtop = $dif;
+                $dbottom = 0;
+                break;
+            default:
+            case 'middle':
+                $dtop = floor($dif / 2);
+                $dbottom = ceil($dif / 2);
+                break;
+        }
+        for ($i = 0;
+             $i < $dtop;
+             $i++) {
             $tmp[] = '';
         }
         foreach ($lines as $line) {
@@ -1240,6 +3524,18 @@ class CliOne
             $tmp[] = '';
         }
         return $tmp;
+    }
+
+    public function maxWidth(array $lines)
+    {
+        $maxWidth = 0;
+        foreach ($lines as $l) {
+            $l = $this->strlen($l);
+            if ($l > $maxWidth) {
+                $maxWidth = $l;
+            }
+        }
+        return $maxWidth;
     }
 
     /**
@@ -1265,7 +3561,7 @@ class CliOne
         [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
         if (!$parameter->isValid()) {
             if (!$this->isSilentError()) {
-                $this->showCheck('ERROR', 'red', "Parameter $key not defined",'stderr');
+                $this->showCheck('ERROR', 'red', "Parameter $key not defined", 'stderr');
             }
             return;
         }
@@ -1282,32 +3578,45 @@ class CliOne
 
     /**
      * It shows the syntax of the parameters.
-     * @param ?string $title      A title (optional)
-     * @param array   $typeParam  =['first','last','second','flag','longflag','onlyinput','none'][$i] the type of
-     *                            parameter
-     * @param array   $excludeKey the keys to exclude
-     * @param ?int    $size       the minimum size of the first column
+     * @param ?string     $title       A title (optional)
+     * @param array       $typeParam   =['command','first','last','second','flag','longflag','onlyinput','none'][$i] the
+     *                                 type of parameter
+     * @param array       $excludeKey  the keys to exclude
+     * @param array|null  $includeKeys the whitelist of elements that only could be included.<br>
+     *                                 Only keys that are in this list are added.
+     * @param string|null $related     if not null then it only shows all the parameteres that are related.<br>
+     *                                 use $param->setRelated() to set the relation.
+     * @param ?int        $size        the minimum size of the first column
      * @return void
      */
     public function showParamSyntax2(?string $title = '',
-                                     array   $typeParam = ['flag', 'longflag', 'first'],
+                                     array   $typeParam = ['flag', 'longflag', 'first', 'command'],
                                      array   $excludeKey = [],
-                                     ?int    $size = null): void
+                                     ?array  $includeKeys = null,
+                                     ?string $related = null,
+                                     ?int    $size = 20): void
     {
-        $col1 = [];
-        $col2 = [];
+
+        $col1Corrected = [];
+        $col2Corrected = [];
         if ($title) {
             $this->showLine("<yellow>$title</yellow>");
         }
         foreach ($this->parameters as $parameter) {
-            if ((in_array($parameter->type, $typeParam, true)) && !in_array($parameter->key, $excludeKey, true) && $parameter->isValid()) {
+            $col1 = [];
+            $col2 = [];
+            if (in_array($parameter->type, $typeParam, true) &&
+                !in_array($parameter->key, $excludeKey, true) && $parameter->isValid() &&
+                ($includeKeys === null || in_array($parameter->key, $includeKeys, true)) &&
+                ($related === null || in_array($related, $parameter->getRelated(), true))
+            ) {
                 /** @noinspection PhpUnusedLocalVariableInspection */
                 [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
                 $v = $this->showParamValue($parameter);
                 $key = $paramprefix . $parameter->key;
                 if ($parameter->getNameArg()) {
                     if ($parameter->required) {
-                        $key .= ' <cyan>' . $parameter->getNameArg() . '</cyan><green> ';
+                        $key .= ' <cyan><' . $parameter->getNameArg() . '</cyan><green> ';
                     } else {
                         $key .= ' <cyan><' . $parameter->getNameArg() . '></cyan><green> ';
                     }
@@ -1318,80 +3627,170 @@ class CliOne
                 }
                 $col1[] = $this->colorText("<green>$key</green>");
                 $col2[] = $this->colorText("$parameter->description <bold><cyan>[$v]</cyan></bold>");
-                foreach ($parameter->getHelpSyntax() as $help) {
-                    $col1[] = '';
-                    $col2[] = $help;
-                }
-            }
-        }
-        $wm = $size ?? 0;
-        foreach ($col1 as $c1) {
-            if ($wm < $this->strlen($c1)) {
-                $wm = $this->strlen($c1);
-            }
-        }
-        // wrap lines.
-        $col2Corrected = [];
-        $col1Corrected = [];
-        foreach ($col2 as $k => $v) {
-            $newlines = $this->wrapLine($this->colorText($v), $this->colSize - $wm - 1);
-            foreach ($newlines as $k2 => $ne) {
-                if ($k2 === 0) {
-                    $col1Corrected[] = $col1[$k];
+                if ($parameter->inputValue !== null) {
+                    $assoc = !isset($parameter->inputValue[0]);
+                    if (!$assoc) {
+                        $options = implode(',', $parameter->inputValue);
+                        foreach ($parameter->getHelpSyntax() as $help) {
+                            $help = str_replace('<option/>', $options,$this->colorText($help,$parameter));
+                            $col1[] = '';
+                            $col2[] = $help;
+                        }
+                    } else {
+                        foreach ($parameter->getHelpSyntax() as $help) {
+                            $foundOptions = strpos($help, '<option/>') !== false;
+                            if (!$foundOptions) {
+                                $col1[] = '';
+                                $col2[] = $this->colorText($help,$parameter);
+                            } else {
+                                foreach ($parameter->inputValue as $k => $v) {
+                                    $helpTmp = str_replace(['<optionkey/>', '<option/>'], [$k, $v], $help);
+                                    $col1[] = '';
+                                    $col2[] = $this->colorText($helpTmp);
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    $col1Corrected[] = '';
+                    foreach ($parameter->getHelpSyntax() as $help) {
+                        $col1[] = '';
+                        $col2[] = $this->colorText($help);
+                    }
                 }
-                $col2Corrected[] = $ne;
             }
+            $col1=$this->wrapLine($col1,$size-4,true); // -4 is for the left alignment
+            $col2=$this->wrapLine($col2,$this->colSize-$size-1,true); // -1 is for the spacing in between.
+            $max=max(count($col1),count($col2));
+            $col1=$this->alignLinesVertically($col1,$max,'top');
+            $col2=$this->alignLinesVertically($col2,$max,'top');
+            $countCol1=count($col1);
+            for($i=1;$i<$countCol1;$i++) {
+                $col1[$i]='  '.$col1[$i];
+            }
+            array_push($col1Corrected,...$col1);
+            array_push($col2Corrected,...$col2);
+
         }
+
         $col2 = $col2Corrected;
         $col1 = $col1Corrected;
         foreach ($col1 as $k => $c1) {
-            $c1 = $this->alignText($c1, $wm, 'left');
-            $this->showLine($c1 . ' ' . $col2[$k]);
+            $c1 = $this->alignText($c1, $size, 'left');
+            $this->showLine('  '.$c1 . ' ' . $col2[$k]);
         }
+    }
+
+    /**
+     * @param string $stream =['stdout','stderr','memory'][$i]
+     * @return CliOne
+     */
+    public function setDefaultStream(string $stream): CliOne
+    {
+        $this->defaultStream = $stream;
+        return $this;
+    }
+
+    /**
+     * @param bool $noColor if <b>true</b> then it will not show colors<br>
+     *                      if <b>false</b>, then it will show the colors.
+     * @return $this
+     */
+    public function setNoColor(bool $noColor = true): CliOne
+    {
+        $this->noColor = $noColor;
+        return $this;
+    }
+
+    /**
+     * @return bool returns if it is returning the values with colors or not
+     */
+    public function isNoColor(): bool
+    {
+        return $this->noColor;
+    }
+
+    /**
+     * if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc.)
+     * @param bool $noANSI
+     * @return $this
+     */
+    public function setNoANSI(bool $noANSI = true): CliOne
+    {
+        $this->noANSI = $noANSI;
+        return $this;
+    }
+
+    /**
+     * returns true if the
+     * @return bool
+     */
+    public function isNoANSI(): bool
+    {
+        return $this->noANSI;
     }
 
     /**
      * it wraps a line and returns one or multiples lines<br>
      * The lines wrapped does not open or close tags.
-     * @param string $text
-     * @param int    $width
+     * @param string|array $texts     The text already formatted.
+     * @param int          $width     The expected width
+     * @param bool         $keepStyle if true then it keeps the initial and end style tag for every new line.<br>
+     *                                if false, then it just wrap the lines.
+     *
      * @return array
      * @noinspection PhpRedundantVariableDocTypeInspection
      */
-    public function wrapLine(string $text, int $width): array
+    public function wrapLine($texts, int $width, bool $keepStyle = false): array
     {
-        if ($text === '') {
+        if ($texts === '') {
             return [''];
         }
+        $texts = !is_array($texts) ? [$texts] : $texts;
         $result = [];
-        $masked = $this->colorMask($text);
-        $tl = strlen($text);
-        $counter = 0;
-        $position0 = 0;
-        /** @var int $positionSpace we store the position of the last space (or other character) */
-        $positionSpace = 0;
-        $space = ' /.,';
-        for ($i = 0; $i < $tl; $i++) {
-            if (strpos($space, $masked[$i]) !== false) {
-                $positionSpace = $i;
+        $initial = '';
+        foreach ($texts as $text) {
+            $masked = $this->colorMask($text);
+            if ($keepStyle) {
+                $this->initialEndStyle($text, $initial, $end);
+                if($initial==='' || $end==='') {
+                    $initial = '';
+                    $end = '';
+                }
+            } else {
+                $initial = '';
+                $end = '';
             }
-            if ($masked[$i] !== chr(250)) {
-                $counter++;
-                if ($counter > $width) {
-                    $result[] = trim(substr($text, $position0, $positionSpace - $position0));
-                    $position0 = $positionSpace;
-                    $counter = 0;
+            $textLen = strlen($text);
+            $counter = 0;
+            $position0 = 0;
+            /** @var int $positionSpace we store the position of the last space (or other character) */
+            $positionSpace = 0;
+            $space = ' /.,'; // values we will use to cut the line
+            $firstElem = true;
+            for ($i = 0; $i < $textLen; $i++) {
+                if (strpos($space, $masked[$i]) !== false) {
+                    $positionSpace = $i;
+                }
+                if ($masked[$i] !== chr(250)) {
+                    $counter++;
+                    if ($counter > $width) {
+                        $tmp = $firstElem ? '' : $initial;
+                        $firstElem = false;
+                        $tmp .= trim(substr($text, $position0, $positionSpace - $position0)) . $end;
+                        $result[] = $tmp;
+                        $position0 = $positionSpace;
+                        $counter = 0;
+                    }
                 }
             }
-        }
-        if ($position0 !== $tl - 1) {
-            // wrap the last line
-            $result[] = trim(substr($text, $position0));
+            if ($position0 !== $textLen - 1) {
+                // wrap the last line
+                $result[] = ($firstElem ? '' : $initial) . trim(substr($text, $position0));
+            }
         }
         return $result;
     }
+
 
     /**
      * @param numeric $currentValue         the current value
@@ -1400,21 +3799,24 @@ class CliOne
      * @param ?string $currentValueText     the current value to display at the left.<br>
      *                                      if null then it will show the current value (with a space in between)
      * @return void
-     * @noinspection PhpUnusedLocalVariableInspection
      */
     public function showProgressBar($currentValue, $max, int $columnWidth, ?string $currentValueText = null): void
     {
-        if (!$this->cmdMode) {
+        if (!$this->noANSI) {
             // progress bar is not compatible in old-cmd mode.
             return;
         }
         $this->initstack();
         $style = $this->styleStack;
-        [$alignTitle, $alignContentText, $alignContentNumber] = $this->alignStack;
-        [$bf, $bl, $bm, $bd] = $this->shadow($style);
+        // [$alignTitle, $alignContentText, $alignContentNumber] = $this->alignStack;
+        $bf = $this->shadow($style, 'full');
+        $bl = $this->shadow($style, 'light');
         $prop = $columnWidth / $max;
         $currentValueText = $currentValueText ?? ' ' . $currentValue;
-        $this->show(str_repeat($bf, floor($currentValue * $prop)) . str_repeat($bl, floor($max * $prop) - floor($currentValue * $prop)) . $currentValueText . "\e[" . (floor($max * $prop) + $this->strlen($currentValueText)) . "D");
+        $this->show(str_repeat($bf, floor($currentValue * $prop)) .
+            str_repeat($bl, floor($max * $prop) - floor($currentValue * $prop)) .
+            $currentValueText . "\e[" . (floor($max * $prop) + $this->strlen($currentValueText)) . "D");
+        $this->resetStack();
     }
 
     /**
@@ -1538,7 +3940,7 @@ class CliOne
      */
     public function showWaitCursor(bool $init = true, string $postfixValue = ''): void
     {
-        if (!$this->cmdMode) {
+        if (!$this->noANSI) {
             // progress bar is not compatible in old-cmd mode.
             return;
         }
@@ -1661,32 +4063,40 @@ class CliOne
     }
 
     /**
-     * @param string $text
-     * @param int    $width
-     * @param string $align =['left','right','middle'][$i]
-     * @return mixed|string
+     * @param string|array $text
+     * @param int          $width
+     * @param string       $align =['left','right','middle'][$i]
+     * @return string[]|string
      */
-    protected function alignText(string $text, int $width, string $align)
+    protected function alignText($text, int $width, string $align)
     {
-        $len = $this->strlen($text);
-        if ($len > $width) {
-            $text = $this->ellipsis($text, $width);
-            $len = $width;
+        $text = !is_array($text) ? [$text] : $text;
+        $result = [];
+        foreach ($text as $txt) {
+            $len = $this->strlen($txt);
+            if ($len > $width) {
+                $txt = $this->ellipsis($txt, $width);
+                $len = $width;
+            }
+            $padnum = $width - $len;
+            switch ($align) {
+                case 'left':
+                    $result[] = $txt . str_repeat(' ', $padnum);
+                    break;
+                case 'right':
+                    $result[] = str_repeat(' ', $padnum) . $txt;
+                    break;
+                case 'middle':
+                    $padleft = floor($padnum / 2);
+                    $padright = ceil($padnum / 2);
+                    $result[] = str_repeat(' ', $padleft) . $txt . str_repeat(' ', $padright);
+                    break;
+                default:
+                    trigger_error("align incorrect $align");
+            }
         }
-        $padnum = $width - $len;
-        switch ($align) {
-            case 'left':
-                return $text . str_repeat(' ', $padnum);
-            case 'right':
-                return str_repeat(' ', $padnum) . $text;
-            case 'middle':
-                $padleft = floor($padnum / 2);
-                $padright = ceil($padnum / 2);
-                return str_repeat(' ', $padleft) . $text . str_repeat(' ', $padright);
-            default:
-                trigger_error("align incorrect $align");
-        }
-        return $text;
+        // if the original text is 1 row, then it returns a string instead of a string[]
+        return count($result) === 1 ? $result[0] : $result;
     }
 
     /**
@@ -1723,7 +4133,7 @@ class CliOne
                 //
                 //Notepad: ╔╦╗ ╠╬╣ ╚╩╝ ═ ║
                 //cmd.exe: ÉË» ÌÎ¹ ÈÊ¼ Í º
-                $r = $this->cmdMode ? [
+                $r = $this->noANSI ? [
                     'É', 'Í', '»',
                     'º', 'Í', 'º',
                     'È', 'Í', '¼', 'º'
@@ -1732,7 +4142,7 @@ class CliOne
                         '╔', '═', '╗',
                         '║', '═', '║',
                         '╚', '═', '╝', '║'];
-                if ($this->cmdMode) {
+                if ($this->noANSI) {
                     foreach ($r as $k => $v) {
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
@@ -1741,7 +4151,7 @@ class CliOne
             case 'simple':
                 //Notepad: ┌┬┐ ├┼┤ └┴┘ ─ │
                 //cmd.exe: ÚÂ¿ ÃÅ´ ÀÁÙ Ä ³
-                $r = $this->cmdMode ? [
+                $r = $this->noANSI ? [
                     'Ú', 'Ä', '¿',
                     '³', 'Ä', '³',
                     'À', 'Ä', 'Ù', '³'
@@ -1750,7 +4160,7 @@ class CliOne
                         '┌', '─', '┐',
                         '│', '─', '│',
                         '└', '─', '┘', '│'];
-                if ($this->cmdMode) {
+                if ($this->noANSI) {
                     foreach ($r as $k => $v) {
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
@@ -1783,10 +4193,10 @@ class CliOne
             case 'double':
                 //Notepad: ╔╦╗ ╠╬╣ ╚╩╝ ═ ║
                 //cmd.exe: ÉË» ÌÎ¹ ÈÊ¼ Í º
-                $r = $this->cmdMode ?
+                $r = $this->noANSI ?
                     ['Ì', 'Ë', '¹', 'Ê', 'Î'] :
                     ['╠', '╦', '╣', '╩', '╬'];
-                if ($this->cmdMode) {
+                if ($this->noANSI) {
                     foreach ($r as $k => $v) {
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
@@ -1795,10 +4205,10 @@ class CliOne
             case 'simple':
                 //Notepad: ┌┬┐ ├┼┤ └┴┘ ─ │
                 //cmd.exe: ÚÂ¿ ÃÅ´ ÀÁÙ Ä ³
-                $r = $this->cmdMode ?
+                $r = $this->noANSI ?
                     ['Ã', 'Â', '´', 'Á', 'Å'] :
                     ['├', '┬', '┤', '┴', '┼'];
-                if ($this->cmdMode) {
+                if ($this->noANSI) {
                     foreach ($r as $k => $v) {
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
@@ -1975,7 +4385,7 @@ class CliOne
                         $v = $ivalues[$i + $shift];
                         $txt = $this->showPattern($parameter, $keydisplay, $v, $selection, $colW, '', $pattern);
                         $col = ($kcol - 1) * $colW;
-                        if ($this->cmdMode) {
+                        if ($this->noANSI) {
                             $this->show($txt);
                         } else {
                             $this->show("\e[" . ($col) . "G" . $txt);
@@ -2039,7 +4449,7 @@ class CliOne
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
                         } else if (!$this->isSilentError()) {
-                            $this->showCheck('ERROR', 'red,', "unknow selection $input",'stderr');
+                            $this->showCheck('ERROR', 'red,', "unknow selection $input", 'stderr');
                         }
                 }
             } else {
@@ -2177,6 +4587,16 @@ class CliOne
         return str_replace($this->columnEscape, array_fill(0, count($this->columnEscape), $m6), $content);
     }
 
+    public function initialEndStyle($contentAnsi, &$initial, &$end): void
+    {
+        $mask = $this->colorMask($contentAnsi);
+        $l = strlen($contentAnsi);
+        $l0 = $l - strlen(ltrim($mask, chr(250)));
+        $l1 = $l - strlen(rtrim($mask, chr(250)));
+        $initial = substr($contentAnsi, 0, $l0);
+        $end = substr($contentAnsi, -$l1);
+    }
+
     protected function resetStack(): CliOne
     {
         foreach ($this->colorStack as $color) {
@@ -2193,17 +4613,20 @@ class CliOne
     }
 
     /**
+     * [full,light,soft,double], light usually it is an space.
      * <pre>
      * [$bf,$bl,$bm,$bd]=$this->shadow();
      * </pre>
-     * @param string $style =['mysql','simple','double']
-     * @return array|string[]
+     * @param string $style       =['mysql','simple','double']
+     * @param string $returnValue =['full','light','soft','double'][$i]
+     * @return string|array
      */
-    protected function shadow(string $style = 'simple'): array
+    protected function shadow(string $style = 'simple', string $returnValue = '*')
     {
         switch ($style) {
             case 'mysql':
-                return ['#', ' ', '-', '='];
+                $r = ['#', ' ', '-', '='];
+                break;
             case 'simple':
                 $r = $this->noColor ?
                     ['Û', ' ', '°', '²'] :
@@ -2213,7 +4636,7 @@ class CliOne
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
                 }
-                return $r;
+                break;
             case 'double':
                 $r = $this->noColor ?
                     ['Û', '°', '±', '²'] :
@@ -2223,13 +4646,27 @@ class CliOne
                         $r[$k] = iconv("UTF-8", "Windows-1252", $v);
                     }
                 }
-                return $r;
+                break;
             case 'minimal':
-                return ['*', ' ', ' ', ' '];
+                $r = ['*', ' ', ' ', ' '];
+                break;
             default:
                 trigger_error("style not defined $style");
+                $r = ['', '', '', ''];
         }
-        return [];
+        switch ($returnValue) {
+            case 'full':
+                return $r[0];
+            case 'light':
+                return $r[1];
+            case 'soft':
+                return $r[2];
+            case 'double':
+                return $r[3];
+            default:
+            case '*':
+                return $r;
+        }
     }
 
     /**
@@ -2302,7 +4739,14 @@ class CliOne
                 $pattern = $parameter->getPatterColumns()['1'] ?: "{desc} <bold><cyan>[{def}]</cyan></bold> {prefix}:";
                 // the 9999 is to indicate to never ellipses this input.
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
-                $origInput = $this->readline($txt, $parameter);
+                while (true) {
+                    $origInput = $this->readline($txt, $parameter);
+                    if ($origInput === '?') {
+                        $this->showHelp($parameter);
+                    } else {
+                        break;
+                    }
+                }
                 $parameter->value = $origInput;
                 $parameter->origin = 'input';
                 $this->refreshParamValueKey($parameter);

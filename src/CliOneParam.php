@@ -18,7 +18,7 @@ class CliOneParam
      * @var string|null
      */
     public $key;
-    /** @var string=['first','last','second','flag','longflag','onlyinput','none'][$i] */
+    /** @var string=['command','first','last','second','flag','longflag','onlyinput','none'][$i] */
     public $type;
     public $alias = [];
     /**
@@ -58,6 +58,7 @@ class CliOneParam
     protected $nameArg = '';
     protected $patterColumns;
     protected $patternQuestion;
+    protected $related=[];
     protected $footer;
     protected $history = [];
     /** @var CliOne */
@@ -67,7 +68,7 @@ class CliOneParam
      * The constructor. It is used internally
      * @param CliOne       $parent
      * @param ?string      $key
-     * @param string       $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]
      * @param array|string $alias
      * @param mixed        $value
      * @param mixed        $valueKey
@@ -316,7 +317,7 @@ class CliOneParam
     }
 
     /**
-     * @param string $type               =['first','last','second','flag','longflag','onlyinput','none'][$i]
+     * @param string $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]
      * @param bool   $argumentIsValueKey <b>true</b> the argument is value-key<br>
      *                                   <b>false</b> (default) the argument is a value
      * @return CliOneParam
@@ -393,6 +394,24 @@ class CliOneParam
         $this->helpSyntax = $helpSyntax;
         $this->nameArg = $nameArg;
         return $this;
+    }
+
+    /**
+     * It marks this parameter as related (as a child) the key of another parameter.<br>
+     * <b>For example:</b><br>
+     * <pre>
+     * $this->setRelated('copy'); // this parameter is related with the operation copy.
+     * </pre>
+     * @param string|string[] $command empty means that it is not related with anything.
+     * @return $this
+     */
+    public function setRelated($command): CliOneParam
+    {
+        $this->related=!is_array($command)?[$command]:$command;
+        return $this;
+    }
+    public function getRelated():array {
+        return $this->related;
     }
 
     /**

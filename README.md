@@ -219,8 +219,10 @@ php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valuef
 ```
 
 The system allows reading multiple types of arguments
-
+ 
 * **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
+* **command**: it is simmilar to **first** but it does not compares the name of the argument.
+  * cliprogram.php com -flag, first returns "com" if the argument is named first.  command returns "com" regardless of its name.
 * **second**: this argument is also positional (second position) and does not have any value
 * **last**: this argument is also positional and it is always at the latest argument
 * **flag**: the argument is prefixed with a single "-". This argument not need to be a single character.
@@ -452,6 +454,23 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.12 (2022-02-26)
+  * CliOne:
+    * added a memory stream
+    * set the default stream
+    * set the current stream to use stdout,stderr or memory (stdin is not used for in)
+    * added a new parameter type "command" that it is equals than first but it ignores the name and considers the position.
+    * added the method showHelp()
+    * added the method makeBigWords()
+    * added fontZnaki()
+    * added fontaatr()
+      * both fonts use a lot of space in code but they are only an array of bits, so they use only 2KB.
+    * new method alignLinesVertically()
+    * new method maxWidth()
+    * renamed field cmdMode to noANSI
+    * method initialEndStyle()
+  * CliOneParam:
+    * Added a field related.
 * 1.11 (2022-02-22)
   * Added supports for STDIN, STDOUT, and STDERR. 
 * 1.10 (2022-02-21)
