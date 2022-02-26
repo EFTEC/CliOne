@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.11
+ * @version   1.12
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.11';
+    public const VERSION = '1.12';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -58,97 +58,6 @@ class CliOne
     protected $patternContentStack;
     protected $wait = 0;
     protected $silentError = false;
-
-    /**
-     * @return bool
-     */
-    public function isSilentError(): bool
-    {
-        return $this->silentError;
-    }
-
-    public function getMemory($autoflush = false): string
-    {
-        fseek($this->MEMORY, 0);
-        $r = stream_get_contents($this->MEMORY);
-        if ($autoflush) {
-            @ftruncate($this->MEMORY, 0);
-        }
-        return $r;
-    }
-
-    /**
-     * This function is based in Symfony
-     * @return bool
-     */
-    public function hasColorSupport(): bool
-    {
-        if ('Hyper' === getenv('TERM_PROGRAM')) {
-            return true;
-        }
-        if (PHP_OS_FAMILY === 'Windows') {
-            return (function_exists('sapi_windows_vt100_support')
-                    && @sapi_windows_vt100_support(STDOUT))
-                || false !== getenv('ANSICON')
-                || 'ON' === getenv('ConEmuANSI')
-                || 'xterm' === getenv('TERM');
-        }
-        if (function_exists('stream_isatty')) {
-            return @stream_isatty(STDOUT);
-        }
-        if (function_exists('posix_isatty')) {
-            return @posix_isatty(STDOUT);
-        }
-        $stat = @fstat(STDOUT);
-        return $stat && 0020000 === ($stat['mode'] & 0170000);
-    }
-
-
-    /**
-     * It is used for testing. You can simulate arguments using this function<br>
-     * This function must be called before the creation of the instance
-     * @param array $arguments
-     * @return void
-     */
-    public static function testArguments(array $arguments): void
-    {
-        global $argv;
-        $argv = $arguments;
-    }
-
-    /**
-     * It is used for testing. You can simulate user-input using this function<br>
-     * This function must be called before every interactivity<br>
-     * This function is not resetted automatically, to reset it, set $userInput=null<br>
-     * @param ?array $userInput
-     * @return void
-     */
-    public static function testUserInput(?array $userInput): void
-    {
-        if ($userInput === null) {
-            unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
-        } else {
-            array_unshift($userInput, 0);
-            $GLOBALS['PHPUNIT_FAKE_READLINE'] = $userInput;
-        }
-    }
-
-    public function setMemory(string $memory): CliOne
-    {
-        ftruncate($this->MEMORY, 0);
-        fwrite($this->MEMORY, $memory);
-        return $this;
-    }
-
-    /**
-     * @param bool $silentError
-     * @return CliOne
-     */
-    public function setSilentError(bool $silentError): CliOne
-    {
-        $this->silentError = $silentError;
-        return $this;
-    }
 
     protected $waitPrev = '';
     /**
@@ -229,6 +138,108 @@ class CliOne
         });
     }
 
+    /**
+     * @return bool
+     */
+    public function isSilentError(): bool
+    {
+        return $this->silentError;
+    }
+
+    public function getMemory($autoflush = false): string
+    {
+        fseek($this->MEMORY, 0);
+        $r = stream_get_contents($this->MEMORY);
+        if ($autoflush) {
+            @ftruncate($this->MEMORY, 0);
+        }
+        return $r;
+    }
+
+    /**
+     * This function is based in Symfony
+     * @return bool
+     */
+    public function hasColorSupport(): bool
+    {
+        if ('Hyper' === getenv('TERM_PROGRAM')) {
+            return true;
+        }
+        if (PHP_OS_FAMILY === 'Windows') {
+            return (function_exists('sapi_windows_vt100_support')
+                    && @sapi_windows_vt100_support(STDOUT))
+                || false !== getenv('ANSICON')
+                || 'ON' === getenv('ConEmuANSI')
+                || 'xterm' === getenv('TERM');
+        }
+        if (function_exists('stream_isatty')) {
+            return @stream_isatty(STDOUT);
+        }
+        if (function_exists('posix_isatty')) {
+            return @posix_isatty(STDOUT);
+        }
+        $stat = @fstat(STDOUT);
+        return $stat && 0020000 === ($stat['mode'] & 0170000);
+    }
+
+
+    /**
+     * It is used for testing. You can simulate arguments using this function<br>
+     * This function must be called before the creation of the instance
+     * @param array $arguments
+     * @return void
+     */
+    public static function testArguments(array $arguments): void
+    {
+        global $argv;
+        $argv = $arguments;
+    }
+
+    /**
+     * It is used for testing. You can simulate user-input using this function<br>
+     * This function must be called before every interactivity<br>
+     * This function is not resetted automatically, to reset it, set $userInput=null<br>
+     * @param ?array $userInput
+     * @return void
+     */
+    public static function testUserInput(?array $userInput): void
+    {
+        if ($userInput === null) {
+            unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+        } else {
+            array_unshift($userInput, 0);
+            $GLOBALS['PHPUNIT_FAKE_READLINE'] = $userInput;
+        }
+    }
+
+    /**
+     * It sets the value stored into the memory stream<br>
+     * If the memory stream has values, then they are deleted and replaced.
+     * @param string $memory The value to store
+     * @return $this
+     */
+    public function setMemory(string $memory): CliOne
+    {
+        ftruncate($this->MEMORY, 0);
+        fwrite($this->MEMORY, $memory);
+        return $this;
+    }
+
+    /**
+     * @param bool $silentError
+     * @return CliOne
+     */
+    public function setSilentError(bool $silentError): CliOne
+    {
+        $this->silentError = $silentError;
+        return $this;
+    }
+
+
+    /**
+     * This function is used internally to reading the arguments and storing into the field $this->argv
+     * @return void
+     */
     protected function readingArgv(): void
     {
         global $argv;
@@ -493,6 +504,10 @@ class CliOne
         return $this;
     }
 
+    /**
+     * It clears the global history (if any).
+     * @return $this
+     */
     public function clearHistory(): CliOne
     {
         if (function_exists('readline_clear_history')) {
@@ -501,6 +516,10 @@ class CliOne
         return $this;
     }
 
+    /**
+     * It retrieves the global history (if any)
+     * @return array
+     */
     public function listHistory(): array
     {
         if (function_exists('readline_list_history')) {
@@ -737,7 +756,14 @@ class CliOne
         return $final;
     }
 
-    protected function fontZnaki($letter, $bit1 = null, $bit2 = ' '): array
+    /**
+     * Font Znaki
+     * @param string $letter the letter to generate
+     * @param ?string $bit1 the character to show then the bit is "on"
+     * @param string $bit2 the character to show then the bit is "off"
+     * @return array return an array of 8 lines and each line has 8 characters to show the letter.
+     */
+    protected function fontZnaki(string $letter,?string $bit1 = null,string $bit2 = ' '): array
     {
         switch ($letter) {
             case ' ':
@@ -1820,7 +1846,14 @@ class CliOne
         return $result;
     }
 
-    protected function fontAtr($letter, $bit1 = null, $bit2 = ' '): array
+    /**
+     * Font Atr
+     * @param string  $letter the letter to generate
+     * @param ?string $bit1   the character to show then the bit is "on"
+     * @param string  $bit2   the character to show then the bit is "off"
+     * @return array return an array of 8 lines and each line has 8 characters to show the letter.
+     */
+    protected function fontAtr(string $letter, ?string $bit1 = null, string $bit2 = ' '): array
     {
         $bit1 = $bit1 ?? $letter;
         switch ($letter) {
@@ -4222,7 +4255,12 @@ class CliOne
         return [];
     }
 
-    protected function calculateColSize($min = 40)
+    /**
+     * It calculates the size of the columns in the console
+     * @param int $min
+     * @return false|int|string
+     */
+    protected function calculateColSize(int $min = 40)
     {
         try {
             if (PHP_OS_FAMILY === 'Windows') {
@@ -4253,7 +4291,12 @@ class CliOne
         return $col < $min ? $min : $col;
     }
 
-    protected function calculateRowSize($min = 5)
+    /**
+     * It calculates the size of rows in the console
+     * @param int $min
+     * @return mixed
+     */
+    protected function calculateRowSize(int $min = 5)
     {
         try {
             if (PHP_OS_FAMILY === 'Windows') {
@@ -4268,7 +4311,13 @@ class CliOne
         return max($row, $min);
     }
 
-    protected function ellipsis($text, $lenght)
+    /**
+     * Add an ellispis "..." to the end of a text, for example, to trip a long text.
+     * @param string $text
+     * @param int    $lenght
+     * @return string
+     */
+    protected function ellipsis(string $text, int $lenght): string
     {
         $l = $this->strlen($text);
         if ($l <= $lenght) {
@@ -4277,12 +4326,36 @@ class CliOne
         return $this->removechar($text, $l - $lenght + 3) . '...';
     }
 
+    /**
+     * Internal. it starts the stack.
+     * @return void
+     */
     protected function initStack(): void
     {
         foreach ($this->colorStack as $color) {
             $this->show("<$color>");
         }
     }
+
+    /**
+     * Internal. It ends the visual stack
+     * @return $this
+     */
+    protected function resetStack(): CliOne
+    {
+        foreach ($this->colorStack as $color) {
+            $this->show("</$color>");
+        }
+        $this->styleStack = 'simple';
+        $this->alignStack = ['middle', 'middle', 'middle'];
+        $this->colorStack = [];
+        $this->patternTitleStack = null;
+        $this->patternCurrentStack = null;
+        $this->patternSeparatorStack = null;
+        $this->patternContentStack = null;
+        return $this;
+    }
+
 
     /**
      * It shows the listing of options
@@ -4587,7 +4660,16 @@ class CliOne
         return str_replace($this->columnEscape, array_fill(0, count($this->columnEscape), $m6), $content);
     }
 
-    public function initialEndStyle($contentAnsi, &$initial, &$end): void
+    /**
+     * It returns the initial and end style of a text.<br>
+     * If the text only contains an initial or final style, then nothing is returned
+     *
+     * @param string $contentAnsi the content text already formatted in Ansi
+     * @param ?string $initial     (this value is returned)
+     * @param ?string $end         (this value is returned)
+     * @return void
+     */
+    public function initialEndStyle(string $contentAnsi, ?string &$initial, ?string &$end): void
     {
         $mask = $this->colorMask($contentAnsi);
         $l = strlen($contentAnsi);
@@ -4597,20 +4679,6 @@ class CliOne
         $end = substr($contentAnsi, -$l1);
     }
 
-    protected function resetStack(): CliOne
-    {
-        foreach ($this->colorStack as $color) {
-            $this->show("</$color>");
-        }
-        $this->styleStack = 'simple';
-        $this->alignStack = ['middle', 'middle', 'middle'];
-        $this->colorStack = [];
-        $this->patternTitleStack = null;
-        $this->patternCurrentStack = null;
-        $this->patternSeparatorStack = null;
-        $this->patternContentStack = null;
-        return $this;
-    }
 
     /**
      * [full,light,soft,double], light usually it is an space.

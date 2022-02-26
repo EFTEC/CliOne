@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.10
+ * @version   1.12
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -270,7 +270,12 @@ class CliOneParam
         return $this->addHistory;
     }
 
-    public function setAddHistory($add = true): CliOneParam
+    /**
+     * Set true if you want to add to the history this value (if it is entered interactively).
+     * @param bool $add
+     * @return $this
+     */
+    public function setAddHistory(bool $add = true): CliOneParam
     {
         $this->addHistory = $add;
         return $this;
