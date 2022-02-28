@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.12
+ * @version   1.13
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -58,7 +58,7 @@ class CliOneParam
     protected $nameArg = '';
     protected $patterColumns;
     protected $patternQuestion;
-    protected $related=[];
+    protected $related = [];
     protected $footer;
     protected $history = [];
     /** @var CliOne */
@@ -87,7 +87,7 @@ class CliOneParam
         $this->key = $key;
         $this->type = $type;
         $this->alias = is_array($alias) ? $alias : [$alias];
-        $this->question = 'Select the value of '.$key;
+        $this->question = 'Select the value of ' . $key;
         $this->value = $value;
         $this->valueKey = $valueKey;
         $this->argumentIsValueKey = $argumentIsValueKey;
@@ -102,9 +102,7 @@ class CliOneParam
     public function add(bool $override = false): bool
     {
         if ($this->key === null) {
-            if (!$this->parent->isSilentError()) {
-                $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
-            }
+            $this->parent->throwError("error in creation of input $this->key inputType for range must be an array");
             return false;
         }
         if ($this->type === 'none') {
@@ -120,9 +118,7 @@ class CliOneParam
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    if (!$this->parent->isSilentError()) {
-                        $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for range must be an array");
-                    }
+                    $this->parent->throwError("error in creation of input $this->key inputType for range must be an array");
                     $fail = true;
                 }
                 break;
@@ -136,9 +132,7 @@ class CliOneParam
             case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
-                    if (!$this->parent->isSilentError()) {
-                        $this->parent->showCheck('ERROR', 'red', "error in creation of input $this->key inputType for $this->inputType must be an array");
-                    }
+                    $this->parent->throwError("error in creation of input $this->key inputType for $this->inputType must be an array");
                     $fail = true;
                 }
                 break;
@@ -151,33 +145,23 @@ class CliOneParam
                     //$this->parent->parameters[$keyParam]->parent=null;
                     return true;
                 }
-                if (!$this->parent->isSilentError()) {
-                    $this->parent->showCheck('ERROR', 'red',
-                        "error in creation of input $this->key,parameter already defined");
-                }
+                $this->parent->throwError("error in creation of input $this->key,parameter already defined");
                 $fail = true;
                 break;
             }
             if (in_array($this->key, $parameter->alias, true)) {
                 // we found an alias that matches the parameter.
-                if (!$this->parent->isSilentError()) {
-                    $this->parent->showCheck('ERROR', 'red',
-                        "error in creation of input $this->key,parameter already defined as an alias");
-                }
+                $this->parent->throwError("error in creation of input $this->key,parameter already defined as an alias");
                 $fail = true;
                 break;
             }
             foreach ($this->alias as $alias) {
-                if (($alias === $parameter->key) && !$this->parent->isSilentError()) {
-                    $this->parent->showCheck('ERROR', 'red',
-                        "error in creation of alias $this->key/$alias,parameter already defined");
+                if (($alias === $parameter->key)) {
+                    $this->parent->throwError("error in creation of alias $this->key/$alias,parameter already defined");
                 }
                 if (in_array($alias, $parameter->alias, true)) {
                     // we found an alias that matches the parameter.
-                    if (!$this->parent->isSilentError()) {
-                        $this->parent->showCheck('ERROR', 'red',
-                            "error in creation of alias $this->key/$alias,parameter already defined as other alias");
-                    }
+                    $this->parent->throwError("error in creation of alias $this->key/$alias,parameter already defined as other alias");
                     $fail = true;
                     break;
                 }
@@ -412,10 +396,12 @@ class CliOneParam
      */
     public function setRelated($command): CliOneParam
     {
-        $this->related=!is_array($command)?[$command]:$command;
+        $this->related = !is_array($command) ? [$command] : $command;
         return $this;
     }
-    public function getRelated():array {
+
+    public function getRelated(): array
+    {
         return $this->related;
     }
 

@@ -94,7 +94,6 @@ class CliOneTest extends TestCase
             "\e[36mit is a test example one two\e[39m"
         ],
             $t->wrapLine([$t->colorText('<cyan>it is a test example one two</cyan>')], 100, true));
-
     }
 
     public function testArgumentAsKey()
@@ -305,17 +304,18 @@ class CliOneTest extends TestCase
         $t->createParam('paramv2', 'v2', 'longflag')->setDescription('descv2')->setRelated('p3')->add();
         $t->setDefaultStream('memory')->setNoColor(true)->showParamSyntax2('title1', ['flag', 'longflag']);
         $this->assertEquals("title1\n --param1, -p1 desc1 [(null)]\n --param2, -p2 desc2 [(null)]\n" .
-            " --paramv1, -v1 descv1 [(null)]\n --paramv2, -v2 descv2 [(null)]\n",$this->removespaces($t->getMemory(true)));
+            " --paramv1, -v1 descv1 [(null)]\n --paramv2, -v2 descv2 [(null)]\n", $this->removespaces($t->getMemory(true)));
         $t->setDefaultStream('memory')->setNoColor(true)->showParamSyntax2('title1', ['flag', 'longflag'], [], null, 'p3');
         $this->assertEquals("title1\n --paramv1, -v1 descv1 [(null)]\n --paramv2, -v2 descv2 [(null)]\n", $this->removespaces($t->getMemory(true)));
     }
 
     /** @noinspection CascadeStringReplacementInspection */
-    public function removespaces($text) {
-        $text= str_replace(array('    ', '   ', '  ',"\t"), ' ', $text);
-        $text= str_replace(array('    ', '   ', '  '), ' ', $text);
-        $text= str_replace(array('    ', '   ', '  '), ' ', $text);
-        $text= str_replace(array('    ', '   ', '  '), ' ', $text);
+    public function removespaces($text)
+    {
+        $text = str_replace(array('    ', '   ', '  ', "\t"), ' ', $text);
+        $text = str_replace(array('    ', '   ', '  '), ' ', $text);
+        $text = str_replace(array('    ', '   ', '  '), ' ', $text);
+        $text = str_replace(array('    ', '   ', '  '), ' ', $text);
         return $text;
     }
 
@@ -415,11 +415,26 @@ class CliOneTest extends TestCase
         $this->assertEquals('IT MUST BE VISIBLE2', $param2->value);
     }
 
+    public function testCut()
+    {
+        $txt = 'C1234 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789';
+        $w = 34;
+        $t = new CliOne();
+        $r = $t->wrapLine($txt, $w, true);
+        $this->assertEquals([
+            //0        1        2         3
+            //234567890123456789012345678901234
+            'C1234 123456789 123456789',
+            '123456789 123456789 123456789',
+            '123456789 123456789 123456789'], $r);
+    }
+
     public function testValid()
     {
         CliOne::testArguments(['program.php']);
         $t = new CliOne();
-        $t->setSilentError(true);
+        $t->setErrorType('silent');
+        $this->assertEquals('silent', $t->getErrorType());
         $this->assertEquals(true, $t->createParam('param1')->add());
         $this->assertEquals(true, $t->getParameter('param1')->isValid());
         $this->assertEquals(false, $t->createParam('param1')->add());

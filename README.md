@@ -454,6 +454,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.13 (2022-02-28)
+  * Changed silentError to errorType 
 * 1.12 (2022-02-26)
   * CliOne:
     * added a memory stream

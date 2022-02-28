@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.12
+ * @version   1.13
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.12';
+    public const VERSION = '1.13';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -57,7 +57,9 @@ class CliOne
     protected $patternSeparatorStack;
     protected $patternContentStack;
     protected $wait = 0;
-    protected $silentError = false;
+    /** @var string=['silent','show','throw'][$i] */
+    protected $errorType = 'show';
+
 
     protected $waitPrev = '';
     /**
@@ -139,11 +141,11 @@ class CliOne
     }
 
     /**
-     * @return bool
+     * @return string
      */
-    public function isSilentError(): bool
+    public function getErrorType(): string
     {
-        return $this->silentError;
+        return $this->errorType;
     }
 
     public function getMemory($autoflush = false): string
@@ -226,12 +228,13 @@ class CliOne
     }
 
     /**
-     * @param bool $silentError
+     * It sets if you want to display errors or not. This flag is reseted every time it is used.
+     * @param bool $errorType =['silent','show','throw'][$i]
      * @return CliOne
      */
-    public function setSilentError(bool $silentError): CliOne
+    public function setErrorType(bool $errorType = true): CliOne
     {
-        $this->silentError = $silentError;
+        $this->errorType = $errorType;
         return $this;
     }
 
@@ -411,6 +414,7 @@ class CliOne
                     if ($parameter->isAddHistory()) {
                         $this->addHistory($parameter->value);
                     }
+                    $this->errorType = 'show';
                     return $returnValue === true ? $parameter->value : $parameter;
                 }
                 if (!$parameter->argumentIsValueKey) {
@@ -444,9 +448,7 @@ class CliOne
                     if ($def === false || $parameter->value === false) {
                         $parameter->value = $parameter->default;
                         if ($parameter->required && $parameter->value === false) {
-                            if (!$this->isSilentError()) {
-                                $this->showCheck('ERROR', 'red', "Field $parameter->key is missing", 'stderr');
-                            }
+                            $this->throwError("Field $parameter->key is missing");
                             $parameter->value = false;
                         }
                     }
@@ -464,16 +466,41 @@ class CliOne
                 break;
             }
         }
-        if ($notfound && !$this->isSilentError()) {
-            $this->showCheck('ERROR', 'red', "parameter $key not defined", 'stderr');
+        if ($notfound) {
+            $this->throwError("parameter [$key] is not defined");
         }
         if ($valueK === false || $valueK === null) {
+            $this->errorType = 'show';
             return false;
         }
         if ($this->parameters[$valueK]->isAddHistory()) {
             $this->addHistory($this->parameters[$valueK]->value);
         }
+        $this->errorType = 'show';
         return $returnValue === true ? $this->parameters[$valueK]->value : $this->parameters[$valueK];
+    }
+
+    public function throwError($msg): void
+    {
+        switch ($this->errorType) {
+            case 'show':
+                //var_dump(@debug_backtrace()[1]['file'].'::'.@debug_backtrace()[1]['line']);
+                $this->showCheck('ERROR', 'red', $msg, 'stderr');
+                break;
+            case 'throw':
+                throw new RuntimeException($msg);
+            default:
+                // silent
+                break;
+        }
+        $this->errorType = 'show';
+    }
+
+    public function showWarning($msg): void
+    {
+        if ($this->errorType === 'show' || $this->errorType === 'throw') {
+            $this->showCheck('WARNING', 'yellow', $msg);
+        }
     }
 
     /**
@@ -758,12 +785,12 @@ class CliOne
 
     /**
      * Font Znaki
-     * @param string $letter the letter to generate
-     * @param ?string $bit1 the character to show then the bit is "on"
-     * @param string $bit2 the character to show then the bit is "off"
+     * @param string  $letter the letter to generate
+     * @param ?string $bit1   the character to show then the bit is "on"
+     * @param string  $bit2   the character to show then the bit is "off"
      * @return array return an array of 8 lines and each line has 8 characters to show the letter.
      */
-    protected function fontZnaki(string $letter,?string $bit1 = null,string $bit2 = ' '): array
+    protected function fontZnaki(string $letter, ?string $bit1 = null, string $bit2 = ' '): array
     {
         switch ($letter) {
             case ' ':
@@ -3186,12 +3213,14 @@ class CliOne
                         break;
                     }
                 }
-                if (!$found && !$this->isSilentError()) {
-                    $this->showCheck('ERROR', 'red', "Parameter $k not defined", 'stderr');
+                if (!$found) {
+                    $this->throwError("Parameter $k not defined");
+                    $this->errorType = 'show';
                     return;
                 }
             }
         }
+        $this->errorType = 'show';
     }
 
     /**
@@ -3587,15 +3616,15 @@ class CliOne
                     $this->showParamSyntax($parameter->key, $tab, $tab2);
                 }
             }
+            $this->errorType = 'show';
             return;
         }
         $parameter = $this->getParameter($key);
         /** @noinspection PhpUnusedLocalVariableInspection */
         [$paramprefix, $paramprefixalias, $position] = $this->prefixByType($parameter->type);
         if (!$parameter->isValid()) {
-            if (!$this->isSilentError()) {
-                $this->showCheck('ERROR', 'red', "Parameter $key not defined", 'stderr');
-            }
+            $this->throwError("Parameter $key not defined");
+            $this->errorType = 'show';
             return;
         }
         $v = $this->showParamValue($parameter);
@@ -3607,6 +3636,7 @@ class CliOne
         foreach ($parameter->getHelpSyntax() as $help) {
             $this->showLine("<col$tab2/>$help", $parameter);
         }
+        $this->errorType = 'show';
     }
 
     /**
@@ -3629,7 +3659,6 @@ class CliOne
                                      ?string $related = null,
                                      ?int    $size = 20): void
     {
-
         $col1Corrected = [];
         $col2Corrected = [];
         if ($title) {
@@ -3665,7 +3694,7 @@ class CliOne
                     if (!$assoc) {
                         $options = implode(',', $parameter->inputValue);
                         foreach ($parameter->getHelpSyntax() as $help) {
-                            $help = str_replace('<option/>', $options,$this->colorText($help,$parameter));
+                            $help = str_replace('<option/>', $options, $this->colorText($help, $parameter));
                             $col1[] = '';
                             $col2[] = $help;
                         }
@@ -3674,7 +3703,7 @@ class CliOne
                             $foundOptions = strpos($help, '<option/>') !== false;
                             if (!$foundOptions) {
                                 $col1[] = '';
-                                $col2[] = $this->colorText($help,$parameter);
+                                $col2[] = $this->colorText($help, $parameter);
                             } else {
                                 foreach ($parameter->inputValue as $k => $v) {
                                     $helpTmp = str_replace(['<optionkey/>', '<option/>'], [$k, $v], $help);
@@ -3691,25 +3720,23 @@ class CliOne
                     }
                 }
             }
-            $col1=$this->wrapLine($col1,$size-4,true); // -4 is for the left alignment
-            $col2=$this->wrapLine($col2,$this->colSize-$size-1,true); // -1 is for the spacing in between.
-            $max=max(count($col1),count($col2));
-            $col1=$this->alignLinesVertically($col1,$max,'top');
-            $col2=$this->alignLinesVertically($col2,$max,'top');
-            $countCol1=count($col1);
-            for($i=1;$i<$countCol1;$i++) {
-                $col1[$i]='  '.$col1[$i];
+            $col1 = $this->wrapLine($col1, $size - 4, true); // -4 is for the left alignment
+            $col2 = $this->wrapLine($col2, $this->colSize - $size - 2, true); // -1 is for the spacing in between.
+            $max = max(count($col1), count($col2));
+            $col1 = $this->alignLinesVertically($col1, $max, 'top');
+            $col2 = $this->alignLinesVertically($col2, $max, 'top');
+            $countCol1 = count($col1);
+            for ($i = 1; $i < $countCol1; $i++) {
+                $col1[$i] = '  ' . $col1[$i];
             }
-            array_push($col1Corrected,...$col1);
-            array_push($col2Corrected,...$col2);
-
+            array_push($col1Corrected, ...$col1);
+            array_push($col2Corrected, ...$col2);
         }
-
         $col2 = $col2Corrected;
         $col1 = $col1Corrected;
         foreach ($col1 as $k => $c1) {
             $c1 = $this->alignText($c1, $size, 'left');
-            $this->showLine('  '.$c1 . ' ' . $col2[$k]);
+            $this->showLine('  ' . $c1 . ' ' . $col2[$k]);
         }
     }
 
@@ -3785,7 +3812,7 @@ class CliOne
             $masked = $this->colorMask($text);
             if ($keepStyle) {
                 $this->initialEndStyle($text, $initial, $end);
-                if($initial==='' || $end==='') {
+                if ($initial === '' || $end === '') {
                     $initial = '';
                     $end = '';
                 }
@@ -3798,27 +3825,32 @@ class CliOne
             $position0 = 0;
             /** @var int $positionSpace we store the position of the last space (or other character) */
             $positionSpace = 0;
-            $space = ' /.,'; // values we will use to cut the line
+            $positionSpace2 = 0;
+            $spacePattern = ' /.,'; // values we will use to cut the line
             $firstElem = true;
             for ($i = 0; $i < $textLen; $i++) {
-                if (strpos($space, $masked[$i]) !== false) {
+                if (strpos($spacePattern, $masked[$i]) !== false) {
                     $positionSpace = $i;
+                    $positionSpace2=0;
                 }
                 if ($masked[$i] !== chr(250)) {
                     $counter++;
-                    if ($counter > $width) {
+                    $positionSpace2++;
+                    if ($counter >= $width) {
                         $tmp = $firstElem ? '' : $initial;
                         $firstElem = false;
                         $tmp .= trim(substr($text, $position0, $positionSpace - $position0)) . $end;
                         $result[] = $tmp;
                         $position0 = $positionSpace;
-                        $counter = 0;
+                        $counter = $positionSpace2;
                     }
                 }
             }
             if ($position0 !== $textLen - 1) {
                 // wrap the last line
                 $result[] = ($firstElem ? '' : $initial) . trim(substr($text, $position0));
+                //var_dump($result);
+                //var_dump($width);
             }
         }
         return $result;
@@ -4521,14 +4553,15 @@ class CliOne
                         $pos = array_search($input, $parameter->inputValue, true);
                         if ($pos !== false) {
                             $result[$pos] = !$result[$pos];
-                        } else if (!$this->isSilentError()) {
-                            $this->showCheck('ERROR', 'red,', "unknow selection $input", 'stderr');
+                        } else {
+                            $this->throwError("unknow selection $input");
                         }
                 }
             } else {
                 $result = $input;
             }
         } while ($multiple);
+        $this->errorType = 'show';
         return $result;
     }
 
@@ -4664,7 +4697,7 @@ class CliOne
      * It returns the initial and end style of a text.<br>
      * If the text only contains an initial or final style, then nothing is returned
      *
-     * @param string $contentAnsi the content text already formatted in Ansi
+     * @param string  $contentAnsi the content text already formatted in Ansi
      * @param ?string $initial     (this value is returned)
      * @param ?string $end         (this value is returned)
      * @return void
@@ -4676,7 +4709,7 @@ class CliOne
         $l0 = $l - strlen(ltrim($mask, chr(250)));
         $l1 = $l - strlen(rtrim($mask, chr(250)));
         $initial = substr($contentAnsi, 0, $l0);
-        $end = substr($contentAnsi, -$l1);
+        $end = $l1===0?'': substr($contentAnsi, -$l1);
     }
 
 
@@ -4952,13 +4985,14 @@ class CliOne
                     $ok = false;
                     $cause = 'unknown $parameter->inputType inputtype';
             }
-            if (!$ok && !$this->isSilentError()) {
-                $this->showCheck('WARNING', 'yellow', "The value $parameter->key is not correct, $cause");
+            if (!$ok) {
+                $this->showWarning("The value $parameter->key is not correct, $cause");
             }
             if ($askInput === false) {
                 break;
             }
         }
+        $this->errorType = 'show';
         return $ok;
     }
 
