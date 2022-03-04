@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.13
+ * @version   1.14
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.13';
+    public const VERSION = '1.14';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -3887,10 +3887,13 @@ class CliOne
     /**
      * It shows an associative array.  This command is the end of a stack.
      * @param array $assocArray An associative array with the values to show. The key is used for the index.
+     * @param bool  $notop      if true then it will not show the top border
+     * @param bool  $nosides    if true then it will not show the side borders
+     * @param bool  $nobottom   if true then it will not show the bottom border
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showTable(array $assocArray): void
+    public function showTable(array $assocArray, bool $notop=false, bool $nosides=false, bool $nobottom=false): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -3899,6 +3902,14 @@ class CliOne
         [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
         if (count($assocArray) === 0) {
             return;
+        }
+        if($nosides) {
+            $ml='';
+            $mr='';
+            $cutl='';
+            $cutr='';
+            $dl='';
+            $dr='';
         }
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         $columns = array_keys($assocArray[0]);
@@ -3927,7 +3938,7 @@ class CliOne
             $maxColumnSize[$columns[0]]++;
         }
         // top
-        if ($ul) {
+        if ($ul && $notop===false) {
             $txt = $ul;
             foreach ($maxColumnSize as $size) {
                 $txt .= str_repeat($um, $size) . $cutt;
@@ -3951,7 +3962,7 @@ class CliOne
         $this->showLine($txt);
         // content
         foreach ($assocArray as $k => $line) {
-            $txt = $ml;
+            $txt =  $ml;
             foreach ($maxColumnSize as $colName => $size) {
                 $line[$colName] = $line[$colName] ?? '(null)';
                 $txt .= $this->alignText(
@@ -3959,7 +3970,7 @@ class CliOne
                         $size,
                         is_numeric($line[$colName]) ? $alignContentNumber : $alignContentText) . $mmv;
             }
-            $txt = rtrim($txt, $mmv) . $mr;
+            $txt = rtrim($txt, $mmv) .$mr;
             if ($k === count($assocArray) - 1) {
                 $this->show($txt);
             } else {
@@ -3967,7 +3978,7 @@ class CliOne
             }
         }
         // botton table
-        if ($dl) {
+        if (($dl || $dm) && $nobottom===false) {
             $this->showLine();
             $txt = $dl;
             foreach ($maxColumnSize as $size) {
@@ -4709,7 +4720,9 @@ class CliOne
         $l0 = $l - strlen(ltrim($mask, chr(250)));
         $l1 = $l - strlen(rtrim($mask, chr(250)));
         $initial = substr($contentAnsi, 0, $l0);
-        $end = $l1===0?'': substr($contentAnsi, -$l1);
+        $sst=substr($contentAnsi, -$l1);
+        $sst=($sst===false)?'':$sst;
+        $end = $l1===0?'': $sst;
     }
 
 
@@ -4771,6 +4784,7 @@ class CliOne
     }
 
     /**
+     * It shows a pattern
      * @param CliOneParam $parameter $param
      * @param string      $key       the key to show
      * @param mixed       $value     the value to show

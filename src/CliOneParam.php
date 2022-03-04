@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.13
+ * @version   1.14
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -22,10 +22,10 @@ class CliOneParam
     public $type;
     public $alias = [];
     /**
-     * @var bool|string|null
+     * @var string|null
      */
     public $question = '';
-    /** @var mixed */
+    /** @var mixed the default value */
     public $default = false;
     public $currentAsDefault = false;
     /** @var
@@ -35,7 +35,9 @@ class CliOneParam
      */
     public $allowEmpty = false;
     public $description = '';
+    /** @var bool if true then the field is required */
     public $required = false;
+    /** @var bool if true then this parameter could be user-input */
     public $input = false;
     /** @var bool if true then the value is not entered, but it could have a value (default value) */
     public $missing = true;
@@ -45,8 +47,11 @@ class CliOneParam
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
     public $inputType = 'string';
+    /** @var array the values to select. It is used for option and multiple but it is also used for auto-complete. */
     public $inputValue = [];
+    /** @var mixed the current value of the parameter */
     public $value;
+    /** @var mixed the current value-key of the parameter. If the parameter is an option or multiple, then this value is the key */
     public $valueKey;
     /**
      * @var boolean <b>true</b> the argument is value-key<br>
@@ -67,11 +72,14 @@ class CliOneParam
     /**
      * The constructor. It is used internally
      * @param CliOne       $parent
-     * @param ?string      $key
+     * @param ?string      $key                the key to identify the parameter. This key must be unique<br>
+     *                                         in the case of the key is repeated, then it could raise an error or it
+     *                                         could be replaced, see method add()
      * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]
-     * @param array|string $alias
-     * @param mixed        $value
-     * @param mixed        $valueKey
+     * @param array|string $alias              (optional) The alias of the parameter. If null,empty or array empty then
+     *                                         it will not have an alias
+     * @param mixed        $value              (optional) The current value
+     * @param mixed        $valueKey           (optional) The current value key.
      * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
      *                                         <b>false</b> (default) the argument is a value
      */
@@ -86,6 +94,7 @@ class CliOneParam
         $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
+        $alias = $alias === '' || $alias === null ? [] : $alias;
         $this->alias = is_array($alias) ? $alias : [$alias];
         $this->question = 'Select the value of ' . $key;
         $this->value = $value;
@@ -145,23 +154,23 @@ class CliOneParam
                     //$this->parent->parameters[$keyParam]->parent=null;
                     return true;
                 }
-                $this->parent->throwError("error in creation of input $this->key,parameter already defined");
+                $this->parent->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined");
                 $fail = true;
                 break;
             }
             if (in_array($this->key, $parameter->alias, true)) {
                 // we found an alias that matches the parameter.
-                $this->parent->throwError("error in creation of input $this->key,parameter already defined as an alias");
+                $this->parent->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined as an alias");
                 $fail = true;
                 break;
             }
             foreach ($this->alias as $alias) {
                 if (($alias === $parameter->key)) {
-                    $this->parent->throwError("error in creation of alias $this->key/$alias,parameter already defined");
+                    $this->parent->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined");
                 }
                 if (in_array($alias, $parameter->alias, true)) {
                     // we found an alias that matches the parameter.
-                    $this->parent->throwError("error in creation of alias $this->key/$alias,parameter already defined as other alias");
+                    $this->parent->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined as other alias");
                     $fail = true;
                     break;
                 }
