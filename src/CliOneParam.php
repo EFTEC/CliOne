@@ -66,12 +66,10 @@ class CliOneParam
     protected $related = [];
     protected $footer;
     protected $history = [];
-    /** @var CliOne */
-    private $parent;
+
 
     /**
      * The constructor. It is used internally
-     * @param CliOne       $parent
      * @param ?string      $key                the key to identify the parameter. This key must be unique<br>
      *                                         in the case of the key is repeated, then it could raise an error or it
      *                                         could be replaced, see method add()
@@ -83,15 +81,13 @@ class CliOneParam
      * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
      *                                         <b>false</b> (default) the argument is a value
      */
-    public function __construct(CliOne  $parent,
-                                ?string $key = null,
+    public function __construct(?string $key = null,
                                 string  $type = 'flag',
                                         $alias = [],
                                         $value = null,
                                         $valueKey = null,
                                 bool    $argumentIsValueKey = false)
     {
-        $this->parent = $parent;
         $this->key = $key;
         $this->type = $type;
         $alias = $alias === '' || $alias === null ? [] : $alias;
@@ -111,7 +107,7 @@ class CliOneParam
     public function add(bool $override = false): bool
     {
         if ($this->key === null) {
-            $this->parent->throwError("error in creation of input $this->key inputType for range must be an array");
+            Clione::instance()->throwError("error in creation of input $this->key inputType for range must be an array");
             return false;
         }
         if ($this->type === 'none') {
@@ -119,7 +115,7 @@ class CliOneParam
         }
         $fail = false;
         /*if($this->allowEmpty===true && $this->default===false) {
-            $this->parent->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");
+            Clione::instance()->showLine("<red>error in creation of input $this->key. setAllowEmpty() must be accompained by a default (not false) value</red>");
             $fail = true;
 
         }*/
@@ -127,7 +123,7 @@ class CliOneParam
         switch ($this->inputType) {
             case 'range':
                 if (!is_array($this->inputValue) || count($this->inputValue) !== 2) {
-                    $this->parent->throwError("error in creation of input $this->key inputType for range must be an array");
+                    Clione::instance()->throwError("error in creation of input $this->key inputType for range must be an array");
                     $fail = true;
                 }
                 break;
@@ -141,44 +137,44 @@ class CliOneParam
             case 'option4':
             case 'optionshort':
                 if (!is_array($this->inputValue)) {
-                    $this->parent->throwError("error in creation of input $this->key inputType for $this->inputType must be an array");
+                    Clione::instance()->throwError("error in creation of input $this->key inputType for $this->inputType must be an array");
                     $fail = true;
                 }
                 break;
         }
-        foreach ($this->parent->parameters as $keyParam => $parameter) {
+        foreach (Clione::instance()->parameters as $keyParam => $parameter) {
             if ($parameter->key === $this->key) {
                 if ($override) {
                     // override
-                    $this->parent->parameters[$keyParam] = $this;
-                    //$this->parent->parameters[$keyParam]->parent=null;
+                    Clione::instance()->parameters[$keyParam] = $this;
+                    //Clione::instance()->parameters[$keyParam]->parent=null;
                     return true;
                 }
-                $this->parent->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined");
+                Clione::instance()->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined");
                 $fail = true;
                 break;
             }
             if (in_array($this->key, $parameter->alias, true)) {
                 // we found an alias that matches the parameter.
-                $this->parent->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined as an alias");
+                Clione::instance()->throwError("error in creation of input <bold>$this->key</bold>, parameter already defined as an alias");
                 $fail = true;
                 break;
             }
             foreach ($this->alias as $alias) {
                 if (($alias === $parameter->key)) {
-                    $this->parent->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined");
+                    Clione::instance()->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined");
                 }
                 if (in_array($alias, $parameter->alias, true)) {
                     // we found an alias that matches the parameter.
-                    $this->parent->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined as other alias");
+                    Clione::instance()->throwError("error in creation of alias <bold>$this->key/$alias</bold>, parameter already defined as other alias");
                     $fail = true;
                     break;
                 }
             }
         }
         if (!$fail) {
-            $this->parent->parameters[] = $this;
-            //$this->parent = null;
+            Clione::instance()->parameters[] = $this;
+            //Clione::instance() = null;
         }
         return !$fail;
     }
@@ -194,7 +190,7 @@ class CliOneParam
     public function evalParam(bool $forceInput = false, bool $returnValue = false)
     {
         $this->add(true);
-        return $this->parent->evalParam($this->key, $forceInput, $returnValue);
+        return Clione::instance()->evalParam($this->key, $forceInput, $returnValue);
     }
 
     /**
@@ -503,9 +499,12 @@ class CliOneParam
             if (!is_array($this->inputValue)) {
                 return $this;
             }
-            if ($this->value !== null && strpos($this->value, $this->parent->emptyValue) === 0) {
+            if(is_array($this->value)) {
+                return $this;
+            }
+            if ($this->value !== null && strpos($this->value, Clione::instance()->emptyValue) === 0) {
                 // the value is of the type __input_*
-                $this->valueKey = str_replace($this->parent->emptyValue, '', $this->value);
+                $this->valueKey = str_replace(Clione::instance()->emptyValue, '', $this->value);
                 return $this;
             }
             $k = array_search($this->value, $this->inputValue, true);

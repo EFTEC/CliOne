@@ -454,6 +454,10 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+
+* 1.15 (2022-03-15)
+  * showHelp() shows more information.
+  * colorText() now correct some missing tags.
 * 1.14 (2022-03-04)
   * method showTable() allows to show or hide the top, sides and bottom borders. 
 * 1.13 (2022-02-28)

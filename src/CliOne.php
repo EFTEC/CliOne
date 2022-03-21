@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.14
+ * @version   1.15
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.14';
+    public const VERSION = '1.15';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -59,9 +59,12 @@ class CliOne
     protected $wait = 0;
     /** @var string=['silent','show','throw'][$i] */
     protected $errorType = 'show';
-
-
+    /** @var CliOne */
+    protected static $instance;
     protected $waitPrev = '';
+    /** @var string the original script file */
+    protected $phpOriginalFile='';
+
     /**
      * the arguments as a couple key/value. If the value is missing, then it is ''
      * @var array
@@ -98,12 +101,13 @@ class CliOne
     protected $columnEscapeCmd = [];
 
     /**
-     * The constructor
+     * The constructor. If there is an instance, then it replaces the instance.
      * @param ?string $origin you can specify the origin file. If you specify the origin file, then isCli will only
      *                        return true if the file is called directly.
      */
     public function __construct(?string $origin = null)
     {
+        self::$instance=$this;
         $this->origin = $origin;
         if (!$this->isCli()) {
             die("you are not running a CLI: " . $this->error);
@@ -138,6 +142,19 @@ class CliOne
             }
             return $matches;
         });
+    }
+
+    /**
+     * It gets the current instance of the library.<br>
+     * If the instance does not exist, then it is created
+     * @return CliOne
+     */
+    public static function instance(): CliOne
+    {
+        if(self::$instance===null) {
+            self::$instance=new CliOne();
+        }
+        return self::$instance;
     }
 
     /**
@@ -229,10 +246,10 @@ class CliOne
 
     /**
      * It sets if you want to display errors or not. This flag is reseted every time it is used.
-     * @param bool $errorType =['silent','show','throw'][$i]
+     * @param string $errorType =['silent','show','throw'][$i] (default is show)
      * @return CliOne
      */
-    public function setErrorType(bool $errorType = true): CliOne
+    public function setErrorType(string $errorType = 'throw'): CliOne
     {
         $this->errorType = $errorType;
         return $this;
@@ -248,6 +265,9 @@ class CliOne
         global $argv;
         $this->argv = [];
         $c = $argv === null ? 0 : count($argv);
+        if($c>0) {
+            $this->phpOriginalFile=$argv[0];
+        }
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
         for ($i = 1; $i < $c; $i++) {
             $x = explode('=', $argv[$i], 2);
@@ -356,7 +376,7 @@ class CliOne
                                 string $type = 'flag',
                                 bool   $argumentIsValueKey = false): CliOneParam
     {
-        return new CliOneParam($this, $key, $type, $alias, null, null, $argumentIsValueKey);
+        return new CliOneParam($key, $type, $alias, null, null, $argumentIsValueKey);
     }
 
     /**
@@ -595,7 +615,7 @@ class CliOne
                 return $v;
             }
         }
-        return new CliOneParam($this, null);
+        return new CliOneParam(null);
     }
 
     /**
@@ -728,12 +748,25 @@ class CliOne
         return [true, $value];
     }
 
-    public function showHelp(CliOneParam $parameter): void
+    public function showHelp(CliOneParam $parameter, bool $verbose): void
     {
-        $this->showLine("<yellow>Help : $parameter->key </yellow>");
-        $this->showLine("  " . $parameter->description);
+        $this->showLine("<yellow>Help</yellow> [$parameter->key]");
+        if($verbose) {
+            if(count($parameter->alias)>0) {
+                $this->showLine("  <yellow>Aliases: </yellow> " . json_encode($parameter->alias));
+            }
+            $this->showLine("  <yellow>Can be called as argument?: </yellow>".
+                (($parameter->type!=='onlyinput' && $parameter->type!=='none')?'yes':'no'));
+            $this->showLine("  <yellow>Input Type: </yellow> ".$parameter->inputType);
+        }
+        if($parameter->description) {
+            $this->showLine("  <yellow>Description: </yellow>" . $parameter->description);
+        }
         foreach ($parameter->getHelpSyntax() as $help) {
-            $this->showLine("  " . $help);
+            $help=$this->colorText($help);
+            if(trim($help)!=='') {
+                $this->showLine("  " . $help);
+            }
         }
     }
 
@@ -3222,7 +3255,32 @@ class CliOne
         }
         $this->errorType = 'show';
     }
+    public function reconstructPath($includePHP=true,$trimArguments=999) : string
+    {
+        global $argv;
+        $r=($includePHP)?'php ':'';
+        //$r.=($baseUrl)?basename(@$_SERVER['SCRIPT_FILENAME']):@$_SERVER['SCRIPT_FILENAME'];
+        $tmps=array_slice($argv,0,$trimArguments);
+        $r.=implode(' ',$tmps);
+        return $r;
+    }
+    /**
+     * @return string
+     */
+    public function getPhpOriginalFile(): string
+    {
+        return $this->phpOriginalFile;
+    }
 
+    /**
+     * @param string $phpOriginalFile
+     * @return CliOne
+     */
+    public function setPhpOriginalFile(string $phpOriginalFile): CliOne
+    {
+        $this->phpOriginalFile = $phpOriginalFile;
+        return $this;
+    }
     /**
      * It sets the color in the stack
      * @param array $colors =['black','green','yellow','cyan','magenta','blue'][$i]
@@ -4000,7 +4058,7 @@ class CliOne
      */
     public function showValuesColumn(array $values, string $type, ?string $patternColumn = null): void
     {
-        $p = new CliOneParam($this, 'dummy', false, null, null);
+        $p = new CliOneParam('dummy', false, null, null);
         $p->setPattern($patternColumn);
         $p->inputValue = $values;
         $p->inputType = $type;
@@ -4667,6 +4725,8 @@ class CliOne
                 $v = '';
             }
             $content = str_replace('<option/>', $v, $content);
+        } else {
+            $content = str_replace(['<option/>','<optionkey/>'], ['',''], $content);
         }
         $content = str_replace($this->colorTags,
             $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
@@ -4856,8 +4916,8 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 while (true) {
                     $origInput = $this->readline($txt, $parameter);
-                    if ($origInput === '?') {
-                        $this->showHelp($parameter);
+                    if ($origInput === '?' || $origInput==='??') {
+                        $this->showHelp($parameter, $origInput==='??');
                     } else {
                         break;
                     }

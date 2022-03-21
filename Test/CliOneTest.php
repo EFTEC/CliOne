@@ -60,32 +60,40 @@ class CliOneTest extends TestCase
         $t->initialEndStyle($t->colorText('<cyan>hello</cyan>'), $initial, $end);
         $this->assertEquals("\e[36m", $initial);
         $this->assertEquals("\e[39m", $end);
-        $this->assertEquals(['it is a', 'test example', 'one two'],
+        $this->assertEquals([    0 => 'it is a',
+    1 => 'test',
+    2 => 'example',
+    3 => 'one two'],
             $t->wrapLine([$t->colorText('it is a test example one two')], 10));
         $this->assertEquals([
-            'it is a',
-            'test example',
-            'one two',
-            'it is a',
-            'test example',
-            'one two'],
+            0 => 'it is a',
+    1 => 'test',
+    2 => 'example',
+    3 => 'one two',
+    4 => 'it is a',
+    5 => 'test',
+    6 => 'example',
+    7 => 'one two'],
             $t->wrapLine([
                 'it is a test example one two',
                 'it is a test example one two'], 10)
         );
         $this->assertEquals([
             "\e[36mit is a\e[39m",
-            "\e[36mtest example\e[39m",
+            1 => "\e[36mtest\e[39m",
+            2 => "\e[36mexample\e[39m",
             "\e[36mone two\e[39m"
         ],
             $t->wrapLine([$t->colorText('<cyan>it is a test example one two</cyan>')], 10, true));
         $this->assertEquals([
-            'it is a',
-            'test example',
-            'one two',
-            'it is a',
-            'test example',
-            'one two'],
+            0 => 'it is a',
+    1 => 'test',
+    2 => 'example',
+    3 => 'one two',
+    4 => 'it is a',
+    5 => 'test',
+    6 => 'example',
+    7 => 'one two'],
             $t->wrapLine([
                 'it is a test example one two',
                 'it is a test example one two'], 10)
@@ -197,7 +205,7 @@ class CliOneTest extends TestCase
         CliOne::testUserInput(null);
         CliOne::testArguments(['program.php', '--test1b', 'hello', '-test2', '"hello world"']);
         $t = new CliOne();
-        $t->createParam('test1', ['test1b'], 'flag')->add();
+        $t->createParam('test1', ['test1b'])->add();
         $this->assertEquals('hello', $t->evalParam('test1')->value);
     }
 
@@ -302,10 +310,10 @@ class CliOneTest extends TestCase
         $t->createParam('param3', 'p3', 'first')->setDescription('desc2')->add();
         $t->createParam('paramv1', 'v1', 'longflag')->setDescription('descv1')->setRelated('p3')->add();
         $t->createParam('paramv2', 'v2', 'longflag')->setDescription('descv2')->setRelated('p3')->add();
-        $t->setDefaultStream('memory')->setNoColor(true)->showParamSyntax2('title1', ['flag', 'longflag']);
+        $t->setDefaultStream('memory')->setNoColor()->showParamSyntax2('title1', ['flag', 'longflag']);
         $this->assertEquals("title1\n --param1, -p1 desc1 [(null)]\n --param2, -p2 desc2 [(null)]\n" .
             " --paramv1, -v1 descv1 [(null)]\n --paramv2, -v2 descv2 [(null)]\n", $this->removespaces($t->getMemory(true)));
-        $t->setDefaultStream('memory')->setNoColor(true)->showParamSyntax2('title1', ['flag', 'longflag'], [], null, 'p3');
+        $t->setDefaultStream('memory')->setNoColor()->showParamSyntax2('title1', ['flag', 'longflag'], [], null, 'p3');
         $this->assertEquals("title1\n --paramv1, -v1 descv1 [(null)]\n --paramv2, -v2 descv2 [(null)]\n", $this->removespaces($t->getMemory(true)));
     }
 
@@ -353,6 +361,18 @@ class CliOneTest extends TestCase
             ->setCurrentAsDefault()
             ->add();
         $this->assertEquals('def', $t->evalParam('test1', true)->value);
+    }
+    public function testBasic() {
+        CliOne::testArguments(['program.php','aaa','-bbb','ccc','-ddd']);
+        /** @var CliOne $t */
+        $t = new CliOne();
+        CliOne::testUserInput(['hello world']);
+        $this->assertEquals('php program.php aaa -bbb ccc',$t->reconstructPath(true,4));
+        $this->assertEquals('program.php',$t->getPhpOriginalFile());
+        $t->setPhpOriginalFile('dummy.php');
+        $this->assertEquals('dummy.php',$t->getPhpOriginalFile());
+
+
     }
 
     public function testInputDefault()
@@ -439,10 +459,10 @@ class CliOneTest extends TestCase
         $this->assertEquals(true, $t->getParameter('param1')->isValid());
         $this->assertEquals(false, $t->createParam('param1')->add());
         $this->assertEquals(false, $t->getParameter('helloworld')->isValid());
-        $this->assertEquals(true, $t->createParam('multi1', ['alpha', 'beta'], 'flag')->add());
-        $this->assertEquals(false, $t->createParam('alpha', ['a', 'b'], 'flag')->add());
-        $this->assertEquals(false, $t->createParam('gamma', ['alpha'], 'flag')->add());
-        $this->assertEquals(false, $t->createParam('delta', ['alpha'], 'flag')->add());
+        $this->assertEquals(true, $t->createParam('multi1', ['alpha', 'beta'])->add());
+        $this->assertEquals(false, $t->createParam('alpha', ['a', 'b'])->add());
+        $this->assertEquals(false, $t->createParam('gamma', ['alpha'])->add());
+        $this->assertEquals(false, $t->createParam('delta', ['alpha'])->add());
     }
 
     public function testInputV2()
