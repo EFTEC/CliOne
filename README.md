@@ -455,7 +455,7 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
-* 1.15 (2022-03-21)
+* 1.16 (2022-03-25)
   * setParam() allows to set the value or the value-key    
 * 1.15 (2022-03-15)
   * showHelp() shows more information.
