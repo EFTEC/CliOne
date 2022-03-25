@@ -221,13 +221,14 @@ php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valuef
 The system allows reading multiple types of arguments
  
 * **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
-* **command**: it is simmilar to **first** but it does not compares the name of the argument.
+* **command**: it is similar to **first** but it does not compares the name of the argument.
   * cliprogram.php com -flag, first returns "com" if the argument is named first.  command returns "com" regardless of its name.
 * **second**: this argument is also positional (second position) and does not have any value
 * **last**: this argument is also positional and it is always at the latest argument
 * **flag**: the argument is prefixed with a single "-". This argument not need to be a single character.
 * **longflag**: the argument is prefixed with a double "--"
-* **onlyinput/none**: the system never read the argument so it could be user-input.
+* **onlyinput/none**: the system never read it as argument so it could be user-input.
+   * none means that the argument is only user-input and it must not be stored. 
 
 The argument could be created as:
 
@@ -454,7 +455,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
-
+* 1.15 (2022-03-21)
+  * setParam() allows to set the value or the value-key    
 * 1.15 (2022-03-15)
   * showHelp() shows more information.
   * colorText() now correct some missing tags.

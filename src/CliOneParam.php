@@ -483,23 +483,26 @@ class CliOneParam
     }
 
     /**
-     * We set a new value
-     * @param mixed $newValue    it sets a new value
-     * @param mixed $newValueKey it sets the value-key. If null then the value is asumed using inputvalue.
-     * @param bool  $missing     by default every time we set a value, we mark missing as false, however you can change
-     *                           it.
+     * We set a new value or value-key<br>
+     * The $origin of this parameter is marked as "set".
+     * @param mixed|null $newValue    it sets a new value.<br>
+     *                                If null then it will use $newValueKey to set the value (or null if not found)
+     * @param mixed|null $newValueKey it sets the value-key.<br>
+     *                                If null then the valueKey is set using the value (or null if not found)
+     * @param bool       $missing     by default every time we set a value, we mark missing as false, however you can
+     *                                change it and sets this parameter as missing.
      * @return $this
      */
     public function setValue($newValue, $newValueKey = null, bool $missing = false): CliOneParam
     {
-        $this->value = $newValue;
         $this->origin = 'set';
         $this->missing = $missing;
         if ($newValueKey === null) {
+            $this->value = $newValue;
             if (!is_array($this->inputValue)) {
                 return $this;
             }
-            if(is_array($this->value)) {
+            if (is_array($this->value)) {
                 return $this;
             }
             if ($this->value !== null && strpos($this->value, Clione::instance()->emptyValue) === 0) {
@@ -511,6 +514,11 @@ class CliOneParam
             $this->valueKey = $k === false ? null : $k;
         } else {
             $this->valueKey = $newValueKey;
+            if ($this->value !== null) {
+                $this->value = $newValue;
+            } else {
+                $this->value = $this->inputValue[$newValueKey] ?? null;
+            }
         }
         return $this;
     }

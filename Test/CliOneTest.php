@@ -291,6 +291,15 @@ class CliOneTest extends TestCase
         $t->setParam('test1', 'hello world');
         $p = $t->evalParam('test1');
         $this->assertEquals('apple', $p->value);
+        // test 5 it test setparam() with a value-key
+        CliOne::testArguments(['program.php']);
+        $t = new CliOne();
+        $t->createParam('test1k')->setInput(true,'option',['h1'=>'hello','w1'=>'world'])->setRequired(false)->add();
+        $t->setParam('test1k', 'h1',true);
+        $this->assertEquals('hello', $t->getValue('test1k'));
+        $t->createParam('test2k')->setInput(true,'option',['h1'=>'hello','w1'=>'world'])->setRequired(false)->add();
+        $t->setParam('test2k', 'hello');
+        $this->assertEquals('h1', $t->getValueKey('test2k'));
         // test 5
         CliOne::testArguments(['program.php']);
         $t = new CliOne();
@@ -323,8 +332,7 @@ class CliOneTest extends TestCase
         $text = str_replace(array('    ', '   ', '  ', "\t"), ' ', $text);
         $text = str_replace(array('    ', '   ', '  '), ' ', $text);
         $text = str_replace(array('    ', '   ', '  '), ' ', $text);
-        $text = str_replace(array('    ', '   ', '  '), ' ', $text);
-        return $text;
+        return str_replace(array('    ', '   ', '  '), ' ', $text);
     }
 
     public function testInput()

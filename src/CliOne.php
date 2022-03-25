@@ -63,7 +63,7 @@ class CliOne
     protected static $instance;
     protected $waitPrev = '';
     /** @var string the original script file */
-    protected $phpOriginalFile='';
+    protected $phpOriginalFile = '';
 
     /**
      * the arguments as a couple key/value. If the value is missing, then it is ''
@@ -107,7 +107,7 @@ class CliOne
      */
     public function __construct(?string $origin = null)
     {
-        self::$instance=$this;
+        self::$instance = $this;
         $this->origin = $origin;
         if (!$this->isCli()) {
             die("you are not running a CLI: " . $this->error);
@@ -151,8 +151,8 @@ class CliOne
      */
     public static function instance(): CliOne
     {
-        if(self::$instance===null) {
-            self::$instance=new CliOne();
+        if (self::$instance === null) {
+            self::$instance = new CliOne();
         }
         return self::$instance;
     }
@@ -265,8 +265,8 @@ class CliOne
         global $argv;
         $this->argv = [];
         $c = $argv === null ? 0 : count($argv);
-        if($c>0) {
-            $this->phpOriginalFile=$argv[0];
+        if ($c > 0) {
+            $this->phpOriginalFile = $argv[0];
         }
         // the first argument is the name of the program, i.e ./program.php, so it is excluded.
         for ($i = 1; $i < $c; $i++) {
@@ -751,20 +751,20 @@ class CliOne
     public function showHelp(CliOneParam $parameter, bool $verbose): void
     {
         $this->showLine("<yellow>Help</yellow> [$parameter->key]");
-        if($verbose) {
-            if(count($parameter->alias)>0) {
+        if ($verbose) {
+            if (count($parameter->alias) > 0) {
                 $this->showLine("  <yellow>Aliases: </yellow> " . json_encode($parameter->alias));
             }
-            $this->showLine("  <yellow>Can be called as argument?: </yellow>".
-                (($parameter->type!=='onlyinput' && $parameter->type!=='none')?'yes':'no'));
-            $this->showLine("  <yellow>Input Type: </yellow> ".$parameter->inputType);
+            $this->showLine("  <yellow>Can be called as argument?: </yellow>" .
+                (($parameter->type !== 'onlyinput' && $parameter->type !== 'none') ? 'yes' : 'no'));
+            $this->showLine("  <yellow>Input Type: </yellow> " . $parameter->inputType);
         }
-        if($parameter->description) {
+        if ($parameter->description) {
             $this->showLine("  <yellow>Description: </yellow>" . $parameter->description);
         }
         foreach ($parameter->getHelpSyntax() as $help) {
-            $help=$this->colorText($help);
-            if(trim($help)!=='') {
+            $help = $this->colorText($help);
+            if (trim($help) !== '') {
                 $this->showLine("  " . $help);
             }
         }
@@ -3255,15 +3255,17 @@ class CliOne
         }
         $this->errorType = 'show';
     }
-    public function reconstructPath($includePHP=true,$trimArguments=999) : string
+
+    public function reconstructPath($includePHP = true, $trimArguments = 999): string
     {
         global $argv;
-        $r=($includePHP)?'php ':'';
+        $r = ($includePHP) ? 'php ' : '';
         //$r.=($baseUrl)?basename(@$_SERVER['SCRIPT_FILENAME']):@$_SERVER['SCRIPT_FILENAME'];
-        $tmps=array_slice($argv,0,$trimArguments);
-        $r.=implode(' ',$tmps);
+        $tmps = array_slice($argv, 0, $trimArguments);
+        $r .= implode(' ', $tmps);
         return $r;
     }
+
     /**
      * @return string
      */
@@ -3281,6 +3283,7 @@ class CliOne
         $this->phpOriginalFile = $phpOriginalFile;
         return $this;
     }
+
     /**
      * It sets the color in the stack
      * @param array $colors =['black','green','yellow','cyan','magenta','blue'][$i]
@@ -3293,24 +3296,25 @@ class CliOne
     }
 
     /**
-     * It sets the value of a parameter manually.<br>
-     * If the value is present as argument, then the value of the argument is used<br>
-     * If the value is not present as argument, then the user input is skipped.
+     * It sets the value or value-key of a parameter manually.<br>
+     * It also marks the origin of the argument as "set" and it markes the argument as missing=false
      *
-     * @param string $key   the key of the parameter
-     * @param mixed  $value the value to assign.
+     * @param string $key        the key of the parameter
+     * @param mixed  $value      the value (or the value-key) to assign.
+     * @param bool   $isValueKey if <b>false</b> (default) then the argument $value is the value of the parameter<br>
+     *                           if <b>true</b> then the argument $value is the value-key.
      * @return CliOneParam true if the parameter is set, otherwise false
      * @throws RuntimeException
      */
-    public function setParam(string $key, $value): CliOneParam
+    public function setParam(string $key, $value, bool $isValueKey = false): CliOneParam
     {
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
-                $parameter->value = $value;
-                $parameter->origin = 'set';
-                $parameter->valueKey = null;
-                $this->refreshParamValueKey($parameter);
-                $parameter->missing = false;
+                if(!$isValueKey) {
+                    $parameter->setValue($value);
+                    } else {
+                    $parameter->setValue(null,$value);
+                }
                 return $parameter;
             }
         }
@@ -3319,6 +3323,7 @@ class CliOne
     }
 
     /**
+     * It sets the pattern used for the title. This operation is used in a stack.
      * {value} {type}
      * @param ?string $pattern1Stack if null then it will use the default value.
      * @return $this
@@ -3889,7 +3894,7 @@ class CliOne
             for ($i = 0; $i < $textLen; $i++) {
                 if (strpos($spacePattern, $masked[$i]) !== false) {
                     $positionSpace = $i;
-                    $positionSpace2=0;
+                    $positionSpace2 = 0;
                 }
                 if ($masked[$i] !== chr(250)) {
                     $counter++;
@@ -3951,7 +3956,7 @@ class CliOne
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showTable(array $assocArray, bool $notop=false, bool $nosides=false, bool $nobottom=false): void
+    public function showTable(array $assocArray, bool $notop = false, bool $nosides = false, bool $nobottom = false): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -3961,13 +3966,13 @@ class CliOne
         if (count($assocArray) === 0) {
             return;
         }
-        if($nosides) {
-            $ml='';
-            $mr='';
-            $cutl='';
-            $cutr='';
-            $dl='';
-            $dr='';
+        if ($nosides) {
+            $ml = '';
+            $mr = '';
+            $cutl = '';
+            $cutr = '';
+            $dl = '';
+            $dr = '';
         }
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         $columns = array_keys($assocArray[0]);
@@ -3996,7 +4001,7 @@ class CliOne
             $maxColumnSize[$columns[0]]++;
         }
         // top
-        if ($ul && $notop===false) {
+        if ($ul && $notop === false) {
             $txt = $ul;
             foreach ($maxColumnSize as $size) {
                 $txt .= str_repeat($um, $size) . $cutt;
@@ -4020,7 +4025,7 @@ class CliOne
         $this->showLine($txt);
         // content
         foreach ($assocArray as $k => $line) {
-            $txt =  $ml;
+            $txt = $ml;
             foreach ($maxColumnSize as $colName => $size) {
                 $line[$colName] = $line[$colName] ?? '(null)';
                 $txt .= $this->alignText(
@@ -4028,7 +4033,7 @@ class CliOne
                         $size,
                         is_numeric($line[$colName]) ? $alignContentNumber : $alignContentText) . $mmv;
             }
-            $txt = rtrim($txt, $mmv) .$mr;
+            $txt = rtrim($txt, $mmv) . $mr;
             if ($k === count($assocArray) - 1) {
                 $this->show($txt);
             } else {
@@ -4036,7 +4041,7 @@ class CliOne
             }
         }
         // botton table
-        if (($dl || $dm) && $nobottom===false) {
+        if (($dl || $dm) && $nobottom === false) {
             $this->showLine();
             $txt = $dl;
             foreach ($maxColumnSize as $size) {
@@ -4726,7 +4731,7 @@ class CliOne
             }
             $content = str_replace('<option/>', $v, $content);
         } else {
-            $content = str_replace(['<option/>','<optionkey/>'], ['',''], $content);
+            $content = str_replace(['<option/>', '<optionkey/>'], ['', ''], $content);
         }
         $content = str_replace($this->colorTags,
             $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
@@ -4780,9 +4785,9 @@ class CliOne
         $l0 = $l - strlen(ltrim($mask, chr(250)));
         $l1 = $l - strlen(rtrim($mask, chr(250)));
         $initial = substr($contentAnsi, 0, $l0);
-        $sst=substr($contentAnsi, -$l1);
-        $sst=($sst===false)?'':$sst;
-        $end = $l1===0?'': $sst;
+        $sst = substr($contentAnsi, -$l1);
+        $sst = ($sst === false) ? '' : $sst;
+        $end = $l1 === 0 ? '' : $sst;
     }
 
 
@@ -4916,8 +4921,8 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 while (true) {
                     $origInput = $this->readline($txt, $parameter);
-                    if ($origInput === '?' || $origInput==='??') {
-                        $this->showHelp($parameter, $origInput==='??');
+                    if ($origInput === '?' || $origInput === '??') {
+                        $this->showHelp($parameter, $origInput === '??');
                     } else {
                         break;
                     }
