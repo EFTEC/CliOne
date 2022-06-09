@@ -14,7 +14,7 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.16
+ * @version   1.17
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
@@ -123,6 +123,7 @@ class CliOne
             }
             $this->noColor = true;
         }
+
         $this->colSize = $this->calculateColSize();
         $this->rowSize = $this->calculateRowSize();
         $t = floor($this->colSize / 6);
@@ -724,7 +725,7 @@ class CliOne
             }
             /** @noinspection PhpUndefinedVariableInspection */
             if (($value !== null && $keyP[0] === '-') || (!isset($this->argv[$trueName]) && $parameter->type !== 'command')) {
-                // positional argument exists however it is a flag or the argument does not exists
+                // positional argument exists however it is a flag or the argument does not exist
                 $value = null;
             }
         }
@@ -773,7 +774,7 @@ class CliOne
     /**
      * @param string  $word the words to display.
      * @param string  $font =['atr','znaki'][$i]
-     * @param bool    $trim if true then if the first line and/or the last line is empty, then it is removed.
+     * @param bool    $trim if true then, if the first line and/or the last line is empty, then it is removed.
      * @param ?string $bit1 the visible character, if null then it will use a block code
      * @param string  $bit0 the invisible character
      * @return array
@@ -3858,7 +3859,7 @@ class CliOne
      * @param string|array $texts     The text already formatted.
      * @param int          $width     The expected width
      * @param bool         $keepStyle if true then it keeps the initial and end style tag for every new line.<br>
-     *                                if false, then it just wrap the lines.
+     *                                if false, then it just wraps the lines.
      *
      * @return array
      * @noinspection PhpRedundantVariableDocTypeInspection
@@ -4409,7 +4410,7 @@ class CliOne
                 //$row = shell_exec('$Host.UI.RawUI.WindowSize.height'); however it chances the screen of the shell
                 $row = 30; // cmd.exe by default (modern windows) uses 120x30.
             } else {
-                $row = trim(exec('tput rows'));
+                $row = trim(exec('tput lines'));
             }
         } catch (Exception $ex) {
             $row = 25;
@@ -4649,7 +4650,12 @@ class CliOne
      */
     protected function readline(string $content, CliOneParam $parameter)
     {
-        $this->show($content);
+        if(PHP_OS_FAMILY === 'Windows') {
+            $this->show($content);
+        } else {
+            $this->show("\0337$content\0338");    // \0337 save point \0338 return save point.
+            $largo=$this->strlen($content);
+        }
         // globals is used for phpunit.
         if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
             $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
@@ -4689,7 +4695,13 @@ class CliOne
             $prevhistory = $this->listHistory();
             $this->setHistory($parameter->getHistory());
         }
-        $r = readline("");
+        if(PHP_OS_FAMILY === 'Windows') {
+            $r = readline();
+        } else {
+            /** @noinspection PhpUndefinedVariableInspection */
+            $r = readline(str_repeat(' ', $largo));
+        }
+        $r=$r===false?false:trim($r);
         if (count($parameter->getHistory()) > 0) {
             // if we use a parameter history, then we return to the previous history
             /** @noinspection PhpUndefinedVariableInspection */

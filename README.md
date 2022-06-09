@@ -59,7 +59,7 @@ For example, let's say we need to create a CLI code to read an information and s
 >php basic.php read -o result.json
 ```
 
-We have two arguments, the first (read) is in the first position and it doesn't have any "-".  The second is "-o" that it is our flag with a value.
+We have two arguments, the first (read) is in the first position, and it doesn't have any "-".  The second is "-o" that it is our flag with a value.
 
 So we could create our arguments.
 
@@ -82,7 +82,7 @@ var_dump($cli->getValue('read'));
 var_dump($cli->getValue('o'));
 ```
 
-It will return **false** if we don't set a value and it will return the value it we set it.
+It will return **false** if we don't set a value, and it will return the value it we set it.
 
 ```shell
 >php basic.php read -o result.json
@@ -90,7 +90,7 @@ string(4) "read"
 string(11) "result.json"
 ```
 
-> **The parameters are create and evaluated separately because it allows to do more powerful operations with it.**
+> **The parameters are created and evaluated separately because it allows to do more powerful operations with it.**
 >
 > For example, sometimes we want to show the help (the list of parameters available) without evaluating the parameters.
 
@@ -159,13 +159,13 @@ You could also enter
 
 > php .\basic.php read -o result.json -pwd 123 -type json
 
-Now, you can shows the parameters ("show the syntax help") as follows:
+Now, you can show the parameters ("show the syntax help") as follows:
 
 ```php
 $cli->showParamSyntax2('parameters:');
 ```
 
-But it will looks plain.
+But it will look plain.
 
 It is because you can add a description, change the question and add more help information
 
@@ -221,14 +221,14 @@ php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valuef
 The system allows reading multiple types of arguments
  
 * **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
-* **command**: it is similar to **first** but it does not compares the name of the argument.
+* **command**: it is similar to **first,** but it does not compare the name of the argument.
   * cliprogram.php com -flag, first returns "com" if the argument is named first.  command returns "com" regardless of its name.
 * **second**: this argument is also positional (second position) and does not have any value
-* **last**: this argument is also positional and it is always at the latest argument
+* **last**: this argument is also positional, and it is always at the latest argument
 * **flag**: the argument is prefixed with a single "-". This argument not need to be a single character.
 * **longflag**: the argument is prefixed with a double "--"
-* **onlyinput/none**: the system never read it as argument so it could be user-input.
-   * none means that the argument is only user-input and it must not be stored. 
+* **onlyinput/none**: the system never read it as argument, so it could be user-input.
+   * none means that the argument is only user-input, and it must not be stored. 
 
 The argument could be created as:
 
@@ -446,8 +446,8 @@ You can find the definition of the classes, methods and fields at:
 
 ## Compatibility
 
-* It must supports all moderns interface that are compatibles with Virtual Terminal.
-* Since Windows TH2 (v1511, 2015), cmd.exe and powershell.exe has supports or VT but it must be enabled.
+* It must support all moderns interface that are compatibles with Virtual Terminal.
+* Since Windows TH2 (v1511, 2015), cmd.exe and powershell.exe has supports or VT, but it must be enabled.
   * REG ADD HKCU\CONSOLE /f /v VirtualTerminalLevel /t REG_DWORD /d 1
 * Since Windows 10 Anniversary Edition (v1607, 2016), cmd.exe and powershell.exe has default supports of VT (AFAIK)
 * Windows 2019 (LTS, 2018) supports this library by default.
@@ -455,6 +455,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.17 (2022-06-09)
+  * fixed many problems with Linux (number of rows, autocomplete, etc.)
 * 1.16 (2022-03-25)
   * setParam() allows to set the value or the value-key    
 * 1.15 (2022-03-15)
@@ -469,12 +471,12 @@ You can find the definition of the classes, methods and fields at:
     * added a memory stream
     * set the default stream
     * set the current stream to use stdout,stderr or memory (stdin is not used for in)
-    * added a new parameter type "command" that it is equals than first but it ignores the name and considers the position.
+    * added a new parameter type "command" that it is equals than first, but it ignores the name and considers the position.
     * added the method showHelp()
     * added the method makeBigWords()
     * added fontZnaki()
     * added fontaatr()
-      * both fonts use a lot of space in code but they are only an array of bits, so they use only 2KB.
+      * both fonts use a lot of space in code, but they are only an array of bits, so they use only 2KB.
     * new method alignLinesVertically()
     * new method maxWidth()
     * renamed field cmdMode to noANSI
