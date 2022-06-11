@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.17
+ * @version   1.18
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.16';
+    public const VERSION = '1.18';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -3083,16 +3083,14 @@ class CliOne
     /**
      * It reads information from a file. The information will be de-serialized.
      * @param string $filename the filename with or without extension.
+     * @param string $defaultExtension the default extension.
      * @return array it returns an array of the type [bool,mixed]<br>
      *                         In error, it returns [false,"error message"]<br>
      *                         In success, it returns [true,values de-serialized]<br>
      */
-    public function readData(string $filename): ?array
+    public function readData(string $filename,$defaultExtension='.config.php'): ?array
     {
-        $path = pathinfo($filename, PATHINFO_EXTENSION);
-        if ($path === '') {
-            $filename .= '.php';
-        }
+        $filename=$this->addExtensionFile($filename,$defaultExtension);
         try {
             $content = @file_get_contents($filename);
             if ($content === false) {
@@ -3181,17 +3179,31 @@ class CliOne
     }
 
     /**
-     * It saves the information into a file. The content will be serialized.
-     * @param string $filename the filename (without extension) to where the value will be saved.
-     * @param mixed  $content  The content to save. It will be serialized.
-     * @return string empty string if the operation is correct, otherwise it will return a message with the error.
+     * Util class. It adds a default extension to a filename only if the filename doesn't have extension.
+     * @param string $filename  The filename full or partial, example "file.jpg", "file", "/folder/file"
+     * @param string $extension The extension to add including the dot, example ".ext".<br>
+     *                          The default value is ".config.php"
+     * @return string
      */
-    public function saveData(string $filename, $content): string
+    public function addExtensionFile(string $filename,string $extension='.config.php'): string
     {
         $path = pathinfo($filename, PATHINFO_EXTENSION);
         if ($path === '') {
-            $filename .= '.php';
+            $filename .= $extension;
         }
+        return $filename;
+    }
+
+    /**
+     * It saves the information into a file. The content will be serialized.
+     * @param string $filename the filename (without extension) to where the value will be saved.
+     * @param mixed  $content  The content to save. It will be serialized.
+     * @param string $defaultExtension The default extension.
+     * @return string empty string if the operation is correct, otherwise it will return a message with the error.
+     */
+    public function saveData(string $filename, $content,$defaultExtension='.config.php'): string
+    {
+        $filename=$this->addExtensionFile($filename,$defaultExtension);
         $contentData = "<?php http_response_code(404); die(1); // eftec/CliOne configuration file ?>\n";
         $contentData .= json_encode($content, JSON_PRETTY_PRINT);
         try {

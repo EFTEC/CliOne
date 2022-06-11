@@ -455,6 +455,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.18 (2022-06-11)
+  * Added the method addExtensionFile()
 * 1.17 (2022-06-09)
   * fixed many problems with Linux (number of rows, autocomplete, etc.)
 * 1.16 (2022-03-25)

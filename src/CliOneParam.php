@@ -47,7 +47,7 @@ class CliOneParam
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
     public $inputType = 'string';
-    /** @var array the values to select. It is used for option and multiple but it is also used for auto-complete. */
+    /** @var array the values to select. It is used for option and multiple, but it is also used for auto-complete. */
     public $inputValue = [];
     /** @var mixed the current value of the parameter */
     public $value;
@@ -71,7 +71,7 @@ class CliOneParam
     /**
      * The constructor. It is used internally
      * @param ?string      $key                the key to identify the parameter. This key must be unique<br>
-     *                                         in the case of the key is repeated, then it could raise an error or it
+     *                                         in the case of the key is repeated, then it could raise an error, or it
      *                                         could be replaced, see method add()
      * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]
      * @param array|string $alias              (optional) The alias of the parameter. If null,empty or array empty then
@@ -100,7 +100,7 @@ class CliOneParam
 
     /**
      * It adds an argument but it is not evaluated.
-     * @param bool $override if false (default) and the argument exists, then it trigger an exception.<br>
+     * @param bool $override if false (default) and the argument exists, then it triggers an exception.<br>
      *                       if true and the argument exists, then it is replaced.
      * @return bool
      */
