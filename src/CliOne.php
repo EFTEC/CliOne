@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.18.1
+ * @version   1.19
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.18.1';
+    public const VERSION = '1.19';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -453,7 +453,7 @@ class CliOne
                 }
                 if ($parameter->currentAsDefault && $currentValue !== null) {
                     // if the value is not empty, and we set the current value as default, then we set it.
-                    if (strpos($parameter->inputType, 'option') === 0) {
+                    if ($parameter->inputType !== 'optionshort' && strpos($parameter->inputType, 'option') === 0) {
                         $parameter->default = $parameter->valueKey;
                     } else {
                         $parameter->default = $currentValue;
@@ -3963,6 +3963,10 @@ class CliOne
             $currentValueText . "\e[" . (floor($max * $prop) + $this->strlen($currentValueText)) . "D");
         $this->resetStack();
     }
+    /** it gets the size of the page (number of rows) to display in a table */
+    public function getPageSize(int $reduceRows=8):int {
+        return $this->rowSize -$reduceRows;
+    }
 
     /**
      * It shows an associative array.  This command is the end of a stack.
@@ -3970,10 +3974,23 @@ class CliOne
      * @param bool  $notop      if true then it will not show the top border
      * @param bool  $nosides    if true then it will not show the side borders
      * @param bool  $nobottom   if true then it will not show the bottom border
+     * @param int   $maxColumns The max number of columns to show.<br>
+     *                          If the table has 15 columns and maxColumns is 5, then only the
+     *                          first 5 columns will be displayed.
+     * @param int   $reduceRows The number of rows to reduce considering the size of the screen.<br>
+     *                          If the screen has 30 rows, then the table will use 30-3=27 rows<br>
+     *                          If set to >-99999, then it will display all rows.
+     * @param int   $curpage    The number of page (base 1) to display.
      * @return void
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showTable(array $assocArray, bool $notop = false, bool $nosides = false, bool $nobottom = false): void
+    public function showTable(array $assocArray,
+                              bool  $notop = false,
+                              bool  $nosides = false,
+                              bool  $nobottom = false,
+                              int  $maxColumns = 5,
+                              int      $reduceRows = 3,
+                              int $curpage=1): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -3994,9 +4011,16 @@ class CliOne
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         $columns = array_keys($assocArray[0]);
         $maxColumnSize = [];
+        foreach ($columns as $numCol => $column) {
+            if ($numCol >= $maxColumns) {
+                unset($columns[$numCol]);
+            }
+        }
+        // initialize the data
         foreach ($columns as $column) {
             $maxColumnSize[$column] = 0;
         }
+        // $maxColumnSize indicates the maximum size (according to the size of the content)
         foreach ($assocArray as $row) {
             foreach ($columns as $column) {
                 if ($this->strlen($row[$column]) > $maxColumnSize[$column]) {
@@ -4004,19 +4028,34 @@ class CliOne
                 }
             }
         }
+        // we also include the title of the column
+        foreach ($columns as $column) {
+            if ($maxColumnSize[$column] < strlen($column)) {
+                $maxColumnSize[$column] = strlen($column);
+            }
+        }
         $contentwCorrected = $contentw - count($columns) + 1;
         $totalCol = array_sum($maxColumnSize);
         foreach ($columns as $column) {
             $maxColumnSize[$column] = (int)round($maxColumnSize[$column] * $contentwCorrected / $totalCol);
+            if ($maxColumnSize[$column] <= 2) {
+                $maxColumnSize[$column] = 3;
+            }
         }
         if (array_sum($maxColumnSize) > $contentwCorrected) {
-            // we correct the precision error of round by removing 1 to the first column
-            $maxColumnSize[$columns[0]]--;
+            // we correct the precision error of round by removing 1 to the first column that is bigger than 3
+            foreach ($columns as $column) {
+                if ($maxColumnSize[$column] > 3) {
+                    $maxColumnSize[$column]--;
+                    break;
+                }
+            }
         }
         if (array_sum($maxColumnSize) < $contentwCorrected) {
             // we correct the precision error of round by removing 1 to the first column
             $maxColumnSize[$columns[0]]++;
         }
+        $curRow = 0;
         // top
         if ($ul && $notop === false) {
             $txt = $ul;
@@ -4024,6 +4063,7 @@ class CliOne
                 $txt .= str_repeat($um, $size) . $cutt;
             }
             $txt = $this->removechar($txt, $this->strlen($cutt, false)) . $ur;
+            $curRow++;
             $this->showLine($txt);
         }
         // title
@@ -4032,6 +4072,7 @@ class CliOne
             $txt .= $this->alignText($colName, $size, $alignTitle) . $mmv;
         }
         $txt = $this->removechar($txt, $this->strlen($mmv, false)) . $mr;
+        $curRow++;
         $this->showLine($txt);
         // botton title
         $txt = $cutl;
@@ -4039,32 +4080,49 @@ class CliOne
             $txt .= str_repeat($mm, $size) . $cutm;
         }
         $txt = rtrim($txt, $cutm) . $cutr;
+        $curRow++;
         $this->showLine($txt);
+        $pageSize=$this->getPageSize();
+        $rowSwift=$pageSize*($curpage-1);
+        $totalPage=ceil(count($assocArray)/$pageSize);
         // content
         foreach ($assocArray as $k => $line) {
+
             $txt = $ml;
-            foreach ($maxColumnSize as $colName => $size) {
-                $line[$colName] = $line[$colName] ?? '(null)';
-                $txt .= $this->alignText(
-                        $line[$colName],
-                        $size,
-                        is_numeric($line[$colName]) ? $alignContentNumber : $alignContentText) . $mmv;
+            $lineDisplay=@$assocArray[$k+$rowSwift];
+            if($lineDisplay) {
+                foreach ($maxColumnSize as $colName => $size) {
+                    if ($k > $this->rowSize - $curRow - $reduceRows - 3) {
+                        $lineDisplay[$colName] = '...';
+                    }
+                    $lineDisplay[$colName] = $lineDisplay[$colName] ?? '(null)';
+                    $txt .= $this->alignText(
+                            $lineDisplay[$colName],
+                            $size,
+                            is_numeric($lineDisplay[$colName]) ? $alignContentNumber : $alignContentText) . $mmv;
+                }
             }
             $txt = rtrim($txt, $mmv) . $mr;
-            if ($k === count($assocArray) - 1) {
-                $this->show($txt);
-            } else {
-                $this->showLine($txt);
+            if (!$lineDisplay || $k > $this->rowSize - $curRow - $reduceRows - 3 || $k === count($assocArray) - 1) {
+                // last line
+               // if($lineDisplay) {
+                    $this->show($txt);
+
+                break;
             }
+            $this->showLine($txt);
         }
         // botton table
         if (($dl || $dm) && $nobottom === false) {
             $this->showLine();
             $txt = $dl;
+            $count = "Page #$curpage of $totalPage";
             foreach ($maxColumnSize as $size) {
                 $txt .= str_repeat($dm, $size) . $cutd;
             }
             $txt = rtrim($txt, $cutd) . $dr;
+            //var_dump(strlen($count));
+            $txt=substr_replace($txt,$count,strlen($txt)-(strlen($count)*3)-6,strlen($count)*3);
             $this->show($txt);
         }
         $this->resetStack();

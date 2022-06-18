@@ -7,7 +7,7 @@
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="false"
-         bootstrap="tests/bootstrap.php">
+         bootstrap="test/bootstrap.php">
     <testsuites>
         <testsuite name="PdoOne Test Suite">
             <directory suffix="Test.php">./tests</directory>

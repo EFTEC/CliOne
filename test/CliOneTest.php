@@ -151,6 +151,27 @@ class CliOneTest extends TestCase
         $this->assertNotEmpty(CliOne::VERSION);
         $this->assertStringContainsString('vendor', CliOne::findVendorPath());
     }
+    public function testDefault() {
+        CliOne::testUserInput(null);
+        CliOne::testArguments([]);
+        CliOne::testUserInput([""]);
+        $t = new CliOne();
+        $t->createParam('t1',[],'none')->setCurrentAsDefault()->setDescription('','select value:')->setInput(true,'option',['a'=>1,'b'=>2,'c'=>3])->add();
+        $t->getParameter('t1')->setValue(null,'b');
+        $v=$t->evalParam('t1',true);
+        $this->assertEquals(2,$v->value);
+        $this->assertEquals('b',$v->valueKey);
+
+        CliOne::testUserInput(null);
+        CliOne::testArguments([]);
+        CliOne::testUserInput([""]);
+        $t = new CliOne();
+        $t->createParam('t1',[],'none')->setCurrentAsDefault()->setDescription('','select value:')->setInput(true,'optionshort',['a','b','c'])->add();
+        $t->getParameter('t1')->setValue('b');
+        $v=$t->evalParam('t1',true);
+        $this->assertEquals('b',$v->value);
+        //$this->assertEquals('b',$v->valueKey);
+    }
 
     public function testArgNone()
     {
@@ -176,7 +197,7 @@ class CliOneTest extends TestCase
         $this->assertEquals('', $t->saveData('file1', $t->getArrayParams()));
         $t->getParameter('test1')->value = 'xxxxxxx';
         $rd = $t->readData('file2');
-        $this->assertEquals([false, 'Unable to read file file2.php'], $rd);
+        $this->assertEquals([false, 'Unable to read file file2.config.php'], $rd);
         $rd = $t->readData('file1');
         $this->assertEquals([true, ['test1' => 'hello', 'test2' => null]], $rd);
         $t->setArrayParam($rd[1]);

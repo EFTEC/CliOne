@@ -210,16 +210,38 @@ There are more operations available but the basic is there.
   - [Definitions](#definitions)
   - [Changelog](#changelog)
 
+## Flow
+
+* (optional) you can set the current value using the method setParam()
+* If the type of parameter is not "onlyinput" and "none", then it reads the parameter
+  * Example: php program.php -param1 value --param2 -param3="hello world" parampositional
+* If the parameter is found, then it is returned, **end of the flow**.
+* If the parameter is not found then
+  * If setCurrentAsDefault() is set, and the current value is not null, then the default value is the current value.
+  * Otherwise, the default value is the value set using the method setDefault(). If none, then it uses null.
+* if input is true setInput(true) then it asks to user-input the value
+  * if the user doesn't fill the information, then it returns the default value (if any), **end of the flow**
+  * if the user fills the information, but it is incorrect, then it asks again and again.
+  * if the user fills the right information, then it returns this value, **end of the flow**
+* if input is true setInput(false) then
+  * Note: we were unable to read the values of the argument, and we don't want to read from user input. 
+  * it returns the default value, and it could raise an error, **end of the flow**
+
+Note:
+
+* isRequired() if the value is missing, then it shows an error.
+* setAllowEmpty() if the value is empty (not missing), then it allows to enter an empty value
 
 
-## Types of arguments
+
+## Input as arguments
 
 ```shell
 php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valueflag2 subcommandlatest
 ```
 
 The system allows reading multiple types of arguments
- 
+
 * **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
 * **command**: it is similar to **first,** but it does not compare the name of the argument.
   * cliprogram.php com -flag, first returns "com" if the argument is named first.  command returns "com" regardless of its name.
@@ -256,26 +278,102 @@ Now, what if you want to create multiples alias for the same parameter.
 $cli->createParam('h','flag',['help'])->add();  // it adds an alias longflag called "help"
 ```
 
-## Flow
+## Input interactive
 
-* (optional) you can set the current value using the method setParam()
-* If the type of parameter is not "onlyinput" and "none", then it reads the parameter
-  * Example: php program.php -param1 value --param2 -param3="hello world" parampositional
-* If the parameter is found, then it is returned, **end of the flow**.
-* If the parameter is not found then
-  * If setCurrentAsDefault() is set, and the current value is not null, then the default value is the current value.
-  * Otherwise, the default value is the value set using the method setDefault(). If none, then it uses null.
-* if input is true setInput(true) then it asks to user-input the value
-  * if the user doesn't fill the information, then it returns the default value (if any), **end of the flow**
-  * if the user fills the information, but it is incorrect, then it asks again and again.
-  * if the user fills the right information, then it returns this value, **end of the flow**
-* if input is true setInput(false) then
-  * Note: we were unable to read the values of the argument, and we don't want to read from user input. 
-  * it returns the default value, and it could raise an error, **end of the flow**
+There are several configuration to set an input interactively.
 
-Note:
-* isRequired() if the value is missing, then it shows an error.
-* setAllowEmpty() if the value is empty (not missing), then it allows to enter an empty value.
+By default, every parameter is read as argument. If the value is read as argument, then it is not asked interactively.
+
+However, if the parameter is of the type "**none**" or "**onlyinput**", then they are only obtained by user input (interactively).
+
+Example:
+
+```php
+$cli->$t->createParam('paramname',[],'none');
+```
+
+### User input (interactive)
+
+With the method setInput() we set that this parameter could also be read interactively.
+
+```php
+$cli->$t->createParam('paramname',[],'none')->setInput();
+```
+
+Example, let's say the next example:
+
+```php
+$cli=new CliOne();
+$cli->createParam('p1',[],'none')
+    ->setInput()
+    ->add(); // we create the param
+$cli->evalParam('p1'); // and we evaluated the parameter
+```
+
+![](docs/basic1.jpg)
+
+Now, this input accepts any kind of text. But there is many  different kind of user input.
+
+| type        | description                                                  | argument                            | example                                                      |
+| ----------- | ------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------ |
+| number      | It allows any kind of number                                 |                                     | setInput(true,"number")                                      |
+| range       | it only allow number between a range of values               | [1,20]                              | setInput(true,"range",[1,10])                                |
+| string      | It allows any type of value                                  | (used for auto complete)            | setInput(true,"string")                                      |
+| password    | It allows any type of value but the  default value is never displayed | setInput(true,"password")           |                                                              |
+| multiple    | it allows to check one or multiple values using 1 column     | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple",['key1'=>'value1','key2'=>'value2']) |
+| multiple2   | it allows to check one or multiple values using 2 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple2",['key1'=>'value1','key2'=>'value2']) |
+| multiple3   | it allows to check one or multiple values using 3 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple3",['key1'=>'value1','key2'=>'value2']) |
+| multiple4   | it allows to check one or multiple values using 4 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
+| option      | it allows to select a value from a list using 1 column       | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option",['key1'=>'value1','key2'=>'value2'])  |
+| option2     | it allows to select a value from a list using 2 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option2",['key1'=>'value1','key2'=>'value2']) |
+| option3     | it allows to select a value from a list using 3 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option3",['key1'=>'value1','key2'=>'value2']) |
+| option4     | it allows to select a value from a list using 4 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option4",['key1'=>'value1','key2'=>'value2']) |
+| optionshort | It allows a selection of values                              | ["yes","no"]                        | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
+
+Option returns a value and a value-key.  Value is the content visible. And value-key, is the content selected by the user.
+
+**Example Option:**
+
+```php
+$cli=new CliOne();
+$cli->createParam('p1',[],'none')
+    ->setInput(true,'option2',['key1'=>'value1','key2'=>'value2','key3'=>'value3','key4'=>'value4'])
+    ->add(); // we create the param
+$cli->evalParam('p1');
+$cli->showLine("value :".$cli->getValue('p1'));
+$cli->showLine("valuekey :".$cli->getValueKey('p1'));
+```
+
+![](docs/basic2.jpg)
+
+**Example Multiple:**
+
+```php
+$cli=new CliOne();
+$cli->createParam('p1',[],'none')
+    ->setInput(true,'option2',['key1'=>'value1','key2'=>'value2','key3'=>'value3','key4'=>'value4'])
+    ->add(); 
+$cli->evalParam('p1'); // value returns an associative array with the values selected, example: ["value1","value3"]
+```
+
+![](docs/basic3.jpg)
+
+
+
+### Customize user input
+
+It is possible to customize the input by changing the help description, changing the question, showing an example or showing a value to the argument
+
+```php
+$cli=new CliOne();
+$cli->createParam('p1',[],'none')
+    ->setInput()
+    ->setDescription('it is for help','what is the value of p1?',['help line1','help line 2'],'the argument is called p1')
+    ->add(); 
+$cli->evalParam('p1'); 
+```
+
+
 
 
 
@@ -455,6 +553,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.19   (2022-06-18)
+  * Update the creation of table 
 * 1.18.1 (2022-06-17)
   * Fixed a bug when we use setCurrentAsDefault() but the type of value is an option (we set the default the valuekey instead of the value) 
 * 1.18 (2022-06-11)

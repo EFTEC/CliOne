@@ -484,6 +484,11 @@ class CliOneParam
 
     /**
      * We set a new value or value-key<br>
+     * <b>Example:/<b>
+     * <pre>
+     * $arg->setValue('hello');
+     * $arg->setValue(null,'key1'); // value=1 if arg is option with the values ['key1'=>1,'key2'=>2]
+     * </pre>
      * The $origin of this parameter is marked as "set".
      * @param mixed|null $newValue    it sets a new value.<br>
      *                                If null then it will use $newValueKey to set the value (or null if not found)

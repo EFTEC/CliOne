@@ -21,11 +21,14 @@ include __DIR__.'/../src/CliOneParam.php';
 
 $cli=new CliOne(); // we create an instance
 $values=[];
-$values[]=['col1'=>'value1','col2'=>'value2','col3'=>'value2'];
-$values[]=['col1'=>'value12222222222222','col2'=>'value2','col3'=>'value2'];
-$values[]=['col1'=>'value1','col2'=>'value2','col3'=>3232];
-$values[]=['col1'=>'value1','col2'=>'value2','col3'=>'544554'];
+for($i=1;$i<200;$i++) {
+    $values[] = ['col1' => 'value'.$i, 'col2' => 'value'.$i, 'col3' => "values 1234 #".$i];
+}
 
 $cli->showLine("<yellow>simple table :</yellow>");
 $cli->setStyle()->setColor(['bred','yellow','bold'])->showTable($values);
 $cli->showTable($values);
+$cli->showTable($values,false,false,false,5,3,2);
+$cli->showTable($values,false,false,false,5,3,3);
+$cli->showTable($values,false,false,false,5,3,9);
+$cli->showTable($values,false,false,false,5,3,10);
