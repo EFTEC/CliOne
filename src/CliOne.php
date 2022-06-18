@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.18
+ * @version   1.18.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.18';
+    public const VERSION = '1.18.1';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -123,7 +123,6 @@ class CliOne
             }
             $this->noColor = true;
         }
-
         $this->colSize = $this->calculateColSize();
         $this->rowSize = $this->calculateRowSize();
         $t = floor($this->colSize / 6);
@@ -453,7 +452,12 @@ class CliOne
                     continue;
                 }
                 if ($parameter->currentAsDefault && $currentValue !== null) {
-                    $parameter->default = $currentValue;
+                    // if the value is not empty, and we set the current value as default, then we set it.
+                    if (strpos($parameter->inputType, 'option') === 0) {
+                        $parameter->default = $parameter->valueKey;
+                    } else {
+                        $parameter->default = $currentValue;
+                    }
                 }
                 if ($def === false && $currentValue !== null && $forceInput === false) {
                     $def = true;
@@ -3082,15 +3086,15 @@ class CliOne
 
     /**
      * It reads information from a file. The information will be de-serialized.
-     * @param string $filename the filename with or without extension.
+     * @param string $filename         the filename with or without extension.
      * @param string $defaultExtension the default extension.
      * @return array it returns an array of the type [bool,mixed]<br>
-     *                         In error, it returns [false,"error message"]<br>
-     *                         In success, it returns [true,values de-serialized]<br>
+     *                                 In error, it returns [false,"error message"]<br>
+     *                                 In success, it returns [true,values de-serialized]<br>
      */
-    public function readData(string $filename,$defaultExtension='.config.php'): ?array
+    public function readData(string $filename, $defaultExtension = '.config.php'): ?array
     {
-        $filename=$this->addExtensionFile($filename,$defaultExtension);
+        $filename = $this->addExtensionFile($filename, $defaultExtension);
         try {
             $content = @file_get_contents($filename);
             if ($content === false) {
@@ -3185,7 +3189,7 @@ class CliOne
      *                          The default value is ".config.php"
      * @return string
      */
-    public function addExtensionFile(string $filename,string $extension='.config.php'): string
+    public function addExtensionFile(string $filename, string $extension = '.config.php'): string
     {
         $path = pathinfo($filename, PATHINFO_EXTENSION);
         if ($path === '') {
@@ -3196,14 +3200,14 @@ class CliOne
 
     /**
      * It saves the information into a file. The content will be serialized.
-     * @param string $filename the filename (without extension) to where the value will be saved.
-     * @param mixed  $content  The content to save. It will be serialized.
+     * @param string $filename         the filename (without extension) to where the value will be saved.
+     * @param mixed  $content          The content to save. It will be serialized.
      * @param string $defaultExtension The default extension.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public function saveData(string $filename, $content,$defaultExtension='.config.php'): string
+    public function saveData(string $filename, $content, $defaultExtension = '.config.php'): string
     {
-        $filename=$this->addExtensionFile($filename,$defaultExtension);
+        $filename = $this->addExtensionFile($filename, $defaultExtension);
         $contentData = "<?php http_response_code(404); die(1); // eftec/CliOne configuration file ?>\n";
         $contentData .= json_encode($content, JSON_PRETTY_PRINT);
         try {
@@ -3323,10 +3327,10 @@ class CliOne
     {
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
-                if(!$isValueKey) {
+                if (!$isValueKey) {
                     $parameter->setValue($value);
-                    } else {
-                    $parameter->setValue(null,$value);
+                } else {
+                    $parameter->setValue(null, $value);
                 }
                 return $parameter;
             }
@@ -4662,11 +4666,11 @@ class CliOne
      */
     protected function readline(string $content, CliOneParam $parameter)
     {
-        if(PHP_OS_FAMILY === 'Windows') {
+        if (PHP_OS_FAMILY === 'Windows') {
             $this->show($content);
         } else {
             $this->show("\0337$content\0338");    // \0337 save point \0338 return save point.
-            $largo=$this->strlen($content);
+            $largo = $this->strlen($content);
         }
         // globals is used for phpunit.
         if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
@@ -4707,13 +4711,13 @@ class CliOne
             $prevhistory = $this->listHistory();
             $this->setHistory($parameter->getHistory());
         }
-        if(PHP_OS_FAMILY === 'Windows') {
+        if (PHP_OS_FAMILY === 'Windows') {
             $r = readline();
         } else {
             /** @noinspection PhpUndefinedVariableInspection */
             $r = readline(str_repeat(' ', $largo));
         }
-        $r=$r===false?false:trim($r);
+        $r = $r === false ? false : trim($r);
         if (count($parameter->getHistory()) > 0) {
             // if we use a parameter history, then we return to the previous history
             /** @noinspection PhpUndefinedVariableInspection */

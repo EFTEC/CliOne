@@ -455,6 +455,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.18.1 (2022-06-17)
+  * Fixed a bug when we use setCurrentAsDefault() but the type of value is an option (we set the default the valuekey instead of the value) 
 * 1.18 (2022-06-11)
   * Added the method addExtensionFile()
 * 1.17 (2022-06-09)
