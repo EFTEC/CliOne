@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.19
+ * @version   1.20
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.19';
+    public const VERSION = '1.20';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -783,7 +783,7 @@ class CliOne
      * @param string  $bit0 the invisible character
      * @return array
      */
-    public function makeBigWords(string $word, string $font, bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
+    public function makeBigWords(string $word, string $font='atr', bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
     {
         $bf = $this->shadow('simple', 'full');
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
@@ -3578,12 +3578,13 @@ class CliOne
     }
 
     /**
-     * @param string|string[] $lines
-     * @param string|string[] $titles
-     * @return void
+     * It shows a message box consisting of two columns.
+     * @param string|string[] $lines (right side)
+     * @param string|string[] $titles (left sie)
+     * @param bool            $wrapLines if true, then $lines could be wrapped (if the lines are too long)
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showMessageBox($lines, $titles = []): void
+    public function showMessageBox($lines, $titles = [],$wrapLines=false): void
     {
         $this->initstack();
         $patternTitle = $this->patternTitleStack ?? '{value}';
@@ -3593,6 +3594,9 @@ class CliOne
         [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
         // message box
         [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
+
+
+
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         if (is_string($lines)) {
             // transform into array
@@ -3602,6 +3606,18 @@ class CliOne
             // transform into array
             $titles = [$titles];
         }
+
+        $maxTitleL = 0;
+        // max title width
+        foreach ($titles as $title) {
+            $maxTitleL = ($this->strlen($title) > $maxTitleL) ? $this->strlen($title) : $maxTitleL;
+        }
+
+        if($wrapLines) {
+            //var_dump($contentw - $maxTitleL - 3);
+            $lines=$this->wrapLine($lines,$contentw - $maxTitleL - 1);
+
+        }
         if (count($titles) > count($lines)) {
             $lines = $this->alignLinesVertically($lines, count($titles));
         }
@@ -3609,11 +3625,7 @@ class CliOne
             // align to the center by adding the missing lines at the top and bottom.
             $titles = $this->alignLinesVertically($titles, count($lines));
         }
-        $maxTitleL = 0;
-        // max title width
-        foreach ($titles as $title) {
-            $maxTitleL = ($this->strlen($title) > $maxTitleL) ? $this->strlen($title) : $maxTitleL;
-        }
+
         $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
         foreach ($lines as $k => $line) {
             $ttitle = str_replace(['{value}'],
@@ -3770,7 +3782,7 @@ class CliOne
                 $col1[] = $this->colorText("<green>$key</green>");
                 $col2[] = $this->colorText("$parameter->description <bold><cyan>[$v]</cyan></bold>");
                 if ($parameter->inputValue !== null) {
-                    $assoc = !isset($parameter->inputValue[0]);
+                    $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
                     if (!$assoc) {
                         $options = implode(',', $parameter->inputValue);
                         foreach ($parameter->getHelpSyntax() as $help) {
@@ -4105,8 +4117,8 @@ class CliOne
             $txt = rtrim($txt, $mmv) . $mr;
             if (!$lineDisplay || $k > $this->rowSize - $curRow - $reduceRows - 3 || $k === count($assocArray) - 1) {
                 // last line
-               // if($lineDisplay) {
-                    $this->show($txt);
+                // if($lineDisplay) {
+                $this->show($txt);
 
                 break;
             }
@@ -4606,7 +4618,7 @@ class CliOne
             $kvalues[] = $k;
             $ivalues[] = $v;
         }
-        $assoc = !isset($parameter->inputValue[0]);
+        $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1); //!isset($parameter->inputValue[0]);
         $chalf = (int)ceil(count($ivalues) / $columns);
         $colW = (int)ceil($this->colSize / $columns);
         $maxL = 0;
@@ -4740,7 +4752,7 @@ class CliOne
             return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
         }
         if (is_array($parameter->inputValue) && count($parameter->inputValue) > 0) {
-            $assoc = !isset($parameter->inputValue[0]);
+            $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
             if ($assoc) {
                 if ($parameter->inputType === 'optionshort') {
                     self::$autocomplete = $parameter->inputValue;
@@ -5040,7 +5052,7 @@ class CliOne
                     case 'option2':
                     case 'option3':
                     case 'option4':
-                        $assoc = !isset($parameter->inputValue[0]);
+                        $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
                         if (!$assoc) {
                             if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                                 $parameter->value = $this->emptyValue . ($parameter->value ?? '');

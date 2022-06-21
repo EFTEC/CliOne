@@ -553,6 +553,9 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.20 (22-06-21)
+  * showMessageBox() added wrap lines
+  * updated the way to find if an array is associative or not.
 * 1.19   (2022-06-18)
   * Update the creation of table 
 * 1.18.1 (2022-06-17)
