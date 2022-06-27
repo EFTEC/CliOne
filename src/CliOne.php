@@ -19,7 +19,7 @@ use RuntimeException;
  */
 class CliOne
 {
-    public const VERSION = '1.20';
+    public const VERSION = '1.21';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -3580,7 +3580,7 @@ class CliOne
     /**
      * It shows a message box consisting of two columns.
      * @param string|string[] $lines (right side)
-     * @param string|string[] $titles (left sie)
+     * @param string|string[] $titles (left side)
      * @param bool            $wrapLines if true, then $lines could be wrapped (if the lines are too long)
      * @noinspection PhpUnusedLocalVariableInspection
      */
@@ -3595,23 +3595,31 @@ class CliOne
         // message box
         [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
 
-
-
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         if (is_string($lines)) {
             // transform into array
-            $lines = [$lines];
+            if(strpos($lines,"\n")!==false) {
+                $lines=explode("\n",$lines);
+            } else {
+                $lines = [$lines];
+            }
         }
         if (is_string($titles)) {
             // transform into array
-            $titles = [$titles];
+            if(strpos($titles,"\n")!==false) {
+                $titles=explode("\n",$titles);
+            } else {
+                $titles = [$titles];
+            }
         }
 
         $maxTitleL = 0;
         // max title width
-        foreach ($titles as $title) {
+        foreach ($titles as &$title) {
+            $title=$this->colorText($title);
             $maxTitleL = ($this->strlen($title) > $maxTitleL) ? $this->strlen($title) : $maxTitleL;
         }
+        unset($title);
 
         if($wrapLines) {
             //var_dump($contentw - $maxTitleL - 3);
