@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.22
+ * @version   1.22.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.22';
+    public const VERSION = '1.22.1';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -138,6 +138,7 @@ class CliOne
             foreach (CliOne::$autocomplete as $cmd) {
                 if (stripos($cmd, $input) === 0) {
                     $matches[] = $cmd;
+
                 }
             }
             return $matches;

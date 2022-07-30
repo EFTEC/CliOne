@@ -445,10 +445,10 @@ class CliOneParam
     {
         $this->input = $input;
         if($inputType==='wide-option') {
-            $inputValue=Clione::instance()->getColSize()>80?'option2':'option';
+            $inputType=Clione::instance()->getColSize()>80?'option2':'option';
         }
         if($inputType==='wide-multiple') {
-            $inputValue=Clione::instance()->getColSize()>80?'multiple2':'multiple';
+            $inputType=Clione::instance()->getColSize()>80?'multiple2':'multiple';
         }
         $this->inputType = $inputType;
         $this->inputValue = $inputValue;
