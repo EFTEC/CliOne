@@ -1,6 +1,8 @@
 <?php
 
 namespace eftec\CliOne;
+
+
 /**
  * CliOne - A simple creator of command line argument program.
  *
@@ -8,7 +10,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.14
+ * @version   1.15
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -47,7 +49,7 @@ class CliOneParam
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
     public $inputType = 'string';
-    /** @var array the values to select. It is used for option and multiple, but it is also used for auto-complete. */
+    /** @var array|null the values to select. It is used for option and multiple, but it is also used for auto-complete. */
     public $inputValue = [];
     /** @var mixed the current value of the parameter */
     public $value;
@@ -421,7 +423,17 @@ class CliOneParam
      *
      * @param bool   $input      if true, then the value could be input via user. If false, the value could only be
      *                           entered as argument.
-     * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
+     * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort','wide-option','wide-multiple'][$i]
+     *                           <b>number:</b> the input is a number<br>
+     *                           <b>range:</b> the input is between a ranger of number<br>
+     *                           <b>string:</b> the input is a string<br>
+     *                           <b>password:</b> the input is a string<br>
+     *                           <b>multiple*:</b> the input is a multiple selector (*) indicates the number of columns<br>
+     *                           <b>option*:</b> the input allows to select between multiple options (* = columns)<br>
+     *                           <b>optionshort:</b> the input allows to select between multiple options in a single line<br>
+     *                           <b>wide-option:</b> if the screen has 80 columns or more, it uses option2, otherwise option<br>
+     *                           <b>wide-multiple:</b> if the screen has 80 columns or more, it uses multiple2, otherwise multiple<br>
+     *
      * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
      *                           This value allows string, arrays and associative arrays<br>
      *                           The values indicated here are used for input and validation<br>
@@ -432,6 +444,12 @@ class CliOneParam
     public function setInput(bool $input = true, string $inputType = 'string', $inputValue = null, array $history = []): CliOneParam
     {
         $this->input = $input;
+        if($inputType==='wide-option') {
+            $inputValue=Clione::instance()->getColSize()>80?'option2':'option';
+        }
+        if($inputType==='wide-multiple') {
+            $inputValue=Clione::instance()->getColSize()>80?'multiple2':'multiple';
+        }
         $this->inputType = $inputType;
         $this->inputValue = $inputValue;
         $this->history = $history;
@@ -515,7 +533,10 @@ class CliOneParam
                 $this->valueKey = str_replace(Clione::instance()->emptyValue, '', $this->value);
                 return $this;
             }
-            $k = array_search($this->value, $this->inputValue, true);
+            // $k = array_search($this->value, $this->inputValue, true);
+
+            $k = array_search(strtolower($this->value), array_map('strtolower', $this->inputValue),true);
+
             $this->valueKey = $k === false ? null : $k;
         } else {
             $this->valueKey = $newValueKey;

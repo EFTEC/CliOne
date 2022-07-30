@@ -197,8 +197,11 @@ There are more operations available but the basic is there.
   - [Features](#features)
   - [Getting started](#getting-started)
   - [Usage](#usage)
-  - [Types of arguments](#types-of-arguments)
   - [Flow](#flow)
+  - [Input as arguments](#input-as-arguments)
+  - [Input interactive](#input-interactive)
+    - [User input (interactive)](#user-input-interactive)
+    - [Customize user input](#customize-user-input)
   - [Examples](#examples)
     - [Example using arguments](#example-using-arguments)
     - [Example using user input](#example-using-user-input)
@@ -208,6 +211,7 @@ There are more operations available but the basic is there.
   - [Types of user input](#types-of-user-input)
   - [Types of colors](#types-of-colors)
   - [Definitions](#definitions)
+  - [Compatibility](#compatibility)
   - [Changelog](#changelog)
 
 ## Flow
@@ -314,21 +318,21 @@ $cli->evalParam('p1'); // and we evaluated the parameter
 
 Now, this input accepts any kind of text. But there is many  different kind of user input.
 
-| type        | description                                                  | argument                            | example                                                      |
-| ----------- | ------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------ |
-| number      | It allows any kind of number                                 |                                     | setInput(true,"number")                                      |
-| range       | it only allow number between a range of values               | [1,20]                              | setInput(true,"range",[1,10])                                |
-| string      | It allows any type of value                                  | (used for auto complete)            | setInput(true,"string")                                      |
-| password    | It allows any type of value but the  default value is never displayed | setInput(true,"password")           |                                                              |
-| multiple    | it allows to check one or multiple values using 1 column     | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple",['key1'=>'value1','key2'=>'value2']) |
-| multiple2   | it allows to check one or multiple values using 2 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple2",['key1'=>'value1','key2'=>'value2']) |
-| multiple3   | it allows to check one or multiple values using 3 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple3",['key1'=>'value1','key2'=>'value2']) |
-| multiple4   | it allows to check one or multiple values using 4 columns    | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
-| option      | it allows to select a value from a list using 1 column       | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option",['key1'=>'value1','key2'=>'value2'])  |
-| option2     | it allows to select a value from a list using 2 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option2",['key1'=>'value1','key2'=>'value2']) |
-| option3     | it allows to select a value from a list using 3 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option3",['key1'=>'value1','key2'=>'value2']) |
-| option4     | it allows to select a value from a list using 4 columns      | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option4",['key1'=>'value1','key2'=>'value2']) |
-| optionshort | It allows a selection of values                              | ["yes","no"]                        | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
+| type        | description                                                           | argument                            | example                                                        |
+|-------------|-----------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------|
+| number      | It allows any kind of number                                          |                                     | setInput(true,"number")                                        |
+| range       | it only allow number between a range of values                        | [1,20]                              | setInput(true,"range",[1,10])                                  |
+| string      | It allows any type of value                                           | (used for auto complete)            | setInput(true,"string")                                        |
+| password    | It allows any type of value but the  default value is never displayed | setInput(true,"password")           |                                                                |
+| multiple    | it allows to check one or multiple values using 1 column              | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple",['key1'=>'value1','key2'=>'value2'])  |
+| multiple2   | it allows to check one or multiple values using 2 columns             | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple2",['key1'=>'value1','key2'=>'value2']) |
+| multiple3   | it allows to check one or multiple values using 3 columns             | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple3",['key1'=>'value1','key2'=>'value2']) |
+| multiple4   | it allows to check one or multiple values using 4 columns             | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
+| option      | it allows to select a value from a list using 1 column                | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option",['key1'=>'value1','key2'=>'value2'])    |
+| option2     | it allows to select a value from a list using 2 columns               | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option2",['key1'=>'value1','key2'=>'value2'])   |
+| option3     | it allows to select a value from a list using 3 columns               | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option3",['key1'=>'value1','key2'=>'value2'])   |
+| option4     | it allows to select a value from a list using 4 columns               | ['key1'=>'value1','key2'=>'value2'] | setInput(true,"option4",['key1'=>'value1','key2'=>'value2'])   |
+| optionshort | It allows a selection of values                                       | ["yes","no"]                        | setInput(true,"multiple4",['key1'=>'value1','key2'=>'value2']) |
 
 Option returns a value and a value-key.  Value is the content visible. And value-key, is the content selected by the user.
 
@@ -372,10 +376,6 @@ $cli->createParam('p1',[],'none')
     ->add(); 
 $cli->evalParam('p1'); 
 ```
-
-
-
-
 
 ## Examples
 
@@ -553,6 +553,9 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.22 (2022-07-30)
+  * setInput() added format wide to use 1 column (if the screen is equal or less than 80 columns) or two columns
+  * "option" ignore cases.
 * 1.21 (2022-06-27)
   * showMessageBox() now support colors and line carriage. 
 * 1.20 (2022-06-21)

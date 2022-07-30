@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.20
+ * @version   1.22
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.21';
+    public const VERSION = '1.22';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -509,7 +509,6 @@ class CliOne
     {
         switch ($this->errorType) {
             case 'show':
-                //var_dump(@debug_backtrace()[1]['file'].'::'.@debug_backtrace()[1]['line']);
                 $this->showCheck('ERROR', 'red', $msg, 'stderr');
                 break;
             case 'throw':
@@ -591,7 +590,7 @@ class CliOne
     {
         $array = [];
         foreach ($this->parameters as $parameter) {
-            if ($parameter->type !== 'none' && !in_array($parameter->key, $excludeKeys, true)) {
+            if ($parameter->type !== 'none' && !$this->in_array_i($parameter->key, $excludeKeys, true)) {
                 $array[$parameter->key] = $parameter->value;
             }
         }
@@ -763,6 +762,12 @@ class CliOne
             $this->showLine("  <yellow>Can be called as argument?: </yellow>" .
                 (($parameter->type !== 'onlyinput' && $parameter->type !== 'none') ? 'yes' : 'no'));
             $this->showLine("  <yellow>Input Type: </yellow> " . $parameter->inputType);
+            if($parameter->inputValue!==null && count($parameter->inputValue)>0) {
+                $this->showLine("  Values allowed:");
+                foreach ($parameter->inputValue as $k=>$v) {
+                    $this->showLine("  <yellow>$k:</yellow> $v");
+                }
+            }
         }
         if ($parameter->description) {
             $this->showLine("  <yellow>Description: </yellow>" . $parameter->description);
@@ -3252,7 +3257,7 @@ class CliOne
     {
         foreach ($array as $k => $v) {
             $found = false;
-            if (!in_array($k, $excludeKeys, true) && ($includeKeys === null || in_array($k, $includeKeys, true))) {
+            if (!$this->in_array_i($k, $excludeKeys, true) && ($includeKeys === null || $this->in_array_i($k, $includeKeys, true))) {
                 foreach ($this->parameters as $parameter) {
                     if ($parameter->key === $k) {
                         $parameter->value = $v;
@@ -3622,7 +3627,6 @@ class CliOne
         unset($title);
 
         if($wrapLines) {
-            //var_dump($contentw - $maxTitleL - 3);
             $lines=$this->wrapLine($lines,$contentw - $maxTitleL - 1);
 
         }
@@ -3949,8 +3953,6 @@ class CliOne
             if ($position0 !== $textLen - 1) {
                 // wrap the last line
                 $result[] = ($firstElem ? '' : $initial) . trim(substr($text, $position0));
-                //var_dump($result);
-                //var_dump($width);
             }
         }
         return $result;
@@ -4141,7 +4143,6 @@ class CliOne
                 $txt .= str_repeat($dm, $size) . $cutd;
             }
             $txt = rtrim($txt, $cutd) . $dr;
-            //var_dump(strlen($count));
             $txt=substr_replace($txt,$count,strlen($txt)-(strlen($count)*3)-6,strlen($count)*3);
             $this->show($txt);
         }
@@ -5061,7 +5062,9 @@ class CliOne
                     case 'option3':
                     case 'option4':
                         $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
+
                         if (!$assoc) {
+
                             if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                                 $parameter->value = $this->emptyValue . ($parameter->value ?? '');
                                 $this->refreshParamValueKey($parameter);
@@ -5072,9 +5075,11 @@ class CliOne
                                 $parameter->valueKey = null;
                                 $parameter->value = null;
                             }
-                        } else if (array_key_exists($parameter->value, $parameter->inputValue)) {
-                            $parameter->valueKey = $parameter->value;
-                            $parameter->value = $parameter->inputValue[$parameter->value] ?? null;
+                        } else if ($this->array_key_exists_i($parameter->value, $parameter->inputValue)) {
+
+                            $parameter->valueKey = $this->get_array_key_i( $parameter->value, $parameter->inputValue);
+                            $lowerArray=array_change_key_case($parameter->inputValue,CASE_LOWER);
+                            $parameter->value = $lowerArray[strtolower($parameter->value)] ?? null;
                         } else if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->valueKey = $parameter->value;
                             $parameter->value = $this->emptyValue . $parameter->value;
@@ -5123,7 +5128,7 @@ class CliOne
                             $ok = true;
                             break;
                         }
-                        $ok = $parameter->value === '' || in_array($valueTmp, $parameter->inputValue, true);
+                        $ok = $parameter->value === '' || $this->in_array_i($valueTmp, $parameter->inputValue, true);
                         $valueTmp = str_replace($this->emptyValue, '', $valueTmp);
                         $cause = "it must be a valid value [$valueTmp]";
                         if (!$ok) {
@@ -5141,14 +5146,14 @@ class CliOne
                     }
                     $ok = ($parameter->value === '' && $parameter->allowEmpty) || $parameter->valueKey !== null;
                     $vtmp = is_array($parameter->value) ? reset($parameter->value) : $parameter->value;
-                    $cause = "the option does not exist [$vtmp]";
+                    $cause = "this option does not exist [$vtmp]";
                     break;
                 case 'optionshort':
                     if ($parameter->value === $this->emptyValue) {
                         $parameter->valueKey = $parameter->value;
                         $parameter->value = '';
                     }
-                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || in_array($parameter->value, $parameter->inputValue, true);
+                    $ok = ($parameter->value === '' && $parameter->allowEmpty) || $this->in_array_i($parameter->value, $parameter->inputValue, true);
                     if ($ok === false) {
                         $uniques = array_map(static function ($v) {
                             return substr($v, 0, 1);
@@ -5171,7 +5176,7 @@ class CliOne
                     $cause = 'unknown $parameter->inputType inputtype';
             }
             if (!$ok) {
-                $this->showWarning("The value $parameter->key is not correct, $cause");
+                $this->showWarning("The value $parameter->key is not valid, $cause");
             }
             if ($askInput === false) {
                 break;
@@ -5179,6 +5184,33 @@ class CliOne
         }
         $this->errorType = 'show';
         return $ok;
+    }
+    private function in_array_i($needle, array $haystack, bool $strict = false):bool {
+        return in_array(strtolower($needle), array_map('strtolower', $haystack),$strict);
+    }
+
+    /**
+     * It is used for array that ignores clases. If we found the needle "Ab" in the array ["AB"=>1,...]
+     * Then we return the original key "AB"
+     * @param       $needle
+     * @param array $haystack
+     * @return int|string
+     */
+    private function get_array_key_i($needle, array $haystack) {
+        $needle=strtolower($needle);
+        foreach($haystack as $k=>$v) {
+            if(strtolower($k)===$needle) {
+                return $k;
+            }
+        }
+        return $needle;
+    }
+    private function array_key_exists_i($key, $array):bool {
+        if(!is_array($array)) {
+            return false;
+        }
+        $lowerArray=array_change_key_case($array,CASE_LOWER);
+        return array_key_exists(strtolower($key),$lowerArray);
     }
 
     /**
