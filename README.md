@@ -553,6 +553,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.22.1
+  * fix a small typo in the code.
 * 1.22 (2022-07-30)
   * setInput() added format wide to use 1 column (if the screen is equal or less than 80 columns) or two columns
   * "option" ignore cases.
