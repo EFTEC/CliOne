@@ -4,7 +4,7 @@ This library helps to create command line (CLI) operator for PHP in Windows, Mac
 
 [![Packagist](https://img.shields.io/packagist/v/eftec/CliOne.svg)](https://packagist.org/packages/eftec/CliOne)
 [![Total Downloads](https://poser.pugx.org/eftec/CliOne/downloads)](https://packagist.org/packages/eftec/CliOne)
-[![Maintenance](https://img.shields.io/maintenance/yes/2022.svg)]()
+[![Maintenance](https://img.shields.io/maintenance/yes/2023.svg)]()
 [![composer](https://img.shields.io/badge/composer-%3E1.6-blue.svg)]()
 [![php](https://img.shields.io/badge/php-7.1-green.svg)]()
 [![php](https://img.shields.io/badge/php-8.x-green.svg)]()
@@ -591,7 +591,7 @@ You can find the definition of the classes, methods and fields at:
 ## Changelog
 * 1.22.2 (2023-02-17)
   * some cleanups 
-* 1.22.1
+* 1.22.1 (2022-7-30)
   * fix a small typo in the code.
 * 1.22 (2022-07-30)
   * setInput() added format wide to use 1 column (if the screen is equal or less than 80 columns) or two columns
