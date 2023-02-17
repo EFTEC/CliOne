@@ -14,12 +14,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.22.1
+ * @version   1.22.2
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.22.1';
+    public const VERSION = '1.22.2';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -36,8 +36,8 @@ class CliOne
      * If <b>false</b>, then the values are stored into the memory.<br>
      * You can access to the memory using getMemory(), setMemory()<br>
      * @var bool
-     * @see \eftec\CliOne\CliOne::getMemory
-     * @see \eftec\CliOne\CliOne::setMemory
+     * @see CliOne::getMemory
+     * @see CliOne::setMemory
      */
     public $echo = true;
     public $MEMORY;
@@ -3408,7 +3408,7 @@ class CliOne
      * @param string  $content
      * @param ?string $stream =['stdout','stderr','memory'][$i]
      * @return void
-     * @see \eftec\CliOne\CliOne::showLine
+     * @see CliOne::showLine
      */
     public function show(string $content, ?string $stream = null): void
     {
@@ -5079,7 +5079,7 @@ class CliOne
                         } else if ($this->array_key_exists_i($parameter->value, $parameter->inputValue)) {
 
                             $parameter->valueKey = $this->get_array_key_i( $parameter->value, $parameter->inputValue);
-                            $lowerArray=array_change_key_case($parameter->inputValue,CASE_LOWER);
+                            $lowerArray=array_change_key_case($parameter->inputValue);
                             $parameter->value = $lowerArray[strtolower($parameter->value)] ?? null;
                         } else if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->valueKey = $parameter->value;
@@ -5210,7 +5210,7 @@ class CliOne
         if(!is_array($array)) {
             return false;
         }
-        $lowerArray=array_change_key_case($array,CASE_LOWER);
+        $lowerArray=array_change_key_case($array);
         return array_key_exists(strtolower($key),$lowerArray);
     }
 

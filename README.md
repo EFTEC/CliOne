@@ -193,26 +193,29 @@ There are more operations available but the basic is there.
 
 # Table of contents
 
-- [CliOne](#clione)
-  - [Features](#features)
-  - [Getting started](#getting-started)
-  - [Usage](#usage)
-  - [Flow](#flow)
-  - [Input as arguments](#input-as-arguments)
-  - [Input interactive](#input-interactive)
-    - [User input (interactive)](#user-input-interactive)
-    - [Customize user input](#customize-user-input)
-  - [Examples](#examples)
-    - [Example using arguments](#example-using-arguments)
-    - [Example using user input](#example-using-user-input)
-    - [Example with a game](#example-with-a-game)
-    - [Example colors](#example-colors)
-    - [Example tables](#example-tables)
-  - [Types of user input](#types-of-user-input)
-  - [Types of colors](#types-of-colors)
-  - [Definitions](#definitions)
-  - [Compatibility](#compatibility)
-  - [Changelog](#changelog)
+<!-- TOC -->
+* [CliOne](#clione)
+  * [Features](#features)
+  * [Getting started](#getting-started)
+  * [Usage](#usage)
+* [Table of contents](#table-of-contents)
+  * [Flow](#flow)
+  * [Input as arguments](#input-as-arguments)
+  * [Input interactive](#input-interactive)
+    * [User input (interactive)](#user-input--interactive-)
+    * [Customize user input](#customize-user-input)
+  * [Examples](#examples)
+    * [Example using arguments](#example-using-arguments)
+    * [Example using user input](#example-using-user-input)
+    * [Example with a game](#example-with-a-game)
+    * [Example colors](#example-colors)
+    * [Example tables](#example-tables)
+  * [Types of user input](#types-of-user-input)
+  * [Types of colors](#types-of-colors)
+  * [Definitions](#definitions)
+  * [Compatibility](#compatibility)
+  * [Changelog](#changelog)
+<!-- TOC -->
 
 ## Flow
 
@@ -246,15 +249,48 @@ php mycli.php subcommandfirst subcommandsecond -flag valueflag --longflag valuef
 
 The system allows reading multiple types of arguments
 
-* **first**: this argument does not have value, and it is position (in the very first position), it could be not be prefixed with a "-"
+* **first**: this argument does not have value, and it is position (in the very first position), 
+it must be not be prefixed with a "-", otherwise it would be considered a flag instead of a positional argument.
+
+```shell
+cliprogram.php first # the value obtained is "first".
+```
+
 * **command**: it is similar to **first,** but it does not compare the name of the argument.
-  * cliprogram.php com -flag, first returns "com" if the argument is named first.  command returns "com" regardless of its name.
+
+```shell
+cliprogram.php com -flag # first returns "com" if the argument is named first.  command returns "com" regardless of its name.
+```
 * **second**: this argument is also positional (second position) and does not have any value
+
+```shell
+cliprogram.php first second -someflag # the value obtained is "second"
+```
+
 * **last**: this argument is also positional, and it is always at the latest argument
+
+```shell
+cliprogram.php first second  last # the value obtained is "last"
+```
+
 * **flag**: the argument is prefixed with a single "-". This argument not need to be a single character.
+
+```shell
+cliprogram.php -flag hello # the value of the flag called "flag" is "hello"
+```
+
 * **longflag**: the argument is prefixed with a double "--"
+
+```shell
+cliprogram.php --flag hello # the value of the doubleflag called "flag" is "hello"
+```
+
 * **onlyinput/none**: the system never read it as argument, so it could be user-input.
    * none means that the argument is only user-input, and it must not be stored. 
+
+```shell
+cliprogram.php  # "onlyinput/none" could not be obtained via command line
+```
 
 The argument could be created as:
 
@@ -316,7 +352,7 @@ $cli->evalParam('p1'); // and we evaluated the parameter
 
 ![](docs/basic1.jpg)
 
-Now, this input accepts any kind of text. But there is many  different kind of user input.
+Now, this input accepts any kind of text. But there is many kind of user input.
 
 | type        | description                                                           | argument                            | example                                                        |
 |-------------|-----------------------------------------------------------------------|-------------------------------------|----------------------------------------------------------------|
@@ -553,6 +589,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.22.2 (2023-02-17)
+  * some cleanups 
 * 1.22.1
   * fix a small typo in the code.
 * 1.22 (2022-07-30)
@@ -656,7 +694,7 @@ You can find the definition of the classes, methods and fields at:
   * **[fixed]** fixed a problem where the question is truncated with an ellipsis (...)
 * 1.2.1 (2022-02-13)
   * **[fixed]** fixed some bugs
-  * **[new]** keys are padded, example [ 1] [ 2] [ 3] ... [99],  [value 1] [value 2] [value  ]
+  * **[new]** keys are padded, example /[ 1] /[ 2] /[ 3] ... [99],  /[value 1] /[value 2] /[value  ]
 * 1.2 (2022-02-13)
   * **[replaced]** "options" renamed as "multiple". Added "multiple2","multiple3","multiple4"
   * **[new]** associative arrays are allowed.
