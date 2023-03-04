@@ -1,8 +1,6 @@
 <?php
 
 namespace eftec\CliOne;
-
-
 /**
  * CliOne - A simple creator of command line argument program.
  *
@@ -428,11 +426,15 @@ class CliOneParam
      *                           <b>range:</b> the input is between a ranger of number<br>
      *                           <b>string:</b> the input is a string<br>
      *                           <b>password:</b> the input is a string<br>
-     *                           <b>multiple*:</b> the input is a multiple selector (*) indicates the number of columns<br>
+     *                           <b>multiple*:</b> the input is a multiple selector (*) indicates the number of
+     *                           columns<br>
      *                           <b>option*:</b> the input allows to select between multiple options (* = columns)<br>
-     *                           <b>optionshort:</b> the input allows to select between multiple options in a single line<br>
-     *                           <b>wide-option:</b> if the screen has 80 columns or more, it uses option2, otherwise option<br>
-     *                           <b>wide-multiple:</b> if the screen has 80 columns or more, it uses multiple2, otherwise multiple<br>
+     *                           <b>optionshort:</b> the input allows to select between multiple options in a single
+     *                           line<br>
+     *                           <b>wide-option:</b> if the screen has 80 columns or more, it uses option2, otherwise
+     *                           option<br>
+     *                           <b>wide-multiple:</b> if the screen has 80 columns or more, it uses multiple2,
+     *                           otherwise multiple<br>
      *
      * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
      *                           This value allows string, arrays and associative arrays<br>
@@ -444,11 +446,11 @@ class CliOneParam
     public function setInput(bool $input = true, string $inputType = 'string', $inputValue = null, array $history = []): CliOneParam
     {
         $this->input = $input;
-        if($inputType==='wide-option') {
-            $inputType=Clione::instance()->getColSize()>80?'option2':'option';
+        if ($inputType === 'wide-option') {
+            $inputType = Clione::instance()->getColSize() > 80 ? 'option2' : 'option';
         }
-        if($inputType==='wide-multiple') {
-            $inputType=Clione::instance()->getColSize()>80?'multiple2':'multiple';
+        if ($inputType === 'wide-multiple') {
+            $inputType = Clione::instance()->getColSize() > 80 ? 'multiple2' : 'multiple';
         }
         $this->inputType = $inputType;
         $this->inputValue = $inputValue;
@@ -533,10 +535,7 @@ class CliOneParam
                 $this->valueKey = str_replace(Clione::instance()->emptyValue, '', $this->value);
                 return $this;
             }
-            // $k = array_search($this->value, $this->inputValue, true);
-
-            $k = array_search(strtolower($this->value), array_map('strtolower', $this->inputValue),true);
-
+            $k = array_search(strtolower($this->value ?? ''), array_map('strtolower', $this->inputValue), true);
             $this->valueKey = $k === false ? null : $k;
         } else {
             $this->valueKey = $newValueKey;

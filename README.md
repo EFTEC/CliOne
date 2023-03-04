@@ -589,6 +589,8 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.22.3 (2023-03-04)
+  * fixed a small bug when some value is null. It could throw a warning in PHP  
 * 1.22.2 (2023-02-17)
   * some cleanups 
 * 1.22.1 (2022-7-30)
