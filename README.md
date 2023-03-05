@@ -589,6 +589,9 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows.  C'mon, Microsoft!
 
 ## Changelog
+* 1.23 (2023-03-05)
+  * Added new methods readDataPHPFormat() and saveDataPHPFormat()
+  * readDate() and saveData() generate a file that includes the version and the date of generation. It does not impact older files.
 * 1.22.3 (2023-03-04)
   * fixed a small bug when some value is null. It could throw a warning in PHP  
 * 1.22.2 (2023-02-17)

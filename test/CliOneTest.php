@@ -187,6 +187,15 @@ class CliOneTest extends TestCase
                 ->setDescription('', 'Do you want to save?')
                 ->evalParam(true, true));
     }
+    public function testFile2()
+    {
+        $t = new CliOne();
+        $t->createParam('test1')->add();
+        $t->createParam('test2')->add();
+        $t->getParameter('test1')->value = 'hello';
+        $this->assertEquals('', $t->saveDataPHPFormat(__DIR__.'/file1php', $t->getArrayParams()));
+        $this->assertEquals([true,['test1' => 'hello','test2' => null],'$config'], $t->readDataPHPFormat(__DIR__.'/file1php'));
+    }
 
     public function testFile()
     {
@@ -194,11 +203,12 @@ class CliOneTest extends TestCase
         $t->createParam('test1')->add();
         $t->createParam('test2')->add();
         $t->getParameter('test1')->value = 'hello';
-        $this->assertEquals('', $t->saveData('file1', $t->getArrayParams()));
+        $this->assertEquals('', $t->saveData(__DIR__.'/file1', $t->getArrayParams()));
+
         $t->getParameter('test1')->value = 'xxxxxxx';
         $rd = $t->readData('file2');
         $this->assertEquals([false, 'Unable to read file file2.config.php'], $rd);
-        $rd = $t->readData('file1');
+        $rd = $t->readData(__DIR__.'/file1');
         $this->assertEquals([true, ['test1' => 'hello', 'test2' => null]], $rd);
         $t->setArrayParam($rd[1]);
         $this->assertEquals('hello', $t->getParameter('test1')->value);
