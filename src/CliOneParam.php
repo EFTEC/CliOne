@@ -8,7 +8,7 @@ namespace eftec\CliOne;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.15
+ * @version   1.24
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOneParam
@@ -107,7 +107,7 @@ class CliOneParam
     public function add(bool $override = false): bool
     {
         if ($this->key === null) {
-            Clione::instance()->throwError("error in creation of input $this->key inputType for range must be an array");
+            Clione::instance()->throwError("error in creation of input (null key)");
             return false;
         }
         if ($this->type === 'none') {
@@ -190,6 +190,10 @@ class CliOneParam
     public function evalParam(bool $forceInput = false, bool $returnValue = false)
     {
         $this->add(true);
+        if ($this->key === null) {
+            Clione::instance()->throwError("error in evaluation of parameter $this->nameArg");
+            return false;
+        }
         return Clione::instance()->evalParam($this->key, $forceInput, $returnValue);
     }
 
@@ -357,11 +361,14 @@ class CliOneParam
     /**
      * It sets the default value that it is used when the user doesn't input the value<br>
      * Setting a default value could bypass the option isRequired()
-     * @param mixed $default
+     * @param mixed $default If it is a CliOneParam then it uses the value of it.
      * @return CliOneParam
      */
     public function setDefault($default): CliOneParam
     {
+        if($default instanceof self) {
+            $default= $default->value;
+        }
         $this->default = $default;
         return $this;
     }
@@ -535,7 +542,12 @@ class CliOneParam
                 $this->valueKey = str_replace(Clione::instance()->emptyValue, '', $this->value);
                 return $this;
             }
-            $k = array_search(strtolower($this->value ?? ''), array_map('strtolower', $this->inputValue), true);
+            $lower=[];
+            foreach($this->inputValue as $k=>$v) {
+                $lower[$k]=$v===null?null:strtolower($v);
+            }
+            $k = array_search(strtolower($this->value ?? '')
+                , $lower, true);
             $this->valueKey = $k === false ? null : $k;
         } else {
             $this->valueKey = $newValueKey;

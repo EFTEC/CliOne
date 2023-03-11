@@ -566,7 +566,10 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
-
+* 1.24 (2023-03-11)
+  * Added new method createOrReplaceParam(),setParamUsingArray(),getValueAsArray()
+  * setParam() has a new argument to create the parameter if it is not defined.
+  * Added variables that could be displayed when the text contains "{{namevar}}"
 * 1.23 (2023-03-05)
     * Added new methods readDataPHPFormat() and saveDataPHPFormat()
     * readDate() and saveData() generate a file that includes the version and the date of generation. It does not impact

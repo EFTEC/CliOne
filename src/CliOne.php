@@ -15,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.22.3
+ * @version   1.24
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.22.3';
+    public const VERSION = '1.24';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -57,6 +57,8 @@ class CliOne
     protected $patternCurrentStack;
     protected $patternSeparatorStack;
     protected $patternContentStack;
+    /** @var array It is an associative array used to replace when the value displayed contains {{namevar}} */
+    public $variables = [];
     protected $wait = 0;
     /** @var string=['silent','show','throw'][$i] */
     protected $errorType = 'show';
@@ -65,7 +67,6 @@ class CliOne
     protected $waitPrev = '';
     /** @var string the original script file */
     protected $phpOriginalFile = '';
-
     /**
      * the arguments as a couple key/value. If the value is missing, then it is ''
      * @var array
@@ -73,11 +74,8 @@ class CliOne
     protected $argv = [];
     /** @var bool if true then it will not show colors */
     protected $noColor = false;
-
-
     /** @var bool if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc.) */
     protected $noANSI = false;
-
     public $colorTags = ['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
         '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
         '<cyan>', '</cyan>', '<magenta>', '</magenta>',
@@ -88,7 +86,6 @@ class CliOne
         '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'];
     public $columnTags = ['<col0/>', '<col1/>', '<col2/>',
         '<col3/>', '<col4/>', '<col5/>',];
-
     public $colorEscape = ["\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
         "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
         "\e[36m", "\e[39m", "\e[35m", "\e[39m",
@@ -133,13 +130,12 @@ class CliOne
             str_repeat(' ', $t * 3), str_repeat(' ', $t * 4), str_repeat(' ', $t * 5)];
         $this->multibyte = function_exists('mb_strlen');
         // it is used by readline
-        readline_completion_function(static function ($input) {
+        readline_completion_function(static function($input) {
             // Filter Matches
-            $matches = array();
+            $matches = [];
             foreach (CliOne::$autocomplete as $cmd) {
                 if (stripos($cmd, $input) === 0) {
                     $matches[] = $cmd;
-
                 }
             }
             return $matches;
@@ -203,7 +199,6 @@ class CliOne
         return $stat && 0020000 === ($stat['mode'] & 0170000);
     }
 
-
     /**
      * It is used for testing. You can simulate arguments using this function<br>
      * This function must be called before the creation of the instance
@@ -256,7 +251,6 @@ class CliOne
         $this->errorType = $errorType;
         return $this;
     }
-
 
     /**
      * This function is used internally to reading the arguments and storing into the field $this->argv
@@ -381,6 +375,20 @@ class CliOne
         return new CliOneParam($key, $type, $alias, null, null, $argumentIsValueKey);
     }
 
+
+
+    public function createOrReplaceParam(string $key,
+                                                $alias = [],
+                                         string $type = 'flag',
+                                         bool   $argumentIsValueKey = false): CliOneParam
+    {
+        $p = $this->getParameter($key);
+        if ($p->key !== null) {
+            return $p;
+        }
+        return new CliOneParam($key, $type, $alias, null, null, $argumentIsValueKey);
+    }
+
     /**
      * Down a level in the breadcrub.<br>
      * If down more than the number of levels available, then it clears the stack.
@@ -466,7 +474,7 @@ class CliOne
                     $parameter->value = $currentValue;
                     $this->refreshParamValueKey($parameter);
                 }
-                if ($def === false) {
+                if ($def === false || $forceInput) {
                     // the value is not defined as an argument
                     if ($parameter->input === true) {
                         $def = true;
@@ -581,7 +589,6 @@ class CliOne
         return [];
     }
 
-
     /**
      * It returns an associative array with all the parameters of the form [key=>value]<br>
      * Parameters of the type "none" are ignored<br>
@@ -609,7 +616,7 @@ class CliOne
     }
 
     /**
-     * It gets the parameter by the key or false if not found.
+     * It gets the parameter by the key or an empty parameter with a null key if null.
      *
      * @param string $key the key of the parameter
      * @return CliOneParam
@@ -764,9 +771,9 @@ class CliOne
             $this->showLine("  <yellow>Can be called as argument?: </yellow>" .
                 (($parameter->type !== 'onlyinput' && $parameter->type !== 'none') ? 'yes' : 'no'));
             $this->showLine("  <yellow>Input Type: </yellow> " . $parameter->inputType);
-            if($parameter->inputValue!==null && count($parameter->inputValue)>0) {
+            if ($parameter->inputValue !== null && count($parameter->inputValue) > 0) {
                 $this->showLine("  Values allowed:");
-                foreach ($parameter->inputValue as $k=>$v) {
+                foreach ($parameter->inputValue as $k => $v) {
                     $this->showLine("  <yellow>$k:</yellow> $v");
                 }
             }
@@ -790,7 +797,7 @@ class CliOne
      * @param string  $bit0 the invisible character
      * @return array
      */
-    public function makeBigWords(string $word, string $font='atr', bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
+    public function makeBigWords(string $word, string $font = 'atr', bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
     {
         $bf = $this->shadow('simple', 'full');
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
@@ -1912,7 +1919,7 @@ class CliOne
         $result = [];
         foreach ($r as $row) {
             $bin = str_pad(decbin($row), 8, '0', STR_PAD_LEFT);
-            $bin = str_replace(array('1', '0'), array($bit1, $bit2), $bin);
+            $bin = str_replace(['1', '0'], [$bit1, $bit2], $bin);
             $result[] = $bin;
         }
         return $result;
@@ -3017,7 +3024,7 @@ class CliOne
         $result = [];
         foreach ($r as $row) {
             $bin = str_pad(decbin($row), 8, '0', STR_PAD_LEFT);
-            $bin = str_replace(array('1', '0'), array($bit1, $bit2), $bin);
+            $bin = str_replace(['1', '0'], [$bit1, $bit2], $bin);
             $result[] = $bin;
         }
         return $result;
@@ -3113,6 +3120,7 @@ class CliOne
             return [false, $ex->getMessage()];
         }
     }
+
     /**
      * It reads information from a file. The information will be de-serialized.
      * @param string $filename         the filename with or without extension.
@@ -3129,19 +3137,19 @@ class CliOne
             if ($content === false) {
                 throw new RuntimeException("Unable to read file $filename");
             }
-            $p0=strpos($content,'$');
-            if($p0===false) {
+            $p0 = strpos($content, '$');
+            if ($p0 === false) {
                 throw new RuntimeException("Format incorrect $filename, no \"\$\" found");
             }
-            $p1=STRPOS($content,'=',$p0);
-            if($p1===false) {
+            $p1 = STRPOS($content, '=', $p0);
+            if ($p1 === false) {
                 throw new RuntimeException("Format incorrect $filename, no \"=\" found");
             }
-            $varname=substr($content,$p0,$p1-$p0);
-            $content=eval('return '.substr($content,$p1+1));
-            return [true, $content,$varname];
+            $varname = substr($content, $p0, $p1 - $p0);
+            $content = eval('return ' . substr($content, $p1 + 1));
+            return [true, $content, $varname];
         } catch (Exception $ex) {
-            return [false, $ex->getMessage(),''];
+            return [false, $ex->getMessage(), ''];
         }
     }
 
@@ -3246,9 +3254,9 @@ class CliOne
     public function saveData(string $filename, $content, $defaultExtension = '.config.php'): string
     {
         $filename = $this->addExtensionFile($filename, $defaultExtension);
-        $now=(new DateTime())->format('Y-m-d H:i');
-        $contentData = "<?php http_response_code(404); die(1); ".
-            "// eftec/CliOne(".$this::VERSION.") configuration file (date gen: $now)?>\n";
+        $now = (new DateTime())->format('Y-m-d H:i');
+        $contentData = "<?php http_response_code(404); die(1); " .
+            "// eftec/CliOne(" . $this::VERSION . ") configuration file (date gen: $now)?>\n";
         $contentData .= json_encode($content, JSON_PRETTY_PRINT);
         try {
             $f = @file_put_contents($filename, $contentData);
@@ -3260,15 +3268,17 @@ class CliOne
         }
         return "";
     }
+
     protected function varexport($expression): ?string
     {
-        if (!is_array($expression)) return var_export($expression,true);
+        if (!is_array($expression)) {
+            return var_export($expression, true);
+        }
         $export = var_export($expression, TRUE);
-        $export = preg_replace("/^([ ]*)(.*)/m", '$1$1$2', $export);
+        $export = preg_replace("/^( *)(.*)/m", '$1$1$2', $export);
         $array = preg_split("/\r\n|\n|\r/", $export);
         $array = preg_replace(["/\s*array\s\($/", "/\)(,)?$/", "/\s=>\s$/"], [NULL, ']$1', ' => ['], $array);
-        $export = implode(PHP_EOL, array_filter(["["] + $array));
-        return $export;
+        return implode(PHP_EOL, array_filter(["["] + $array));
     }
 
     /**
@@ -3283,16 +3293,15 @@ class CliOne
      * @param string $namevar          The name of the variable, excample: config or $config
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public function saveDataPHPFormat(string $filename, $content, $defaultExtension = '.config.php',$namevar='config'
-        ,$description="It is a configuration file"): string
+    public function saveDataPHPFormat(string $filename, $content, $defaultExtension = '.config.php', $namevar = 'config'
+        ,                                    $description = "It is a configuration file"): string
     {
-
         $filename = $this->addExtensionFile($filename, $defaultExtension);
-        $namevar=trim($namevar,'$ ');
-        $now=(new DateTime())->format('Y-m-d H:i');
-        $contentData = "<?php // eftec/CliOne(".$this::VERSION.
-            ") PHP configuration file (date gen: ".$now.
-            "). DO NOT EDIT THIS FILE \n/**\n * $description\n */\n\$$namevar=".$this->varexport($content).";\n";
+        $namevar = trim($namevar, '$ ');
+        $now = (new DateTime())->format('Y-m-d H:i');
+        $contentData = "<?php // eftec/CliOne(" . $this::VERSION .
+            ") PHP configuration file (date gen: " . $now .
+            "). DO NOT EDIT THIS FILE \n/**\n * $description\n */\n\$$namevar=" . $this->varexport($content) . ";\n";
         try {
             $f = @file_put_contents($filename, $contentData);
             if ($f === false) {
@@ -3386,7 +3395,7 @@ class CliOne
 
     /**
      * It sets the color in the stack
-     * @param array $colors =['black','green','yellow','cyan','magenta','blue'][$i]
+     * @param array $colors =['red','yellow','green','white','blue','black',cyan','magenta'][$i]
      * @return $this
      */
     public function setColor(array $colors): self
@@ -3399,14 +3408,16 @@ class CliOne
      * It sets the value or value-key of a parameter manually.<br>
      * It also marks the origin of the argument as "set" and it markes the argument as missing=false
      *
-     * @param string $key        the key of the parameter
-     * @param mixed  $value      the value (or the value-key) to assign.
-     * @param bool   $isValueKey if <b>false</b> (default) then the argument $value is the value of the parameter<br>
-     *                           if <b>true</b> then the argument $value is the value-key.
+     * @param string $key              the key of the parameter
+     * @param mixed  $value            the value (or the value-key) to assign.
+     * @param bool   $isValueKey       if <b>false</b> (default) then the argument $value is the value of the
+     *                                 parameter<br> if <b>true</b> then the argument $value is the value-key.
+     * @param bool   $createIfNotExist If true and the parameter doesn't exist, then it is created with the default
+     *                                 configuration.
      * @return CliOneParam true if the parameter is set, otherwise false
      * @throws RuntimeException
      */
-    public function setParam(string $key, $value, bool $isValueKey = false): CliOneParam
+    public function setParam(string $key, $value, bool $isValueKey = false, $createIfNotExist = false): CliOneParam
     {
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
@@ -3418,8 +3429,42 @@ class CliOne
                 return $parameter;
             }
         }
+        if ($createIfNotExist) {
+            $this->createParam($key, [], 'none')->add(true);
+            $p = $this->getParameter($key);
+            if ($isValueKey) {
+                $p->setValue(null, $value);
+            } else {
+                $p->setValue($value);
+            }
+            return $p;
+        }
         throw new RuntimeException("Parameter [$key] does not exist");
         //return new CliOneParam($this, null);
+    }
+
+    public function setParamUsingArray(?array $assocArray, ?array $fields = null): void
+    {
+        if ($assocArray === null) {
+            return;
+        }
+        foreach ($assocArray as $k => $v) {
+            if ($fields === null || in_array($k, $fields, true)) {
+                $this->setParam($k, $v, false, true);
+            }
+        }
+    }
+
+    public function getValueAsArray(?array $fields = null): array
+    {
+        $result = [];
+        foreach ($this->parameters as $v) {
+            /** @noinspection TypeUnsafeArraySearchInspection */
+            if ($fields === null || in_array($v->key, $fields)) {
+                $result[$v->key] = $this->getValue($v->key);
+            }
+        }
+        return $result;
     }
 
     /**
@@ -3467,7 +3512,6 @@ class CliOne
         $this->patternContentStack = $pattern4Stack;
         return $this;
     }
-
 
     /**
      * @param string $style =['mysql','simple','double','minimal'][$i]
@@ -3559,7 +3603,7 @@ class CliOne
     /**
      * It shows a label messages in a single line, example: <color>[ERROR]</color> Error message
      * @param string|array $label
-     * @param string       $color  =['black','green','yellow','cyan','magenta','blue'][$i]
+     * @param string       $color  =['red','yellow','green','white','blue','black',cyan','magenta'][$i]
      * @param string|array $content
      * @param string       $stream =['stdout','stderr','memory'][$i]
      * @return void
@@ -3662,12 +3706,12 @@ class CliOne
 
     /**
      * It shows a message box consisting of two columns.
-     * @param string|string[] $lines (right side)
-     * @param string|string[] $titles (left side)
+     * @param string|string[] $lines     (right side)
+     * @param string|string[] $titles    (left side)
      * @param bool            $wrapLines if true, then $lines could be wrapped (if the lines are too long)
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showMessageBox($lines, $titles = [],$wrapLines=false): void
+    public function showMessageBox($lines, $titles = [], $wrapLines = false): void
     {
         $this->initstack();
         $patternTitle = $this->patternTitleStack ?? '{value}';
@@ -3677,36 +3721,32 @@ class CliOne
         [$alignTitle, $alignContent, $alignContentNumeric] = $this->alignStack;
         // message box
         [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
-
         $contentw = $this->colSize - $this->strlen($ml) - $this->strlen($mr);
         if (is_string($lines)) {
             // transform into array
-            if(strpos($lines,"\n")!==false) {
-                $lines=explode("\n",$lines);
+            if (strpos($lines, "\n") !== false) {
+                $lines = explode("\n", $lines);
             } else {
                 $lines = [$lines];
             }
         }
         if (is_string($titles)) {
             // transform into array
-            if(strpos($titles,"\n")!==false) {
-                $titles=explode("\n",$titles);
+            if (strpos($titles, "\n") !== false) {
+                $titles = explode("\n", $titles);
             } else {
                 $titles = [$titles];
             }
         }
-
         $maxTitleL = 0;
         // max title width
         foreach ($titles as &$title) {
-            $title=$this->colorText($title);
+            $title = $this->colorText($title);
             $maxTitleL = ($this->strlen($title) > $maxTitleL) ? $this->strlen($title) : $maxTitleL;
         }
         unset($title);
-
-        if($wrapLines) {
-            $lines=$this->wrapLine($lines,$contentw - $maxTitleL - 1);
-
+        if ($wrapLines) {
+            $lines = $this->wrapLine($lines, $contentw - $maxTitleL - 1);
         }
         if (count($titles) > count($lines)) {
             $lines = $this->alignLinesVertically($lines, count($titles));
@@ -3715,7 +3755,6 @@ class CliOne
             // align to the center by adding the missing lines at the top and bottom.
             $titles = $this->alignLinesVertically($titles, count($lines));
         }
-
         $this->showLine($ul . str_repeat($um, $maxTitleL) . $cutt . str_repeat($um, $contentw - $maxTitleL - 1) . $ur);
         foreach ($lines as $k => $line) {
             $ttitle = str_replace(['{value}'],
@@ -4036,7 +4075,6 @@ class CliOne
         return $result;
     }
 
-
     /**
      * @param numeric $currentValue         the current value
      * @param numeric $max                  the max value to fill the bar.
@@ -4063,9 +4101,11 @@ class CliOne
             $currentValueText . "\e[" . (floor($max * $prop) + $this->strlen($currentValueText)) . "D");
         $this->resetStack();
     }
+
     /** it gets the size of the page (number of rows) to display in a table */
-    public function getPageSize(int $reduceRows=8):int {
-        return $this->rowSize -$reduceRows;
+    public function getPageSize(int $reduceRows = 8): int
+    {
+        return $this->rowSize - $reduceRows;
     }
 
     /**
@@ -4088,9 +4128,9 @@ class CliOne
                               bool  $notop = false,
                               bool  $nosides = false,
                               bool  $nobottom = false,
-                              int  $maxColumns = 5,
-                              int      $reduceRows = 3,
-                              int $curpage=1): void
+                              int   $maxColumns = 5,
+                              int   $reduceRows = 3,
+                              int   $curpage = 1): void
     {
         $this->initstack();
         $style = $this->styleStack;
@@ -4182,15 +4222,14 @@ class CliOne
         $txt = rtrim($txt, $cutm) . $cutr;
         $curRow++;
         $this->showLine($txt);
-        $pageSize=$this->getPageSize();
-        $rowSwift=$pageSize*($curpage-1);
-        $totalPage=ceil(count($assocArray)/$pageSize);
+        $pageSize = $this->getPageSize();
+        $rowSwift = $pageSize * ($curpage - 1);
+        $totalPage = ceil(count($assocArray) / $pageSize);
         // content
         foreach ($assocArray as $k => $line) {
-
             $txt = $ml;
-            $lineDisplay=@$assocArray[$k+$rowSwift];
-            if($lineDisplay) {
+            $lineDisplay = @$assocArray[$k + $rowSwift];
+            if ($lineDisplay) {
                 foreach ($maxColumnSize as $colName => $size) {
                     if ($k > $this->rowSize - $curRow - $reduceRows - 3) {
                         $lineDisplay[$colName] = '...';
@@ -4207,7 +4246,6 @@ class CliOne
                 // last line
                 // if($lineDisplay) {
                 $this->show($txt);
-
                 break;
             }
             $this->showLine($txt);
@@ -4221,7 +4259,7 @@ class CliOne
                 $txt .= str_repeat($dm, $size) . $cutd;
             }
             $txt = rtrim($txt, $cutd) . $dr;
-            $txt=substr_replace($txt,$count,strlen($txt)-(strlen($count)*3)-6,strlen($count)*3);
+            $txt = substr_replace($txt, $count, strlen($txt) - (strlen($count) * 3) - 6, strlen($count) * 3);
             $this->show($txt);
         }
         $this->resetStack();
@@ -4636,7 +4674,6 @@ class CliOne
         return $this;
     }
 
-
     /**
      * It shows the listing of options
      *
@@ -4883,7 +4920,6 @@ class CliOne
         return $r;
     }
 
-
     /**
      * It sets the color of the cli<br>
      * <pre>
@@ -4904,9 +4940,9 @@ class CliOne
      *
      * @param string       $content
      * @param ?CliOneParam $cliOneParam
-     * @return array|string|string[]
+     * @return string
      */
-    public function colorText(string $content, ?CliOneParam $cliOneParam = null)
+    public function colorText(string $content, ?CliOneParam $cliOneParam = null): string
     {
         if ($cliOneParam !== null) {
             if (is_array($cliOneParam->inputValue)) {
@@ -4918,6 +4954,7 @@ class CliOne
         } else {
             $content = str_replace(['<option/>', '<optionkey/>'], ['', ''], $content);
         }
+        $content=self::replaceCurlyVariable($content,$this->variables,true);
         $content = str_replace($this->colorTags,
             $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
             $content);
@@ -4974,7 +5011,6 @@ class CliOne
         $sst = ($sst === false) ? '' : $sst;
         $end = $l1 === 0 ? '' : $sst;
     }
-
 
     /**
      * [full,light,soft,double], light usually it is an space.
@@ -5063,8 +5099,8 @@ class CliOne
         }
         // $patern='{selection} {key}{value}';
         $text = str_replace(
-            array('{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'),
-            array($selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix), $pattern);
+            ['{selection}', '{key}', '{value}', '{valueinit}', '{valuenext}', '{valueend}', '{desc}', '{def}', '{prefix}'],
+            [$selection, $key, $valueToShow, $valueinit, $valuenext, $valueend, $desc, $def, $prefix], $pattern);
         $text = $this->colorText($text);
         return $this->ellipsis($text, $colW - 1);
     }
@@ -5084,14 +5120,14 @@ class CliOne
                     $prefix = @$parameter->inputValue[0] . '-' . @$parameter->inputValue[1];
                     break;
                 case 'optionshort':
-                    $uniques = array_map(static function ($v) {
+                    $uniques = array_map(static function($v) {
                         return substr($v, 0, 1);
                     }, $parameter->inputValue);
                     if (count(array_unique($uniques)) !== count($uniques)) {
                         // there is some  repeated valued
                         $prefix = implode('/', $parameter->inputValue);
                     } else {
-                        $values2 = array_map(static function ($v) {
+                        $values2 = array_map(static function($v) {
                             return "<underline>" . substr($v, 0, 1) . "</underline>" . substr($v, 1);
                         }, $parameter->inputValue);
                         $prefix = implode('/', $values2);
@@ -5140,9 +5176,7 @@ class CliOne
                     case 'option3':
                     case 'option4':
                         $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
-
                         if (!$assoc) {
-
                             if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                                 $parameter->value = $this->emptyValue . ($parameter->value ?? '');
                                 $this->refreshParamValueKey($parameter);
@@ -5154,9 +5188,8 @@ class CliOne
                                 $parameter->value = null;
                             }
                         } else if ($this->array_key_exists_i($parameter->value, $parameter->inputValue)) {
-
-                            $parameter->valueKey = $this->get_array_key_i( $parameter->value, $parameter->inputValue);
-                            $lowerArray=array_change_key_case($parameter->inputValue);
+                            $parameter->valueKey = $this->get_array_key_i($parameter->value, $parameter->inputValue);
+                            $lowerArray = array_change_key_case($parameter->inputValue);
                             $parameter->value = $lowerArray[strtolower($parameter->value)] ?? null;
                         } else if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
                             $parameter->valueKey = $parameter->value;
@@ -5233,7 +5266,7 @@ class CliOne
                     }
                     $ok = ($parameter->value === '' && $parameter->allowEmpty) || $this->in_array_i($parameter->value, $parameter->inputValue, true);
                     if ($ok === false) {
-                        $uniques = array_map(static function ($v) {
+                        $uniques = array_map(static function($v) {
                             return substr($v, 0, 1);
                         }, $parameter->inputValue);
                         if (count(array_unique($uniques)) === count($uniques)) {
@@ -5263,8 +5296,10 @@ class CliOne
         $this->errorType = 'show';
         return $ok;
     }
-    private function in_array_i($needle, array $haystack, bool $strict = false):bool {
-        return in_array(strtolower($needle), array_map('strtolower', $haystack),$strict);
+
+    private function in_array_i($needle, array $haystack, bool $strict = false): bool
+    {
+        return in_array(strtolower($needle), array_map('strtolower', $haystack), $strict);
     }
 
     /**
@@ -5274,21 +5309,24 @@ class CliOne
      * @param array $haystack
      * @return int|string
      */
-    private function get_array_key_i($needle, array $haystack) {
-        $needle=strtolower($needle);
-        foreach($haystack as $k=>$v) {
-            if(strtolower($k)===$needle) {
+    private function get_array_key_i($needle, array $haystack)
+    {
+        $needle = strtolower($needle);
+        foreach ($haystack as $k => $v) {
+            if (strtolower($k) === $needle) {
                 return $k;
             }
         }
         return $needle;
     }
-    private function array_key_exists_i($key, $array):bool {
-        if(!is_array($array)) {
+
+    private function array_key_exists_i($key, $array): bool
+    {
+        if (!is_array($array)) {
             return false;
         }
-        $lowerArray=array_change_key_case($array);
-        return array_key_exists(strtolower($key),$lowerArray);
+        $lowerArray = array_change_key_case($array);
+        return array_key_exists(strtolower($key), $lowerArray);
     }
 
     /**
@@ -5303,15 +5341,14 @@ class CliOne
      * @param bool   $notFoundThenKeep [false] If true and the value is not found, then it keeps the value.
      *                                 Otherwise, it is replaced by an empty value
      *
-     * @return string|string[]|null
-     * @noinspection PhpUnused
+     * @return string
      */
-    public static function replaceCurlyVariable(string $string, array $values, bool $notFoundThenKeep = false)
+    public static function replaceCurlyVariable(string $string, array $values, bool $notFoundThenKeep = false):string
     {
         if (strpos($string, '{{') === false) {
             return $string;
         } // nothing to replace.
-        return preg_replace_callback('/{{\s?(\w+)\s?}}/u', static function ($matches) use ($values, $notFoundThenKeep) {
+        return preg_replace_callback('/{{\s?(\w+)\s?}}/u', static function($matches) use ($values, $notFoundThenKeep) {
             if (is_array($matches)) {
                 $item = substr($matches[0], 2, -2); // removes {{ and }}
                 /** @noinspection NestedTernaryOperatorInspection */

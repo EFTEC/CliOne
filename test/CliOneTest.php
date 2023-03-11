@@ -50,6 +50,15 @@ class CliOneTest extends TestCase
         $this->assertEquals(true, $t->isNoANSI());
         $this->assertEquals(true, $t->isNoColor());
     }
+    public function testCurly() {
+        CliOne::testUserInput(null);
+        CliOne::testArguments([]);
+        $t = new CliOne();
+        $t->variables['var1']='it is the var1';
+        $t->variables['varcolor']='<red>red</red>';
+        $this->assertEquals("var1:it is the var1,{{var2}}", $t->colorText('var1:{{var1}},{{var2}}'));
+        $this->assertEquals("color:\e[31mred\e[39m", $t->colorText('color:{{varcolor}}'));
+    }
 
     public function testWrap()
     {
@@ -161,12 +170,18 @@ class CliOneTest extends TestCase
         $v=$t->evalParam('t1',true);
         $this->assertEquals(2,$v->value);
         $this->assertEquals('b',$v->valueKey);
+        $this->assertEquals(['t1'=>2],$t->getValueAsArray());
+        $t->setParamUsingArray(['param2'=>'hello','param3'=>'world','t1'=>'changed']);
+        $this->assertEquals('hello',$t->getValue('param2'));
+        $this->assertEquals('world',$t->getValue('param3'));
+        $this->assertEquals(['t1'=>'changed','param2'=>'hello','param3'=>'world'],$t->getValueAsArray());
+
 
         CliOne::testUserInput(null);
         CliOne::testArguments([]);
         CliOne::testUserInput([""]);
         $t = new CliOne();
-        $t->createParam('t1',[],'none')->setCurrentAsDefault()->setDescription('','select value:')->setInput(true,'optionshort',['a','b','c'])->add();
+        $t->createOrReplaceParam('t1',[],'none')->setCurrentAsDefault()->setDescription('','select value:')->setInput(true,'optionshort',['a','b','c'])->add();
         $t->getParameter('t1')->setValue('b');
         $v=$t->evalParam('t1',true);
         $this->assertEquals('b',$v->value);
