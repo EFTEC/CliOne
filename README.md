@@ -622,6 +622,7 @@ You can find the definition of the classes, methods and fields at:
 
 ## Changelog
 * 1.26 (2023-03-21)
+  * addMenu() and addMenuItem() allows to use callable arguments. 
 * 1.25.1 (2023-03-20)
   * Fixed a small bug with evalMenu()
   * Added option to addMenu() ($size)
