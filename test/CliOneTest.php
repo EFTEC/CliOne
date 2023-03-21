@@ -37,6 +37,31 @@ class CliOneTest extends TestCase
         CliOne::testUserInput(null);
         CliOne::testUserInput(['option1','wrong', 'option2', 'option3','option1','','']);
         $cli->addMenu('menu1', 'header','footer');
+        $cli->addMenuItem('menu1','option1', 'option #1',
+            function($cli) {$cli->showLine('calling action1');$this->assertTrue(true, true);});
+        $cli->addMenuItem('menu1','option2', 'option #2');
+        $cli->addMenuItem('menu1','option3', 'option #3','navigate:menu1.1');
+        $cli->addMenuItems('menu1',['option4'=>'option #4','option5'=> 'option #5']);
+        $cli->addMenu('menu1.1', 'header2','footer2');
+        $cli->addMenuItem('menu1.1','option1', 'option #1.1');
+        $cli->addMenuItem('menu1.1','option2', 'option #2.1');
+        $cli->addMenuItem('menu1.1','option3', 'option #3.1');
+        $cli->addMenuItem('menu1.1','option4', 'option #4.1');
+        $cli->addMenuItem('menu1.1','option5', 'option #5.1');
+
+        $cli->evalMenu('menu1',$this);
+        $cli->showLine('exit ok');
+        $cli->clearMenu();
+    }
+
+    public function testMenuCallable()
+    {
+        $cli = new CliOne();
+        CliOne::testUserInput(null);
+        CliOne::testUserInput(['option1','wrong', 'option2', 'option3','option1','','']);
+        $cli->addMenu('menu1',
+            function($cli) { $cli->upLevel('menu1'); $cli->showBread();},
+            function($cli) { $cli->downLevel();});
         $cli->addMenuItem('menu1','option1', 'option #1','action1');
         $cli->addMenuItem('menu1','option2', 'option #2');
         $cli->addMenuItem('menu1','option3', 'option #3','navigate:menu1.1');

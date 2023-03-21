@@ -15,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.24.1
+ * @version   1.25
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.24.1';
+    public const VERSION = '1.25';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -174,22 +174,32 @@ class CliOne
     }
 
     /**
-     * It adds a new menu that could be called by evalMenu()
-     * @param string      $idMenu         The unique name of the menu
-     * @param string|null $headerFunction Optional, the name of the method called every time the menu is displayed<br>
-     *                                    The method called must have a prefix "menu". Ex: "opt1",method:menuopt1"
-     * @param string|null $footerFunction Optional, the name of the method called every time the menu end its display.
-     *                                    The method called must have a prefix "menu".
-     * @param string      $question       The input question.
-     * @param string      $size           =['option','option2','option3','option4','wide-option','wide-option2'][$i]
-     *                                    The size of the option menu.
+     * It adds a new menu that could be called by evalMenu()<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * //"fnheader" call to $this->menuHeader(CliOne $cli);
+     * $this->addMenu('idmenu','fnheader',null,'What do you want to do?','option3');
+     * // you can use a callable argument, the first argument is of type CliOne.
+     * $this->addMenu('idmenu',function($cli) { echo "header";},function($cli) { echo "footer;"});
+     * </pre>
+     * @param string               $idMenu         The unique name of the menu
+     * @param string|null|callable $headerFunction Optional, the name of the method called every time the menu is
+     *                                             displayed<br>
+     *                                             The method called must have a prefix menu.Ex:"opt1",method:menuopt1"
+     *                                             If $headerFunction is callable, then it calls the function.
+     * @param string|null|callable $footerFunction Optional, the name of the method called every time the menu end its
+     *                                             display. The method called must have a prefix "menu".<br>
+     *                                             If $footerFunction is callable, then it calls the function
+     * @param string               $question       The input question.
+     * @param string               $size           =['option','option2','option3','option4','wide-option','wide-option2'][$i]
+     *                                             The size of the option menu.
      * @return CliOne
      */
-    public function addMenu(string  $idMenu,
-                            ?string $headerFunction = null,
-                            ?string $footerFunction = null,
-                            string  $question = 'Select an option (empty for exit)',
-                            string  $size = 'wide-option'): CliOne
+    public function addMenu(string $idMenu,
+                                   $headerFunction = null,
+                                   $footerFunction = null,
+                            string $question = 'Select an option (empty for exit)',
+                            string $size = 'wide-option'): CliOne
     {
         $this->menu[$idMenu] = [];
         $this->menuEventItem[$idMenu] = [];
@@ -208,25 +218,29 @@ class CliOne
      * // if op1 is selected then it calls method menuop2()
      * $this->addMenuItem('menu1','op2','option #2');
      * $this->addMenuItem('menu1','op3','go to menu2','navigate:menu2');
+     * $this->addMenuItem('menu1','op4','call function',function(CliOne $cli) {  });
      * $this->evalMenu('menu1',$obj);
      * // the method inside $obj
      * public function menufnop1($caller):void {
      * }
      * public function menuop2($caller):string {
-     *      return 'EXIT'; // if any function returns EXIT (uppercase), then the menu ends (simmilar to "empty to exit")
+     *      return 'EXIT'; // if any function returns EXIT (uppercase), then the menu ends (simmilar to "empty to
+     *      exit")
      * }
      * </pre>
      *
-     * @param string      $idMenu        The unique name of the menu
-     * @param string      $indexMenuItem The unique index of the menu. It is used for selection and action
-     *                                   (if no action is supplied).
-     * @param string      $description   The description of the menu
-     * @param string|null $action        The action is the method called (the method must have a prefix "menu").<br>
-     *                                   If action starts with <b>"navigate:"</b> then it opens the menu indicated.<br>
-     *                                   If action is "exit:" then exit of the menu.
+     * @param string               $idMenu        The unique name of the menu
+     * @param string               $indexMenuItem The unique index of the menu. It is used for selection and action
+     *                                            (if no action is supplied).
+     * @param string               $description   The description of the menu
+     * @param string|null|callable $action        The action is the method called (the method must have a prefix
+     *                                            "menu").<br> If action starts with <b>"navigate:"</b> then it opens
+     *                                            the menu indicated.<br> If action is "exit:" then exit of the
+     *                                            menu.<br> If action is callable, then it calls the function
+     *
      * @return CliOne
      */
-    public function addMenuItem(string $idMenu, string $indexMenuItem, string $description, ?string $action = null): CliOne
+    public function addMenuItem(string $idMenu, string $indexMenuItem, string $description, $action = null): CliOne
     {
         $this->menu[$idMenu][$indexMenuItem] = $description;
         $this->menuEventItem[$idMenu][$indexMenuItem] = $action ?? $indexMenuItem;
@@ -282,9 +296,18 @@ class CliOne
         }
         $callfooterExit = false;
         while (true) {
-            if ($this->menuEventMenu[$idMenu]['header'] !== null) {
-                $method = 'menu' . $this->menuEventMenu[$idMenu]['header'];
-                $caller->$method($this);
+            $menuHeader = $this->menuEventMenu[$idMenu]['header'];
+            if ($menuHeader !== null) {
+                if (is_string($menuHeader)) {
+                    $method = 'menu' . $menuHeader;
+                    if(method_exists($this,$method)) {
+                        $caller->$method($this);
+                    } else {
+                        throw new RuntimeException("CliOne: method [$method] does not exist");
+                    }
+                } else {
+                    $menuHeader($this);
+                }
             }
             $value = $this->createParam('_menu', [], 'none')
                 ->setDescription('Select an option'
@@ -298,34 +321,52 @@ class CliOne
                 break;
             }
             $nameAction = $this->menuEventItem[$idMenu][$value->valueKey];
-            if (strpos($nameAction, 'navigate:') === 0) {
-                $menu = substr($nameAction, strlen('navigate:'));
-                $this->evalMenu($menu, $caller);
-            } else {
-                if ($nameAction === 'exit:') {
-                    $callfooterExit = true;
-                    break;
+            if (is_string($nameAction)) {
+                if (strpos($nameAction, 'navigate:') === 0) {
+                    $menu = substr($nameAction, strlen('navigate:'));
+                    $this->evalMenu($menu, $caller);
+                } else {
+                    if ($nameAction === 'exit:') {
+                        $callfooterExit = true;
+                        break;
+                    }
+                    $method = 'menu' . $this->menuEventItem[$idMenu][$value->valueKey];
+                    $result = $caller->$method($this, $value);
+                    if ($result === 'EXIT') {
+                        $callfooterExit = true;
+                        break;
+                    }
                 }
-                $method = 'menu' . $this->menuEventItem[$idMenu][$value->valueKey];
-                $result = $caller->$method($this);
+            } else {
+                $result = $nameAction($this, $value);
                 if ($result === 'EXIT') {
                     $callfooterExit = true;
                     break;
                 }
             }
-            if ($this->menuEventMenu[$idMenu]['footer'] !== null) {
+            $menuFooter = $this->menuEventMenu[$idMenu]['footer'];
+            if ($menuFooter !== null) {
                 // this must be called before any break;
-                $method = 'menu' . $this->menuEventMenu[$idMenu]['footer'];
-                $result = $caller->$method($this);
+                if (is_string($menuFooter)) {
+                    $method = 'menu' . $menuFooter;
+                    $result = $caller->$method($this);
+                } else {
+                    $result = $menuFooter($this);
+                }
                 if ($result === 'EXIT') {
                     break;
                 }
             }
         }
-        if ($callfooterExit && $this->menuEventMenu[$idMenu]['footer'] !== null) {
+        $menuFooter = $this->menuEventMenu[$idMenu]['footer'];
+        if ($callfooterExit && $menuFooter !== null) {
             // this must be called before any break;
-            $method = 'menu' . $this->menuEventMenu[$idMenu]['footer'];
-            $caller->$method($this);
+            if (is_string($menuFooter)) {
+                $method = 'menu' . $menuFooter;
+                $caller->$method($this);
+            } else {
+                $menuFooter($this);
+            }
         }
         return $this;
     }

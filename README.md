@@ -198,6 +198,13 @@ There are more operations available but the basic is there.
   * [Input interactive](#input-interactive)
     * [User input (interactive)](#user-input--interactive-)
     * [Customize user input](#customize-user-input)
+  * [menu](#menu)
+    * [addMenu()](#addmenu--)
+    * [addMenuItem()](#addmenuitem--)
+    * [addMenuItems()](#addmenuitems--)
+    * [evalMenu()](#evalmenu--)
+    * [clearMenu()](#clearmenu--)
+    * [example](#example)
   * [Examples](#examples)
     * [Example using arguments](#example-using-arguments)
     * [Example using user input](#example-using-user-input)
@@ -407,6 +414,54 @@ $cli->createParam('p1',[],'none')
 $cli->evalParam('p1'); 
 ```
 
+## menu
+
+You can create a menu using the next methods
+
+### addMenu()
+It creates a new menu
+
+### addMenuItem()
+It adds an option to a menu
+
+### addMenuItems()
+It adds multiple options to a menu
+
+### evalMenu()
+It executes a menu
+
+### clearMenu()
+It clears a menu.
+
+### example
+```php
+class ClassService {
+  public function menuHeader(CliOne $cli) { /* todo: add header code */ }
+  public function menuFooter(CliOne $cli) { /* todo: add footer code */ }
+  public function menuOption1(CliOne $cli) { /* todo: add menu option 1 code */ }
+  public function menuOption2(CliOne $cli) { /* todo: add menu option 2 code */ }
+}
+$obj=new ClassService();
+
+$cli = new CliOne();
+$cli->addMenu('menu1', 'header','footer');
+$cli->addMenuItem('menu1','option1', 'option #1'
+  ,function($cli) {$cli->showLine('calling action1');$this->assertTrue(true, true);});
+$cli->addMenuItem('menu1','option2', 'option #2');
+$cli->addMenuItem('menu1','option3', 'option #3','navigate:menu1.1');
+$cli->addMenuItems('menu1',['option4'=>'option #4','option5'=> 'option #5']); // adding multiples options
+
+$cli->addMenu('menu1.1', 'header2','footer2');
+$cli->addMenuItem('menu1.1','option1', 'option #1.1');
+$cli->addMenuItem('menu1.1','option2', 'option #2.1');
+$cli->addMenuItem('menu1.1','option3', 'option #3.1');
+$cli->addMenuItem('menu1.1','option4', 'option #4.1');
+$cli->addMenuItem('menu1.1','option5', 'option #5.1');
+$cli->evalMenu('menu1',$obj); // runs the menu.
+$cli->showLine('exit ok');
+$cli->clearMenu();
+```
+
 ## Examples
 
 ### Example using arguments
@@ -566,6 +621,7 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.26 (2023-03-21)
 * 1.25.1 (2023-03-20)
   * Fixed a small bug with evalMenu()
   * Added option to addMenu() ($size)
