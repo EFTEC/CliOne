@@ -89,6 +89,7 @@ class CliOneTest extends TestCase
         $t->addVariableCallBack('call1', function() {
             CliOne::instance()->setVariable('v2', 'world');
         });
+        CliOne::instance()->callVariablesCallBack();
         $this->assertEquals('v1:hello,v2:world', $t->colorText('v1:{{v1}},v2:{{v2}}'));
     }
 

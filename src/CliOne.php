@@ -15,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.24
+ * @version   1.24.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.24';
+    public const VERSION = '1.24.1';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -163,7 +163,7 @@ class CliOne
      * @param string|null $idMenu If null, then it clears all menus
      * @return CliOne
      */
-    public function clearMenu(?string $idMenu=null): CliOne
+    public function clearMenu(?string $idMenu = null): CliOne
     {
         if ($idMenu === null) {
             $this->menu = [];
@@ -181,16 +181,20 @@ class CliOne
      * @param string|null $footerFunction Optional, the name of the method called every time the menu end its display.
      *                                    The method called must have a prefix "menu".
      * @param string      $question       The input question.
+     * @param string      $size           =['option','option2','option3','option4','wide-option','wide-option2'][$i]
+     *                                    The size of the option menu.
      * @return CliOne
      */
     public function addMenu(string  $idMenu,
                             ?string $headerFunction = null,
                             ?string $footerFunction = null,
-                            string  $question = 'Select an option (empty for exit)'): CliOne
+                            string  $question = 'Select an option (empty for exit)',
+                            string  $size = 'wide-option'): CliOne
     {
         $this->menu[$idMenu] = [];
         $this->menuEventItem[$idMenu] = [];
-        $this->menuEventMenu[$idMenu] = ['header' => $headerFunction, 'footer' => $footerFunction, 'question' => $question];
+        $this->menuEventMenu[$idMenu] = ['header' => $headerFunction, 'footer' => $footerFunction,
+            'question' => $question, 'size' => $size];
         return $this;
     }
 
@@ -234,13 +238,16 @@ class CliOne
      * <b>Example:</b><br>
      * <pre>
      * $this->addMenu('menu1');
-     * $this->addMenuItems('menu1',['op1'=>['operation #1','action1'],'op2'=>'operation #2']);
+     * $this->addMenuItems('menu1',[
+     *                'op1'=>['operation #1','action1'], // with description & action
+     *                'op2'=>'operation #2']); // the action is "op2"
      * </pre>
      * @param string     $idMenu The unique name of the menu
      * @param array|null $items  An associative array with the items to add. Examples:<br>
      *                           [index=>[description,action]]<br/>
      *                           [index=>description]<br/>
      * @return $this
+     * @see CliOne::addMenuItem
      */
     public function addMenuItems(string $idMenu, ?array $items): CliOne
     {
@@ -270,6 +277,10 @@ class CliOne
      */
     public function evalMenu(string $idMenu, object $caller): CliOne
     {
+        if (!isset($this->menuEventMenu[$idMenu])) {
+            throw new RuntimeException("CliOne: Menu [$idMenu] does not exist]");
+        }
+        $callfooterExit = false;
         while (true) {
             if ($this->menuEventMenu[$idMenu]['header'] !== null) {
                 $method = 'menu' . $this->menuEventMenu[$idMenu]['header'];
@@ -280,32 +291,41 @@ class CliOne
                     , $this->menuEventMenu[$idMenu]['question']
                     , [], '_menu')
                 ->setAllowEmpty()
-                ->setInput(true, 'wide-option2', $this->menu[$idMenu])
+                ->setInput(true, $this->menuEventMenu[$idMenu]['size'], $this->menu[$idMenu])
                 ->evalParam(true);
             if ($value->valueKey === $this->emptyValue) {
+                $callfooterExit = true;
                 break;
             }
-            $nameAction=$this->menuEventItem[$idMenu][$value->valueKey];
-            if(strpos($nameAction,'navigate:')===0) {
-                $menu=substr($nameAction,strlen('navigate:'));
-                $this->evalMenu($menu,$caller);
+            $nameAction = $this->menuEventItem[$idMenu][$value->valueKey];
+            if (strpos($nameAction, 'navigate:') === 0) {
+                $menu = substr($nameAction, strlen('navigate:'));
+                $this->evalMenu($menu, $caller);
             } else {
-                if($nameAction==='exit:') {
+                if ($nameAction === 'exit:') {
+                    $callfooterExit = true;
                     break;
                 }
                 $method = 'menu' . $this->menuEventItem[$idMenu][$value->valueKey];
                 $result = $caller->$method($this);
                 if ($result === 'EXIT') {
+                    $callfooterExit = true;
                     break;
                 }
             }
             if ($this->menuEventMenu[$idMenu]['footer'] !== null) {
+                // this must be called before any break;
                 $method = 'menu' . $this->menuEventMenu[$idMenu]['footer'];
                 $result = $caller->$method($this);
                 if ($result === 'EXIT') {
                     break;
                 }
             }
+        }
+        if ($callfooterExit && $this->menuEventMenu[$idMenu]['footer'] !== null) {
+            // this must be called before any break;
+            $method = 'menu' . $this->menuEventMenu[$idMenu]['footer'];
+            $caller->$method($this);
         }
         return $this;
     }

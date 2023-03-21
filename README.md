@@ -566,6 +566,9 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.25.1 (2023-03-20)
+  * Fixed a small bug with evalMenu()
+  * Added option to addMenu() ($size)
 * 1.25 (2023-03-20)
   * Added method clearMenu(),addMenu(),addMenuItem(),addMenuItems(),evalMenu()
   * Added method setVariable(),getVariable() and addVariableCallBack().  $variable field is now private.
