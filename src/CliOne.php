@@ -42,8 +42,10 @@ class CliOne
      */
     public $echo = true;
     public $MEMORY;
+    public $menu = [];
+    public $menuEventItem = [];
+    public $menuEventMenu = [];
     protected $defaultStream = 'stdout';
-    protected $memory = '';
     protected $colSize = 80;
     protected $rowSize = 25;
     protected $bread = [];
@@ -58,7 +60,8 @@ class CliOne
     protected $patternSeparatorStack;
     protected $patternContentStack;
     /** @var array It is an associative array used to replace when the value displayed contains {{namevar}} */
-    public $variables = [];
+    protected $variables = [];
+    protected $variablesCallback = [];
     protected $wait = 0;
     /** @var string=['silent','show','throw'][$i] */
     protected $errorType = 'show';
@@ -156,6 +159,158 @@ class CliOne
     }
 
     /**
+     * It clears a menu
+     * @param string|null $idMenu If null, then it clears all menus
+     * @return CliOne
+     */
+    public function clearMenu(?string $idMenu=null): CliOne
+    {
+        if ($idMenu === null) {
+            $this->menu = [];
+        } else {
+            unset($this->menu[$idMenu]);
+        }
+        return $this;
+    }
+
+    /**
+     * It adds a new menu that could be called by evalMenu()
+     * @param string      $idMenu         The unique name of the menu
+     * @param string|null $headerFunction Optional, the name of the method called every time the menu is displayed<br>
+     *                                    The method called must have a prefix "menu". Ex: "opt1",method:menuopt1"
+     * @param string|null $footerFunction Optional, the name of the method called every time the menu end its display.
+     *                                    The method called must have a prefix "menu".
+     * @param string      $question       The input question.
+     * @return CliOne
+     */
+    public function addMenu(string  $idMenu,
+                            ?string $headerFunction = null,
+                            ?string $footerFunction = null,
+                            string  $question = 'Select an option (empty for exit)'): CliOne
+    {
+        $this->menu[$idMenu] = [];
+        $this->menuEventItem[$idMenu] = [];
+        $this->menuEventMenu[$idMenu] = ['header' => $headerFunction, 'footer' => $footerFunction, 'question' => $question];
+        return $this;
+    }
+
+    /**
+     * It adds a menu item.<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->addMenu('menu1');
+     * // if op1 is selected then it calls method menufnop1(), the prefix is for protection.
+     * $this->addMenuItem('menu1','op1','option #1','fnop1');
+     * // if op1 is selected then it calls method menuop2()
+     * $this->addMenuItem('menu1','op2','option #2');
+     * $this->addMenuItem('menu1','op3','go to menu2','navigate:menu2');
+     * $this->evalMenu('menu1',$obj);
+     * // the method inside $obj
+     * public function menufnop1($caller):void {
+     * }
+     * public function menuop2($caller):string {
+     *      return 'EXIT'; // if any function returns EXIT (uppercase), then the menu ends (simmilar to "empty to exit")
+     * }
+     * </pre>
+     *
+     * @param string      $idMenu        The unique name of the menu
+     * @param string      $indexMenuItem The unique index of the menu. It is used for selection and action
+     *                                   (if no action is supplied).
+     * @param string      $description   The description of the menu
+     * @param string|null $action        The action is the method called (the method must have a prefix "menu").<br>
+     *                                   If action starts with <b>"navigate:"</b> then it opens the menu indicated.<br>
+     *                                   If action is "exit:" then exit of the menu.
+     * @return CliOne
+     */
+    public function addMenuItem(string $idMenu, string $indexMenuItem, string $description, ?string $action = null): CliOne
+    {
+        $this->menu[$idMenu][$indexMenuItem] = $description;
+        $this->menuEventItem[$idMenu][$indexMenuItem] = $action ?? $indexMenuItem;
+        return $this;
+    }
+
+    /**
+     * It adds multiples items to a menu<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->addMenu('menu1');
+     * $this->addMenuItems('menu1',['op1'=>['operation #1','action1'],'op2'=>'operation #2']);
+     * </pre>
+     * @param string     $idMenu The unique name of the menu
+     * @param array|null $items  An associative array with the items to add. Examples:<br>
+     *                           [index=>[description,action]]<br/>
+     *                           [index=>description]<br/>
+     * @return $this
+     */
+    public function addMenuItems(string $idMenu, ?array $items): CliOne
+    {
+        foreach ($items as $indexMenuItem => $v) {
+            if (is_array($v)) {
+                $this->menu[$idMenu][$indexMenuItem] = $v[0];
+                $this->menuEventItem[$idMenu][$indexMenuItem] = $v[1] ?? $indexMenuItem;
+            } else {
+                $this->menu[$idMenu][$indexMenuItem] = $v;
+                $this->menuEventItem[$idMenu][$indexMenuItem] = $indexMenuItem;
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Eval (executes) a menu previously defined.<br>
+     * <b>Example:</b><br>
+     * <pre>
+     * $this->addMenu('menu1');
+     * // we add items
+     * $this->evalMenu('menu1',$myService);
+     * </pre>
+     * @param string $idMenu The unique name of the menu
+     * @param object $caller The caller object. It is used to the events and actions.
+     * @return CliOne
+     */
+    public function evalMenu(string $idMenu, object $caller): CliOne
+    {
+        while (true) {
+            if ($this->menuEventMenu[$idMenu]['header'] !== null) {
+                $method = 'menu' . $this->menuEventMenu[$idMenu]['header'];
+                $caller->$method($this);
+            }
+            $value = $this->createParam('_menu', [], 'none')
+                ->setDescription('Select an option'
+                    , $this->menuEventMenu[$idMenu]['question']
+                    , [], '_menu')
+                ->setAllowEmpty()
+                ->setInput(true, 'wide-option2', $this->menu[$idMenu])
+                ->evalParam(true);
+            if ($value->valueKey === $this->emptyValue) {
+                break;
+            }
+            $nameAction=$this->menuEventItem[$idMenu][$value->valueKey];
+            if(strpos($nameAction,'navigate:')===0) {
+                $menu=substr($nameAction,strlen('navigate:'));
+                $this->evalMenu($menu,$caller);
+            } else {
+                if($nameAction==='exit:') {
+                    break;
+                }
+                $method = 'menu' . $this->menuEventItem[$idMenu][$value->valueKey];
+                $result = $caller->$method($this);
+                if ($result === 'EXIT') {
+                    break;
+                }
+            }
+            if ($this->menuEventMenu[$idMenu]['footer'] !== null) {
+                $method = 'menu' . $this->menuEventMenu[$idMenu]['footer'];
+                $result = $caller->$method($this);
+                if ($result === 'EXIT') {
+                    break;
+                }
+            }
+        }
+        return $this;
+    }
+
+    /**
      * @return string
      */
     public function getErrorType(): string
@@ -171,6 +326,65 @@ class CliOne
             @ftruncate($this->MEMORY, 0);
         }
         return $r;
+    }
+
+    /**
+     * It sets a value into an array.<br>
+     * @param string $variableName the name of the variable. If the variable exists, then it is replaced.
+     * @param mixed  $value        the value to assign.
+     * @param bool   $callBack     if the value is true (default), then every modification (if the value is changed)
+     *                             will call the functions defined in addVariableCallBack()<br> if fallse, then it does
+     *                             not call the callback functions.
+     * @return void
+     */
+    public function setVariable(string $variableName, $value, bool $callBack = true): void
+    {
+        if (isset($this->variables[$variableName]) && $this->variables[$variableName] === $value) {
+            // value not changed
+            return;
+        }
+        $this->variables[$variableName] = $value;
+        if ($callBack) {
+            $this->callVariablesCallBack();
+        }
+    }
+
+    /**
+     * It gets the value of a variable
+     * @param string     $variableName    The name of the variable
+     * @param mixed|null $valueIfNotFound If not found then it returns this value
+     * @return mixed|null
+     */
+    public function getVariable(string $variableName, $valueIfNotFound = null)
+    {
+        return $this->variables[$variableName] ?? $valueIfNotFound;
+    }
+
+    /**
+     * It adds a callback function.<br>
+     * This function is called every setVariable() if the value is different as the defined.
+     * @param string        $callbackName the name of the function. If the function exists, then it is replaced
+     * @param callable|null $function     The function. If the function is null, then it deleted the function assigned.
+     * @return void
+     */
+    public function addVariableCallBack(string $callbackName, ?callable $function): void
+    {
+        if ($function !== null) {
+            $this->variablesCallback[$callbackName] = $function;
+        } else {
+            unset($this->variablesCallback[$callbackName]);
+        }
+    }
+
+    /**
+     * It calls the callback functions. Usually they are called every time we setVariable() (and the value is changed).
+     * @return void
+     */
+    public function callVariablesCallBack(): void
+    {
+        foreach ($this->variablesCallback as $v) {
+            $v();
+        }
     }
 
     /**
@@ -374,8 +588,6 @@ class CliOne
     {
         return new CliOneParam($key, $type, $alias, null, null, $argumentIsValueKey);
     }
-
-
 
     public function createOrReplaceParam(string $key,
                                                 $alias = [],
@@ -3106,7 +3318,7 @@ class CliOne
      *                                 In error, it returns [false,"error message"]<br>
      *                                 In success, it returns [true,values de-serialized]<br>
      */
-    public function readData(string $filename, $defaultExtension = '.config.php'): ?array
+    public function readData(string $filename, string $defaultExtension = '.config.php'): ?array
     {
         $filename = $this->addExtensionFile($filename, $defaultExtension);
         try {
@@ -3129,7 +3341,7 @@ class CliOne
      *                                 In error, it returns [false,"error message",'']<br>
      *                                 In success, it returns [true,[1,2,3],'$content']<br>
      */
-    public function readDataPHPFormat(string $filename, $defaultExtension = '.config.php'): ?array
+    public function readDataPHPFormat(string $filename, string $defaultExtension = '.config.php'): ?array
     {
         $filename = $this->addExtensionFile($filename, $defaultExtension);
         try {
@@ -3251,7 +3463,7 @@ class CliOne
      * @param string $defaultExtension The default extension.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public function saveData(string $filename, $content, $defaultExtension = '.config.php'): string
+    public function saveData(string $filename, $content, string $defaultExtension = '.config.php'): string
     {
         $filename = $this->addExtensionFile($filename, $defaultExtension);
         $now = (new DateTime())->format('Y-m-d H:i');
@@ -3293,8 +3505,8 @@ class CliOne
      * @param string $namevar          The name of the variable, excample: config or $config
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
      */
-    public function saveDataPHPFormat(string $filename, $content, $defaultExtension = '.config.php', $namevar = 'config'
-        ,                                    $description = "It is a configuration file"): string
+    public function saveDataPHPFormat(string $filename, $content, string $defaultExtension = '.config.php',
+                                      string $namevar = 'config', string $description = "It is a configuration file"): string
     {
         $filename = $this->addExtensionFile($filename, $defaultExtension);
         $namevar = trim($namevar, '$ ');
@@ -3417,7 +3629,7 @@ class CliOne
      * @return CliOneParam true if the parameter is set, otherwise false
      * @throws RuntimeException
      */
-    public function setParam(string $key, $value, bool $isValueKey = false, $createIfNotExist = false): CliOneParam
+    public function setParam(string $key, $value, bool $isValueKey = false, bool $createIfNotExist = false): CliOneParam
     {
         foreach ($this->parameters as $parameter) {
             if ($parameter->key === $key) {
@@ -3711,7 +3923,7 @@ class CliOne
      * @param bool            $wrapLines if true, then $lines could be wrapped (if the lines are too long)
      * @noinspection PhpUnusedLocalVariableInspection
      */
-    public function showMessageBox($lines, $titles = [], $wrapLines = false): void
+    public function showMessageBox($lines, $titles = [], bool $wrapLines = false): void
     {
         $this->initstack();
         $patternTitle = $this->patternTitleStack ?? '{value}';
@@ -4954,7 +5166,7 @@ class CliOne
         } else {
             $content = str_replace(['<option/>', '<optionkey/>'], ['', ''], $content);
         }
-        $content=self::replaceCurlyVariable($content,$this->variables,true);
+        $content = $this->replaceCurlyVariable($content, true);
         $content = str_replace($this->colorTags,
             $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
             $content);
@@ -5337,27 +5549,26 @@ class CliOne
      *      replaceCurlyVariable('hello={{var}}',['varx'=>'world'],true) // hello={{var}}<br>
      *
      * @param string $string           The input value. It could contain variables defined as {{namevar}}
-     * @param array  $values           The dictionary of values.
      * @param bool   $notFoundThenKeep [false] If true and the value is not found, then it keeps the value.
      *                                 Otherwise, it is replaced by an empty value
      *
      * @return string
+     * @noinspection PhpVariableIsUsedOnlyInClosureInspection
      */
-    public static function replaceCurlyVariable(string $string, array $values, bool $notFoundThenKeep = false):string
+    public function replaceCurlyVariable(string $string, bool $notFoundThenKeep = false): string
     {
         if (strpos($string, '{{') === false) {
             return $string;
         } // nothing to replace.
-        return preg_replace_callback('/{{\s?(\w+)\s?}}/u', static function($matches) use ($values, $notFoundThenKeep) {
+        $me = $this;
+        //$this->callVariablesCallBack();
+        return preg_replace_callback('/{{\s?(\w+)\s?}}/u', static function($matches) use ($notFoundThenKeep, $me) {
             if (is_array($matches)) {
                 $item = substr($matches[0], 2, -2); // removes {{ and }}
-                /** @noinspection NestedTernaryOperatorInspection */
-                /** @noinspection NullCoalescingOperatorCanBeUsedInspection */
-                /** @noinspection PhpIssetCanBeReplacedWithCoalesceInspection */
-                return isset($values[$item]) ? $values[$item] : ($notFoundThenKeep ? $matches[0] : '');
+                return $me->getVariable($item, $notFoundThenKeep ? $matches[0] : '');
             }
             $item = substr($matches, 2, -2); // removes {{ and }}
-            return $values[$item] ?? $notFoundThenKeep ? $matches : '';
+            return $me->getVariable($item, $notFoundThenKeep ? $matches : '');
         }, $string);
     }
 }

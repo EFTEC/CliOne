@@ -3,3 +3,4 @@ composer.lock
 vendor/
 tests/resources/compiled/
 \.php_cs\.cache
+/src/sync.ffs_db

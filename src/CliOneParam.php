@@ -428,7 +428,9 @@ class CliOneParam
      *
      * @param bool   $input      if true, then the value could be input via user. If false, the value could only be
      *                           entered as argument.
-     * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort','wide-option','wide-multiple'][$i]
+     * @param string $inputType  =['number','range','string','password','multiple','multiple2','multiple3'
+     *                           ,'multiple4','option','option2','option3','option4','optionshort'
+     *                           ,'wide-option','wide-option2','wide-multiple'][$i]
      *                           <b>number:</b> the input is a number<br>
      *                           <b>range:</b> the input is between a ranger of number<br>
      *                           <b>string:</b> the input is a string<br>
@@ -438,10 +440,12 @@ class CliOneParam
      *                           <b>option*:</b> the input allows to select between multiple options (* = columns)<br>
      *                           <b>optionshort:</b> the input allows to select between multiple options in a single
      *                           line<br>
-     *                           <b>wide-option:</b> if the screen has 80 columns or more, it uses option2, otherwise
-     *                           option<br>
-     *                           <b>wide-multiple:</b> if the screen has 80 columns or more, it uses multiple2,
-     *                           otherwise multiple<br>
+     *                           <b>wide-option:</b> if the screen has 80 columns or more, it uses "option2", otherwise
+     *                           "option"<br>
+     *                           <b>wide-option2:</b> screen<60 then "option", screen >100 then "option3",
+     *                           otherwise "option2"
+     *                           <b>wide-multiple:</b> if the screen has 80 columns or more, it uses "multiple2",
+     *                           otherwise "multiple"<br>
      *
      * @param mixed  $inputValue Depending on the $inputtype, you couls set the list of values.<br>
      *                           This value allows string, arrays and associative arrays<br>
@@ -455,6 +459,14 @@ class CliOneParam
         $this->input = $input;
         if ($inputType === 'wide-option') {
             $inputType = Clione::instance()->getColSize() > 80 ? 'option2' : 'option';
+        }
+        if ($inputType === 'wide-option2') {
+            $colsize=Clione::instance()->getColSize() ;
+            if ($colsize < 60) {
+                $inputType = 'option';
+            } else {
+                $inputType = ($colsize > 100 ? 'option3' : 'option2');
+            }
         }
         if ($inputType === 'wide-multiple') {
             $inputType = Clione::instance()->getColSize() > 80 ? 'multiple2' : 'multiple';
