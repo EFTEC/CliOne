@@ -621,6 +621,12 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.27 (2023-04-02)
+  * new method instance() so you can get or create a new singleton instance.
+  * new method hasInstance()
+  * new method hasMenu()
+  * new method addMenuService()
+  * fixed a bug with showHelp() and the help is an array or the help is missing.
 * 1.26.1 (2023-03-21)
   * cleaned some code. 
 * 1.26 (2023-03-21)

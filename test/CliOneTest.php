@@ -34,6 +34,7 @@ class CliOneTest extends TestCase
     public function testMenu()
     {
         $cli = new CliOne();
+        $this->assertEquals(false,CliOne::hasMenu());
         CliOne::testUserInput(null);
         CliOne::testUserInput(['option1','wrong', 'option2', 'option3','option1','','']);
         $cli->addMenu('menu1', 'header','footer');
@@ -48,8 +49,8 @@ class CliOneTest extends TestCase
         $cli->addMenuItem('menu1.1','option3', 'option #3.1');
         $cli->addMenuItem('menu1.1','option4', 'option #4.1');
         $cli->addMenuItem('menu1.1','option5', 'option #5.1');
-
-        $cli->evalMenu('menu1',$this);
+        $cli->addMenuService('menu1',$this);
+        $cli->evalMenu('menu1');
         $cli->showLine('exit ok');
         $cli->clearMenu();
     }

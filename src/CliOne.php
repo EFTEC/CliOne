@@ -15,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.26.1
+ * @version   1.27
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.26.1';
+    public const VERSION = '1.27';
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -33,9 +33,9 @@ class CliOne
     /** @var CliOneParam[] */
     public $parameters = [];
     /**
-     * If <b>true</b> (default value), then the values are echo automatically on the screen.<br>
-     * If <b>false</b>, then the values are stored into the memory.<br>
-     * You can access to the memory using getMemory(), setMemory()<br>
+     * If <b>true</b> (default value), then the values are echo automatically on the screen.<br/>
+     * If <b>false</b>, then the values are stored into the memory.<br/>
+     * You can access to the memory using getMemory(), setMemory()<br/>
      * @var bool
      * @see CliOne::getMemory
      * @see CliOne::setMemory
@@ -43,6 +43,7 @@ class CliOne
     public $echo = true;
     public $MEMORY;
     public $menu = [];
+    public $menuServices = [];
     public $menuEventItem = [];
     public $menuEventMenu = [];
     protected $defaultStream = 'stdout';
@@ -103,8 +104,8 @@ class CliOne
 
     /**
      * The constructor. If there is an instance, then it replaces the instance.
-     * @param ?string $origin you can specify the origin file. If you specify the origin file, then isCli will only
-     *                        return true if the file is called directly.
+     * @param string|null $origin you can specify the origin script file. If you specify the origin script
+     *                            then, isCli will only return true if the file is called directly using its file.
      */
     public function __construct(?string $origin = null)
     {
@@ -146,20 +147,44 @@ class CliOne
     }
 
     /**
-     * It gets the current instance of the library.<br>
+     * It gets the current instance of the library.<br/>
      * If the instance does not exist, then it is created
+     * @param string|null $origin you can specify the origin script file. If you specify the origin script
+     *                            then, isCli will only return true if the file is called directly using its file.
      * @return CliOne
      */
-    public static function instance(): CliOne
+    public static function instance(?string $origin = null): CliOne
     {
         if (self::$instance === null) {
-            self::$instance = new CliOne();
+            self::$instance = new CliOne($origin);
         }
         return self::$instance;
     }
 
     /**
-     * It clears a menu
+     * Returns true if there is an instance of CliOne.
+     * @return bool
+     */
+    public static function hasInstance(): bool
+    {
+        return self::$instance !== null;
+    }
+
+    /**
+     * It returns true if CliOne has a menu defined. It will return false if there is no menu or there is no instance.
+     * @return bool
+     */
+    public static function hasMenu(): bool
+    {
+        if (self::hasInstance()) {
+            return count(self::instance()->menu) > 0;
+        }
+        // no instance, no menu
+        return false;
+    }
+
+    /**
+     * It clears a menu and the services associated.
      * @param string|null $idMenu If null, then it clears all menus
      * @return CliOne
      */
@@ -167,15 +192,16 @@ class CliOne
     {
         if ($idMenu === null) {
             $this->menu = [];
+            $this->menuServices = [];
         } else {
-            unset($this->menu[$idMenu]);
+            unset($this->menu[$idMenu], $this->menuServices[$idMenu]);
         }
         return $this;
     }
 
     /**
-     * It adds a new menu that could be called by evalMenu()<br>
-     * <b>Example:</b><br>
+     * It adds a new menu that could be called by evalMenu()<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * //"fnheader" call to $this->menuHeader(CliOne $cli);
      * $this->addMenu('idmenu','fnheader',null,'What do you want to do?','option3');
@@ -184,11 +210,11 @@ class CliOne
      * </pre>
      * @param string               $idMenu         The unique name of the menu
      * @param string|null|callable $headerFunction Optional, the name of the method called every time the menu is
-     *                                             displayed<br>
+     *                                             displayed<br/>
      *                                             The method called must have a prefix menu.Ex:"opt1",method:menuopt1"
      *                                             If $headerFunction is callable, then it calls the function.
      * @param string|null|callable $footerFunction Optional, the name of the method called every time the menu end its
-     *                                             display. The method called must have a prefix "menu".<br>
+     *                                             display. The method called must have a prefix "menu".<br/>
      *                                             If $footerFunction is callable, then it calls the function
      * @param string               $question       The input question.
      * @param string               $size           =['option','option2','option3','option4','wide-option','wide-option2'][$i]
@@ -198,7 +224,7 @@ class CliOne
     public function addMenu(string $idMenu,
                                    $headerFunction = null,
                                    $footerFunction = null,
-                            string $question = 'Select an option (empty for exit)',
+                            string $question = 'Select an option (empty to exit)',
                             string $size = 'wide-option'): CliOne
     {
         $this->menu[$idMenu] = [];
@@ -209,8 +235,8 @@ class CliOne
     }
 
     /**
-     * It adds a menu item.<br>
-     * <b>Example:</b><br>
+     * It adds a menu item.<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * $this->addMenu('menu1');
      * // if op1 is selected then it calls method menufnop1(), the prefix is for protection.
@@ -234,9 +260,9 @@ class CliOne
      *                                            (if no action is supplied).
      * @param string               $description   The description of the menu
      * @param string|null|callable $action        The action is the method called (the method must have a prefix
-     *                                            "menu").<br> If action starts with <b>"navigate:"</b> then it opens
-     *                                            the menu indicated.<br> If action is "exit:" then exit of the
-     *                                            menu.<br> If action is callable, then it calls the function
+     *                                            "menu").<br/> If action starts with <b>"navigate:"</b> then it opens
+     *                                            the menu indicated.<br/> If action is "exit:" then exit of the
+     *                                            menu.<br/> If action is callable, then it calls the function
      *
      * @return CliOne
      */
@@ -248,8 +274,8 @@ class CliOne
     }
 
     /**
-     * It adds multiples items to a menu<br>
-     * <b>Example:</b><br>
+     * It adds multiples items to a menu<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * $this->addMenu('menu1');
      * $this->addMenuItems('menu1',[
@@ -257,7 +283,7 @@ class CliOne
      *                'op2'=>'operation #2']); // the action is "op2"
      * </pre>
      * @param string     $idMenu The unique name of the menu
-     * @param array|null $items  An associative array with the items to add. Examples:<br>
+     * @param array|null $items  An associative array with the items to add. Examples:<br/>
      *                           [index=>[description,action]]<br/>
      *                           [index=>description]<br/>
      * @return $this
@@ -278,31 +304,75 @@ class CliOne
     }
 
     /**
-     * Eval (executes) a menu previously defined.<br>
-     * <b>Example:</b><br>
+     * It adds a service object to be evaluated when we run evalMenu()<br/>
+     * You can add menu services. Every service is evaluated in order, so if both service objects has the same method,
+     * then it is only called by the first object.<br/>
+     * If evalMenu() uses a service then, the services defined here are ignored.<br/>
+     * <b>Example:</b><br/>
      * <pre>
-     * $this->addMenu('menu1');
-     * // we add items
-     * $this->evalMenu('menu1',$myService);
+     * $objService=new Class1();
+     * $this->addMenuService('menu1',$objService);
+     * // or:
+     * $this->addMenuService('menu1',Class1:class);
      * </pre>
-     * @param string $idMenu The unique name of the menu
-     * @param object $caller The caller object. It is used to the events and actions.
+     * @param string        $idMenu  The unique name of the menu
+     * @param object|string $service The service object or the name of the class.<br/>
+     *                               If it is a name of a class, then it creates an instance of it.
      * @return CliOne
      */
-    public function evalMenu(string $idMenu, object $caller): CliOne
+    public function addMenuService(string $idMenu, $service): CliOne
+    {
+        if (!is_object($service)) {
+            $service = new $service();
+        }
+        $this->menuServices[$idMenu] = $service;
+        return $this;
+    }
+
+    /**
+     * Eval (executes) a menu previously defined.<br/>
+     * <b>Example:</b><br/>
+     * <pre>
+     * $this->addMenu('menu1');
+     * // pending: add items to the menu
+     * $this->evalMenu('menu1',$myService);
+     * // or also
+     * $this->>addMenu('menu1')->addMenuService('menu1',$myService)->evalMenu('menu1');
+     * </pre>
+     * @param string            $idMenu The unique name of the menu
+     * @param object|null|array $caller The caller object(s). It is used to the events and actions.<br/>
+     *                                  If null, then it use the services defined by addMenuService();<br/>
+     *                                  If it is an array, then it calls the first object that has the method<br/>
+     *                                  If this argument is used then addMenuService() is ignored
+     *
+     * @return CliOne
+     */
+    public function evalMenu(string $idMenu, $caller = null): CliOne
     {
         if (!isset($this->menuEventMenu[$idMenu])) {
             throw new RuntimeException("CliOne: Menu [$idMenu] does not exist]");
         }
         $callfooterExit = false;
+        if ($caller === null) {
+            $caller = $this->menuServices[$idMenu];
+        }
+        if (!is_array($caller)) {
+            $caller = [$caller];
+        }
         while (true) {
             $menuHeader = $this->menuEventMenu[$idMenu]['header'];
             if ($menuHeader !== null) {
                 if (is_string($menuHeader)) {
                     $method = 'menu' . $menuHeader;
-                    if(method_exists($caller,$method)) {
-                        $caller->$method($this);
-                    } else {
+                    $called = false;
+                    foreach ($caller as $call) {
+                        if (method_exists($call, $method)) {
+                            $call->$method($this);
+                            $called = true;
+                            break;
+                        }
+                    }
+                    if (!$called) {
                         throw new RuntimeException("CliOne: method [$method] does not exist");
                     }
                 } else {
@@ -331,7 +401,18 @@ class CliOne
                         break;
                     }
                     $method = 'menu' . $this->menuEventItem[$idMenu][$value->valueKey];
-                    $result = $caller->$method($this, $value);
+                    $called = false;
+                    $result = null;
+                    foreach ($caller as $call) {
+                        if (method_exists($call, $method)) {
+                            $result = $call->$method($this, $value);
+                            $called = true;
+                            break;
+                        }
+                    }
+                    if (!$called) {
+                        throw new RuntimeException("CliOne: method [$method] does not exist");
+                    }
                     if ($result === 'EXIT') {
                         $callfooterExit = true;
                         break;
@@ -345,11 +426,19 @@ class CliOne
                 }
             }
             $menuFooter = $this->menuEventMenu[$idMenu]['footer'];
+            $result = null;
             if ($menuFooter !== null) {
                 // this must be called before any break;
                 if (is_string($menuFooter)) {
                     $method = 'menu' . $menuFooter;
-                    $result = $caller->$method($this);
+                    //$called=false;
+                    foreach ($caller as $call) {
+                        if (method_exists($call, $method)) {
+                            $result = $call->$method($this);
+                            //$called=true;
+                            break;
+                        }
+                    }
                 } else {
                     $result = $menuFooter($this);
                 }
@@ -363,7 +452,13 @@ class CliOne
             // this must be called before any break;
             if (is_string($menuFooter)) {
                 $method = 'menu' . $menuFooter;
-                $caller->$method($this);
+                foreach ($caller as $call) {
+                    if (method_exists($call, $method)) {
+                        $call->$method($this);
+                        //$called=true;
+                        break;
+                    }
+                }
             } else {
                 $menuFooter($this);
             }
@@ -390,11 +485,11 @@ class CliOne
     }
 
     /**
-     * It sets a value into an array.<br>
+     * It sets a value into an array.<br/>
      * @param string $variableName the name of the variable. If the variable exists, then it is replaced.
      * @param mixed  $value        the value to assign.
      * @param bool   $callBack     if the value is true (default), then every modification (if the value is changed)
-     *                             will call the functions defined in addVariableCallBack()<br> if fallse, then it does
+     *                             will call the functions defined in addVariableCallBack()<br/> if fallse, then it does
      *                             not call the callback functions.
      * @return void
      */
@@ -422,10 +517,17 @@ class CliOne
     }
 
     /**
-     * It adds a callback function.<br>
+     * It adds a callback function.<br/>
+     * <b>Example:</b><br/>
+     * <pre>
+     * $t->addVariableCallBack('call1', function(CliOne $cli) {
+     *          $cli->setVariable('v2', 'world',false); // the false is important if you don't want recursivity.
+     * });
+     * </pre>
      * This function is called every setVariable() if the value is different as the defined.
-     * @param string        $callbackName the name of the function. If the function exists, then it is replaced
-     * @param callable|null $function     The function. If the function is null, then it deleted the function assigned.
+     * @param string        $callbackName the name of the function. If the function exists, then it is replaced.
+     * @param callable|null $function     If the function is null, then it deleted the function assigned.<br/>
+     *                                    The function could be defined using an argument of the type CliOne.
      * @return void
      */
     public function addVariableCallBack(string $callbackName, ?callable $function): void
@@ -444,7 +546,7 @@ class CliOne
     public function callVariablesCallBack(): void
     {
         foreach ($this->variablesCallback as $v) {
-            $v();
+            $v($this);
         }
     }
 
@@ -475,7 +577,7 @@ class CliOne
     }
 
     /**
-     * It is used for testing. You can simulate arguments using this function<br>
+     * It is used for testing. You can simulate arguments using this function<br/>
      * This function must be called before the creation of the instance
      * @param array $arguments
      * @return void
@@ -487,9 +589,9 @@ class CliOne
     }
 
     /**
-     * It is used for testing. You can simulate user-input using this function<br>
-     * This function must be called before every interactivity<br>
-     * This function is not resetted automatically, to reset it, set $userInput=null<br>
+     * It is used for testing. You can simulate user-input using this function<br/>
+     * This function must be called before every interactivity<br/>
+     * This function is not resetted automatically, to reset it, set $userInput=null<br/>
      * @param ?array $userInput
      * @return void
      */
@@ -504,7 +606,7 @@ class CliOne
     }
 
     /**
-     * It sets the value stored into the memory stream<br>
+     * It sets the value stored into the memory stream<br/>
      * If the memory stream has values, then they are deleted and replaced.
      * @param string $memory The value to store
      * @return $this
@@ -609,8 +711,8 @@ class CliOne
     }
 
     /**
-     * It creates a new parameter to be read from the command line and/or to be input manually by the user<br>
-     * <b>Example:</b><br>
+     * It creates a new parameter to be read from the command line and/or to be input manually by the user<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * $this->createParam('k1','first'); // php program.php thissubcommand
      * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3
@@ -619,26 +721,26 @@ class CliOne
      * @param string       $key                The key or the parameter. It must be unique.
      * @param array|string $alias              A simple array with the name of the arguments to read (without - or
      *                                         <b>flag</b>: (default) it reads a flag "php program.php -thisflag
-     *                                         value"<br>
+     *                                         value"<br/>
      *                                         <b>first</b>: it reads the first argument "php program.php thisarg"
-     *                                         (without value)<br>
+     *                                         (without value)<br/>
      *                                         <b>second</b>: it reads the second argument "php program.php sc1
-     *                                         thisarg" (without value)<br>
+     *                                         thisarg" (without value)<br/>
      *                                         <b>last</b>: it reads the second argument "php program.php ... thisarg"
-     *                                         (without value)<br>
+     *                                         (without value)<br/>
      *                                         <b>longflag</b>: it reads a longflag "php program --thislongflag
-     *                                         value<br>
+     *                                         value<br/>
      *                                         <b>last</b>: it reads the second argument "php program.php ...
-     *                                         thisvalue" (without value)<br>
-     *                                         <b>onlyinput</b>: the value means to be user-input, and it is stored<br>
+     *                                         thisvalue" (without value)<br/>
+     *                                         <b>onlyinput</b>: the value means to be user-input, and it is stored<br/>
      *                                         <b>none</b>: the value it is not captured via argument, so it could be
-     *                                         user-input, but it is not stored<br> none parameters could always be
+     *                                         user-input, but it is not stored<br/> none parameters could always be
      *                                         overridden, and they are used to "temporary" input such as validations
      *                                         (y/n).
-     * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]<br>
-     *                                         --)<br> if the type is a flag, then the alias is a double flag "--".<br>
+     * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]<br/>
+     *                                         --)<br/> if the type is a flag, then the alias is a double flag "--".<br/>
      *                                         if the type is a double flag, then the alias is a flag.
-     * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br>
+     * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br/>
      *                                         <b>false</b> (default) the argument is a value
      * @return CliOneParam
      */
@@ -663,7 +765,7 @@ class CliOne
     }
 
     /**
-     * Down a level in the breadcrub.<br>
+     * Down a level in the breadcrub.<br/>
      * If down more than the number of levels available, then it clears the stack.
      * @param int $number number of levels to down.
      * @return CliOne
@@ -677,9 +779,9 @@ class CliOne
     }
 
     /**
-     * It evaluates the parameters obtained from the syntax of the command.<br>
-     * The parameters must be defined before call this method<br>
-     * <b>Example:</b><br>
+     * It evaluates the parameters obtained from the syntax of the command.<br/>
+     * The parameters must be defined before call this method<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * // shell:
      * php mycode.php -argument1 hello -argument2 world
@@ -689,10 +791,10 @@ class CliOne
      * $t->createParam('argument1')->add();
      * $result=$t->evalParam('argument1'); // an object ClieOneParam where value is "hello"
      * </pre>
-     * @param string $key         the key to read.<br>
+     * @param string $key         the key to read.<br/>
      *                            If $key='*' then it reads the first flag and returns its value (if any).
      * @param bool   $forceInput  it forces input no matter if the value is already inserted.
-     * @param bool   $returnValue If true, then it returns the value obtained.<br>
+     * @param bool   $returnValue If true, then it returns the value obtained.<br/>
      *                            If false (default value), it returns an instance of CliOneParam.
      * @return mixed Returns false if not value is found.
      */
@@ -863,8 +965,8 @@ class CliOne
     }
 
     /**
-     * It returns an associative array with all the parameters of the form [key=>value]<br>
-     * Parameters of the type "none" are ignored<br>
+     * It returns an associative array with all the parameters of the form [key=>value]<br/>
+     * Parameters of the type "none" are ignored<br/>
      * @param array $excludeKeys you can add a key that you want to exclude.
      * @return array
      */
@@ -926,7 +1028,7 @@ class CliOne
     }
 
     /**
-     * It returns an array [$prefix,$prefixAlias,$position]<br>
+     * It returns an array [$prefix,$prefixAlias,$position]<br/>
      * <b>$prefix</b> the prefix of the type of data, example "-", "--" or ""
      * <b>$prefixAlias</b> the prefix of the alias of the type of data, example "-", "--" or ""
      * <b>$position</b> return true if it is a positional argument.
@@ -1044,11 +1146,19 @@ class CliOne
             $this->showLine("  <yellow>Can be called as argument?: </yellow>" .
                 (($parameter->type !== 'onlyinput' && $parameter->type !== 'none') ? 'yes' : 'no'));
             $this->showLine("  <yellow>Input Type: </yellow> " . $parameter->inputType);
-            if ($parameter->inputValue !== null && count($parameter->inputValue) > 0) {
-                $this->showLine("  Values allowed:");
-                foreach ($parameter->inputValue as $k => $v) {
-                    $this->showLine("  <yellow>$k:</yellow> $v");
+            $inputVal = $parameter->inputValue;
+            if ($inputVal !== null) {
+                if (!is_array($inputVal)) {
+                    $inputVal = [$inputVal];
                 }
+                if (count($inputVal) > 0) {
+                    $this->showLine("  Values allowed:");
+                    foreach ($inputVal as $k => $v) {
+                        $this->showLine("  <yellow>$k:</yellow> $v");
+                    }
+                }
+            } else {
+                $this->showLine("  No help available.");
             }
         }
         if ($parameter->description) {
@@ -3304,8 +3414,8 @@ class CliOne
     }
 
     /**
-     * It reads the value-key of a parameter selected. It is useful for a list of elements.<br>
-     * <b>Example:</b><br>
+     * It reads the value-key of a parameter selected. It is useful for a list of elements.<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * // [1] option1
      * // [2] option2
@@ -3326,9 +3436,9 @@ class CliOne
     }
 
     /**
-     * It will return true if the PHP is running on CLI<br>
+     * It will return true if the PHP is running on CLI<br/>
      * If the constructor specified a file, then it is also used for validation.
-     * <b>Example:</b><br>
+     * <b>Example:</b><br/>
      * <pre>
      * // page.php:
      * $inst=new CliOne('page.php'); // this security avoid calling the cli when this file is called by others.
@@ -3375,9 +3485,9 @@ class CliOne
      * It reads information from a file. The information will be de-serialized.
      * @param string $filename         the filename with or without extension.
      * @param string $defaultExtension the default extension.
-     * @return array it returns an array of the type [bool,mixed]<br>
-     *                                 In error, it returns [false,"error message"]<br>
-     *                                 In success, it returns [true,values de-serialized]<br>
+     * @return array it returns an array of the type [bool,mixed]<br/>
+     *                                 In error, it returns [false,"error message"]<br/>
+     *                                 In success, it returns [true,values de-serialized]<br/>
      */
     public function readData(string $filename, string $defaultExtension = '.config.php'): ?array
     {
@@ -3395,12 +3505,12 @@ class CliOne
     }
 
     /**
-     * It reads information from a file. The information will be de-serialized.
+     * It reads information from a file. The information is evaluated, so the file must be safe.<br/>
      * @param string $filename         the filename with or without extension.
      * @param string $defaultExtension the default extension.
-     * @return array it returns an array of the type [bool,content,namevar]<br>
-     *                                 In error, it returns [false,"error message",'']<br>
-     *                                 In success, it returns [true,[1,2,3],'$content']<br>
+     * @return array it returns an array of the type [bool,content,namevar]<br/>
+     *                                 In error, it returns [false,"error message",'']<br/>
+     *                                 In success, it returns [true,[1,2,3],'$content']<br/>
      */
     public function readDataPHPFormat(string $filename, string $defaultExtension = '.config.php'): ?array
     {
@@ -3427,9 +3537,9 @@ class CliOne
     }
 
     /**
-     * Returns true if the parameter is present with or without data.<br>
-     * The parameter is not changed, neither the default values nor user input are applied<br>
-     * Returned Values:<br>
+     * Returns true if the parameter is present with or without data.<br/>
+     * The parameter is not changed, neither the default values nor user input are applied<br/>
+     * Returned Values:<br/>
      * <ul>
      * <li><b>none</b> the value is not present, ex: </li>
      * <li><b>empty</b> the value is present but is empty, ex: -arg1</li>
@@ -3504,7 +3614,7 @@ class CliOne
     /**
      * Util class. It adds a default extension to a filename only if the filename doesn't have extension.
      * @param string $filename  The filename full or partial, example "file.jpg", "file", "/folder/file"
-     * @param string $extension The extension to add including the dot, example ".ext".<br>
+     * @param string $extension The extension to add including the dot, example ".ext".<br/>
      *                          The default value is ".config.php"
      * @return string
      */
@@ -3555,8 +3665,8 @@ class CliOne
     }
 
     /**
-     * It saves the information into a file. The content will be converted into a PHP file.<br>
-     * <b>example:</b><br>
+     * It saves the information into a file. The content will be converted into a PHP file.<br/>
+     * <b>example:</b><br/>
      * <pre>
      * $this->saveDataPHPFormat('file',[1,2,3]); // it will save a file with the next content: $config=[1,2,3];
      * </pre>
@@ -3587,8 +3697,8 @@ class CliOne
     }
 
     /**
-     * It sets the alignment.  This method is stackable.<br>
-     * <b>Example:</b><br>
+     * It sets the alignment.  This method is stackable.<br/>
+     * <b>Example:</b><br/>
      * <pre>
      * $cli->setAlign('left','left','right')->setStyle('double')->showTable($values);
      * </pre>>
@@ -3604,12 +3714,12 @@ class CliOne
     }
 
     /**
-     * It sets the parameters using an array of the form [key=>value]<br>
+     * It sets the parameters using an array of the form [key=>value]<br/>
      * It also marks the parameters as missing=false
      * @param array      $array       the associative array to use to set the parameters.
-     * @param array      $excludeKeys you can add a key that you want to exclude.<br>
+     * @param array      $excludeKeys you can add a key that you want to exclude.<br/>
      *                                If the key is in the array and in this list, then it is excluded
-     * @param array|null $includeKeys the whitelist of elements that only could be included.<br>
+     * @param array|null $includeKeys the whitelist of elements that only could be included.<br/>
      *                                Only keys that are in this list are added.
      * @return void
      */
@@ -3678,13 +3788,13 @@ class CliOne
     }
 
     /**
-     * It sets the value or value-key of a parameter manually.<br>
+     * It sets the value or value-key of a parameter manually.<br/>
      * It also marks the origin of the argument as "set" and it markes the argument as missing=false
      *
      * @param string $key              the key of the parameter
      * @param mixed  $value            the value (or the value-key) to assign.
      * @param bool   $isValueKey       if <b>false</b> (default) then the argument $value is the value of the
-     *                                 parameter<br> if <b>true</b> then the argument $value is the value-key.
+     *                                 parameter<br/> if <b>true</b> then the argument $value is the value-key.
      * @param bool   $createIfNotExist If true and the parameter doesn't exist, then it is created with the default
      *                                 configuration.
      * @return CliOneParam true if the parameter is set, otherwise false
@@ -3716,6 +3826,14 @@ class CliOne
         //return new CliOneParam($this, null);
     }
 
+    /**
+     * Set the values of the parameters using an array.<br/>
+     * If the parameter does not exist, then it is created with the default values
+     * @param array|null $assocArray An associative array of the form ['key'=>'value']
+     * @param array|null $fields     if null, then is set all values of the array<br/>
+     *                               If not null, then it is used to determine which fields will be used
+     * @return void
+     */
     public function setParamUsingArray(?array $assocArray, ?array $fields = null): void
     {
         if ($assocArray === null) {
@@ -3826,10 +3944,10 @@ class CliOne
     }
 
     /**
-     * It shows a breadcrumb.<br>
-     * To add values you could use the method uplevel()<br>
-     * To remove a value (going down a level) you could use the method downlevel()<br>
-     * You can also change the style using setPattern1(),setPattern2(),setPattern3()<br>
+     * It shows a breadcrumb.<br/>
+     * To add values you could use the method uplevel()<br/>
+     * To remove a value (going down a level) you could use the method downlevel()<br/>
+     * You can also change the style using setPattern1(),setPattern2(),setPattern3()<br/>
      * <pre>
      * $cli->setPattern1('{value}{type}') // the level
      *      ->setPattern2('<bred>{value}</bred>{type}') // the current level
@@ -3837,7 +3955,7 @@ class CliOne
      *      ->showBread();
      * </pre>
      * It shows the current BreadCrumb if any.
-     * @param bool $showIfEmpty if true then it shows the breadcrumb even if it is empty (empty line)<br>
+     * @param bool $showIfEmpty if true then it shows the breadcrumb even if it is empty (empty line)<br/>
      *                          if false (default) then it doesn't show the breadcrumb if it is empty.
      * @return $this
      */
@@ -3945,7 +4063,7 @@ class CliOne
     }
 
     /**
-     * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br>
+     * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br/>
      * <pre>
      * <red>error</red> (color red)
      * <yellow>warning</yellow> (color yellow)
@@ -4139,9 +4257,9 @@ class CliOne
      * @param array       $typeParam   =['command','first','last','second','flag','longflag','onlyinput','none'][$i] the
      *                                 type of parameter
      * @param array       $excludeKey  the keys to exclude
-     * @param array|null  $includeKeys the whitelist of elements that only could be included.<br>
+     * @param array|null  $includeKeys the whitelist of elements that only could be included.<br/>
      *                                 Only keys that are in this list are added.
-     * @param string|null $related     if not null then it only shows all the parameteres that are related.<br>
+     * @param string|null $related     if not null then it only shows all the parameteres that are related.<br/>
      *                                 use $param->setRelated() to set the relation.
      * @param ?int        $size        the minimum size of the first column
      * @return void
@@ -4245,7 +4363,7 @@ class CliOne
     }
 
     /**
-     * @param bool $noColor if <b>true</b> then it will not show colors<br>
+     * @param bool $noColor if <b>true</b> then it will not show colors<br/>
      *                      if <b>false</b>, then it will show the colors.
      * @return $this
      */
@@ -4284,11 +4402,11 @@ class CliOne
     }
 
     /**
-     * it wraps a line and returns one or multiples lines<br>
+     * it wraps a line and returns one or multiples lines<br/>
      * The lines wrapped does not open or close tags.
      * @param string|array $texts     The text already formatted.
      * @param int          $width     The expected width
-     * @param bool         $keepStyle if true then it keeps the initial and end style tag for every new line.<br>
+     * @param bool         $keepStyle if true then it keeps the initial and end style tag for every new line.<br/>
      *                                if false, then it just wraps the lines.
      *
      * @return array
@@ -4352,7 +4470,7 @@ class CliOne
      * @param numeric $currentValue         the current value
      * @param numeric $max                  the max value to fill the bar.
      * @param int     $columnWidth          the size of the bar (in columns)
-     * @param ?string $currentValueText     the current value to display at the left.<br>
+     * @param ?string $currentValueText     the current value to display at the left.<br/>
      *                                      if null then it will show the current value (with a space in between)
      * @return void
      */
@@ -4387,11 +4505,11 @@ class CliOne
      * @param bool  $notop      if true then it will not show the top border
      * @param bool  $nosides    if true then it will not show the side borders
      * @param bool  $nobottom   if true then it will not show the bottom border
-     * @param int   $maxColumns The max number of columns to show.<br>
+     * @param int   $maxColumns The max number of columns to show.<br/>
      *                          If the table has 15 columns and maxColumns is 5, then only the
      *                          first 5 columns will be displayed.
-     * @param int   $reduceRows The number of rows to reduce considering the size of the screen.<br>
-     *                          If the screen has 30 rows, then the table will use 30-3=27 rows<br>
+     * @param int   $reduceRows The number of rows to reduce considering the size of the screen.<br/>
+     *                          If the screen has 30 rows, then the table will use 30-3=27 rows<br/>
      *                          If set to >-99999, then it will display all rows.
      * @param int   $curpage    The number of page (base 1) to display.
      * @return void
@@ -4602,7 +4720,7 @@ class CliOne
     }
 
     /**
-     * It will show all the parameters by showing the key, the default value and the value<br>
+     * It will show all the parameters by showing the key, the default value and the value<br/>
      * It is used for debugging and testing.
      * @return void
      */
@@ -4724,7 +4842,7 @@ class CliOne
     }
 
     /**
-     * With the value of the parameter, the system assign the valuekey of the parameter<br>
+     * With the value of the parameter, the system assign the valuekey of the parameter<br/>
      * If the parameter doesn't have inputvalues, or the value is not in the list of inputvalues, then it does nothing.
      * @param CliOneParam $parameter
      * @return void
@@ -5124,7 +5242,7 @@ class CliOne
     }
 
     /**
-     * It reads a line input that the user must enter the information<br>
+     * It reads a line input that the user must enter the information<br/>
      * <b>Note:</b> It could be simulated using the global $GLOBALS['PHPUNIT_FAKE_READLINE'] (array)
      * , where the first value must be 0, and the other values must be the input emulated
      * @param string      $content The prompt.
@@ -5194,7 +5312,7 @@ class CliOne
     }
 
     /**
-     * It sets the color of the cli<br>
+     * It sets the color of the cli<br/>
      * <pre>
      * <red>error</red> (color red)
      * <yellow>warning</yellow> (color yellow)
@@ -5265,7 +5383,7 @@ class CliOne
     }
 
     /**
-     * It returns the initial and end style of a text.<br>
+     * It returns the initial and end style of a text.<br/>
      * If the text only contains an initial or final style, then nothing is returned
      *
      * @param string  $contentAnsi the content text already formatted in Ansi
@@ -5603,11 +5721,11 @@ class CliOne
     }
 
     /**
-     * Replaces all variables defined between {{ }} by a variable inside the dictionary of values.<br>
-     * Example:<br>
-     *      replaceCurlyVariable('hello={{var}}',['var'=>'world']) // hello=world<br>
-     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world']) // hello=<br>
-     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world'],true) // hello={{var}}<br>
+     * Replaces all variables defined between {{ }} by a variable inside the dictionary of values.<br/>
+     * Example:<br/>
+     *      replaceCurlyVariable('hello={{var}}',['var'=>'world']) // hello=world<br/>
+     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world']) // hello=<br/>
+     *      replaceCurlyVariable('hello={{var}}',['varx'=>'world'],true) // hello={{var}}<br/>
      *
      * @param string $string           The input value. It could contain variables defined as {{namevar}}
      * @param bool   $notFoundThenKeep [false] If true and the value is not found, then it keeps the value.
