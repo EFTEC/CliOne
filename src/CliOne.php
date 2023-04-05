@@ -15,12 +15,22 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.27
+ * @version   1.28
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.27';
+    public const VERSION = '1.28';
+    /**
+     * @var bool if debug is true then:<br>
+     *           1) every operation will be recorded in $this->debugHistory<br>
+     *           2) if you input ??history then, it will show the debug history in PHP format
+     *           3) if you input ??clear then, it will clean the debug history
+     */
+    public $debug=false;
+    public $debugHistory=[];
+    /** @var array|null this field is called by self::testUserInput() and It's used for debug purpose. */
+    public static $fakeReadLine;
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -598,10 +608,12 @@ class CliOne
     public static function testUserInput(?array $userInput): void
     {
         if ($userInput === null) {
-            unset($GLOBALS['PHPUNIT_FAKE_READLINE']);
+            self::$fakeReadLine=null;
+            //unset(self::$fakeReadLine);
         } else {
             array_unshift($userInput, 0);
-            $GLOBALS['PHPUNIT_FAKE_READLINE'] = $userInput;
+            self::$fakeReadLine=$userInput;
+            //self::$fakeReadLine = $userInput;
         }
     }
 
@@ -5243,7 +5255,7 @@ class CliOne
 
     /**
      * It reads a line input that the user must enter the information<br/>
-     * <b>Note:</b> It could be simulated using the global $GLOBALS['PHPUNIT_FAKE_READLINE'] (array)
+     * <b>Note:</b> It could be simulated using the static self::$fakeReadLine (array)
      * , where the first value must be 0, and the other values must be the input emulated
      * @param string      $content The prompt.
      * @param CliOneParam $parameter
@@ -5258,13 +5270,17 @@ class CliOne
             $largo = $this->strlen($content);
         }
         // globals is used for phpunit.
-        if (array_key_exists('PHPUNIT_FAKE_READLINE', $GLOBALS)) {
-            $GLOBALS['PHPUNIT_FAKE_READLINE'][0]++;
-            if ($GLOBALS['PHPUNIT_FAKE_READLINE'][0] >= count($GLOBALS['PHPUNIT_FAKE_READLINE'])) {
-                throw new RuntimeException('Test incorrect, it is waiting for read more PHPUNIT_FAKE_READLINE ' . json_encode($GLOBALS['PHPUNIT_FAKE_READLINE']));
+        if (self::$fakeReadLine!==null) {
+            self::$fakeReadLine[0]++;
+            if (self::$fakeReadLine[0] >= count(self::$fakeReadLine)) {
+                throw new RuntimeException('Test incorrect, it is waiting for read more CliOne::$fakeReadLine ' . json_encode(self::$fakeReadLine));
             }
-            $this->showLine('<green><underline>[' . $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]] . ']</underline></green>');
-            return $GLOBALS['PHPUNIT_FAKE_READLINE'][$GLOBALS['PHPUNIT_FAKE_READLINE'][0]];
+            $this->showLine('<green><underline>[' . self::$fakeReadLine[self::$fakeReadLine[0]] . ']</underline></green>');
+            if($this->debug) {
+
+                $this->debugHistory[]=self::$fakeReadLine[self::$fakeReadLine[0]];
+            }
+            return self::$fakeReadLine[self::$fakeReadLine[0]];
         }
         if (is_array($parameter->inputValue) && count($parameter->inputValue) > 0) {
             $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
@@ -5303,6 +5319,9 @@ class CliOne
             $r = readline(str_repeat(' ', $largo));
         }
         $r = $r === false ? false : trim($r);
+        if($this->debug) {
+            $this->debugHistory[]=$r;
+        }
         if (count($parameter->getHistory()) > 0) {
             // if we use a parameter history, then we return to the previous history
             /** @noinspection PhpUndefinedVariableInspection */
@@ -5533,7 +5552,17 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 while (true) {
                     $origInput = $this->readline($txt, $parameter);
-                    if ($origInput === '?' || $origInput === '??') {
+                    if(($origInput==='??history' || $origInput==='??clear')  && $this->debug) {
+                        echo "\n-------history-----\n";
+                        if($origInput==='??clear') {
+                            $this->debugHistory=[];
+                        } else {
+                            array_pop($this->debugHistory); // we remove '??history'
+                        }
+                        /** @noinspection ForgottenDebugOutputInspection */
+                        var_export($this->debugHistory);
+                        echo "\n-------------------\n";
+                    } else if ($origInput === '?' || $origInput === '??')  {
                         $this->showHelp($parameter, $origInput === '??');
                     } else {
                         break;

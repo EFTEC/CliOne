@@ -136,6 +136,7 @@ class CliOneTest extends TestCase
         $this->assertEquals("hello world\n", $t->getMemory(true));
         $this->assertEquals(true, $t->isNoANSI());
         $this->assertEquals(true, $t->isNoColor());
+
     }
 
     public function testCurly()
@@ -281,8 +282,9 @@ class CliOneTest extends TestCase
     {
         CliOne::testUserInput(null);
         CliOne::testArguments(['program.php', '-dosave', 'xxxx']); // this value must be ignored
-        CliOne::testUserInput(['bbb', 'yes']);
+        CliOne::testUserInput(['bbb','??history','??clear','ccc', 'yes']);
         $t = new CliOne();
+        $t->debug=true;
         $this->assertEquals('yes'
             , $t->createParam('dosave', [], 'none')
                 ->setRequired(false)
@@ -290,6 +292,7 @@ class CliOneTest extends TestCase
                 ->setInput(true, 'optionshort', ['yes', 'no'])
                 ->setDescription('', 'Do you want to save?')
                 ->evalParam(true, true));
+        $this->assertEquals(['ccc','yes'],$t->debugHistory);
     }
 
     public function testFile2()

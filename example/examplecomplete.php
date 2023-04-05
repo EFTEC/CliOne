@@ -7,6 +7,7 @@ include __DIR__.'/../src/CliOneParam.php';
 $origin='examplecomplete.php';
 
 $cli=new CliOne($origin);
+$cli->debug=true;
 if($cli->isCli()) {
     $cli->createParam('param1')
         ->setDescription('This field is called param1 and it is required')

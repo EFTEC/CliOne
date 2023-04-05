@@ -610,6 +610,28 @@ You can find the definition of the classes, methods and fields at:
 
 [definitions.md](definitions.md)
 
+## debug
+To activate the debug mode, you must set the debug field as true:
+```
+$cli=new CliOne();
+$cli->debug=true;
+```
+In debug mode, every user input is recored in the field $debugHistory
+
+You can also see the history running the input ??history
+
+![](docs/help1.jpg)
+
+And you can clear the history using the input ??clear
+
+The goal is we could store a session and replace it using testUserInput()
+
+```php
+$cli = new CliOne();
+CliOne::testUserInput([...]); // put your story here.
+```
+
+
 ## Compatibility
 
 * It must support all moderns interface that are compatibles with Virtual Terminal.
@@ -621,6 +643,9 @@ You can find the definition of the classes, methods and fields at:
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.28 (2023-04-05)
+  * the $debug field, so you can debug and store the user input history.
+  * PHP_FAKE_READLINE constant or global variable now is a static field $fakeReadLine
 * 1.27 (2023-04-02)
   * new method instance() so you can get or create a new singleton instance.
   * new method hasInstance()
