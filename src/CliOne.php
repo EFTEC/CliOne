@@ -1,7 +1,5 @@
 <?php /** @noinspection DuplicatedCode */
 
-/** @noinspection PhpComposerExtensionStubsInspection */
-
 namespace eftec\CliOne;
 
 use DateTime;
@@ -26,11 +24,14 @@ class CliOne
      *           1) every operation will be recorded in $this->debugHistory<br>
      *           2) if you input ??history then, it will show the debug history in PHP format
      *           3) if you input ??clear then, it will clean the debug history
+     *           4) if you input ??save then, it saves the history in a file called _save.json
+     *           5) if you input ??load then, it loads the history and executes it.
      */
-    public $debug=false;
-    public $debugHistory=[];
+    public $debug = false;
+    public $debugHistory = [];
     /** @var array|null this field is called by self::testUserInput() and It's used for debug purpose. */
     public static $fakeReadLine;
+    public static $throwNoInput;
     public static $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
@@ -335,7 +336,7 @@ class CliOne
         if (!is_object($service)) {
             $service = new $service();
         }
-        $this->menuServices[$idMenu] = $service;
+        $this->menuServices[$idMenu][] = $service;
         return $this;
     }
 
@@ -603,18 +604,21 @@ class CliOne
      * This function must be called before every interactivity<br/>
      * This function is not resetted automatically, to reset it, set $userInput=null<br/>
      * @param ?array $userInput
+     * @param bool   $throwNoInput (def:true) if true then it throws an exception if not input<br>
+     *                             if false, then if no more input then it cleans the userinput
      * @return void
      */
-    public static function testUserInput(?array $userInput): void
+    public static function testUserInput(?array $userInput, bool $throwNoInput = true): void
     {
         if ($userInput === null) {
-            self::$fakeReadLine=null;
+            self::$fakeReadLine = null;
             //unset(self::$fakeReadLine);
         } else {
             array_unshift($userInput, 0);
-            self::$fakeReadLine=$userInput;
+            self::$fakeReadLine = $userInput;
             //self::$fakeReadLine = $userInput;
         }
+        self::$throwNoInput = $throwNoInput;
     }
 
     /**
@@ -744,14 +748,15 @@ class CliOne
      *                                         value<br/>
      *                                         <b>last</b>: it reads the second argument "php program.php ...
      *                                         thisvalue" (without value)<br/>
-     *                                         <b>onlyinput</b>: the value means to be user-input, and it is stored<br/>
+     *                                         <b>onlyinput</b>: the value means to be user-input, and it is
+     *                                         stored<br/>
      *                                         <b>none</b>: the value it is not captured via argument, so it could be
      *                                         user-input, but it is not stored<br/> none parameters could always be
      *                                         overridden, and they are used to "temporary" input such as validations
      *                                         (y/n).
      * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]<br/>
-     *                                         --)<br/> if the type is a flag, then the alias is a double flag "--".<br/>
-     *                                         if the type is a double flag, then the alias is a flag.
+     *                                         --)<br/> if the type is a flag, then the alias is a double flag
+     *                                         "--".<br/> if the type is a double flag, then the alias is a flag.
      * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br/>
      *                                         <b>false</b> (default) the argument is a value
      * @return CliOneParam
@@ -1195,7 +1200,6 @@ class CliOne
     public function makeBigWords(string $word, string $font = 'atr', bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
     {
         $bf = $this->shadow('simple', 'full');
-        /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $bit1 = $bit1 ?? $bf;
         $result = [];
         $words = str_split($word);
@@ -3858,13 +3862,31 @@ class CliOne
         }
     }
 
-    public function getValueAsArray(?array $fields = null): array
+    /**
+     * It gets the values of the parameters are an associative array.
+     * @param array|null $fields       If the fields are null then it returns all parameters, including "none".
+     * @param bool       $asAssocArray (def:true) if true then it returns the values as an associative array<br>
+     *                                 if false, then it returns as an indexed array.
+     * @return array
+     */
+    public function getValueAsArray(?array $fields = null, bool $asAssocArray = true): array
     {
         $result = [];
-        foreach ($this->parameters as $v) {
-            /** @noinspection TypeUnsafeArraySearchInspection */
-            if ($fields === null || in_array($v->key, $fields)) {
-                $result[$v->key] = $this->getValue($v->key);
+        if ($fields === null) {
+            foreach ($this->parameters as $v) {
+                if ($asAssocArray) {
+                    $result[$v->key] = $this->getValue($v->key);
+                } else {
+                    $result[] = $this->getValue($v->key);
+                }
+            }
+        } else {
+            foreach ($fields as $field) {
+                if ($asAssocArray) {
+                    $result[$field] = $this->getValue($field);
+                } else {
+                    $result[] = $this->getValue($field);
+                }
             }
         }
         return $result;
@@ -4077,19 +4099,21 @@ class CliOne
     /**
      * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br/>
      * <pre>
-     * <red>error</red> (color red)
-     * <yellow>warning</yellow> (color yellow)
-     * <blue>information</blue> (blue)
-     * <yellow>yellow</yellow> (yellow)
-     * <green>green</green> <green>success</green> (color green)
-     * <italic>italic</italic>
-     * <bold>bold</bold>
-     * <dim>dim</dim>
-     * <underline>underline</underline>
-     * <cyan>cyan</cyan> (color light cyan)
-     * <magenta>magenta</magenta> (color magenta)
-     * <col0/><col1/><col2/><col3/><col4/><col5/>  columns. col0=0 (left),col1--col5 every column of the page.
-     * <option/> it shows all the options available (if the input has some options)
+     * &lt;red&gt;error&lt;/red&gt; (color red)
+     * &lt;yellow&gt;warning&lt;/yellow&gt; (color yellow)
+     * &lt;blue&gt;information&lt;/blue&gt; (blue)
+     * &lt;yellow&gt;yellow&lt;/yellow&gt; (yellow)
+     * &lt;green&gt;green&lt;/green&gt;  (color green)
+     * &lt;italic&gt;italic&lt;/italic&gt;
+     * &lt;bold&gt;bold&lt;/bold&gt;
+     * &lt;dim&gt;dim&lt;/dim&gt;
+     * &lt;underline&gt;underline&lt;/underline&gt;
+     * &lt;strikethrough&gt;strikethrough&lt;/strikethrough&gt;
+     * &lt;cyan&gt;cyan&lt;/cyan&gt; (color light cyan)
+     * &lt;magenta&gt;magenta&lt;/magenta&gt; (color magenta)
+     * &lt;col0/&gt;&lt;col1/&gt;&lt;col2/&gt;&lt;col3/&gt;&lt;col4/&gt;&lt;col5/&gt;  columns. col0=0
+     * (left),col1--col5 every column of the page.
+     * &lt;option/&gt; it shows all the options available (if the input has some options)
      * </pre>
      *
      *
@@ -4776,6 +4800,7 @@ class CliOne
     {
         $contentClear = $this->colorLess($content);
         if ($this->multibyte && $visual) {
+            /** @noinspection PhpComposerExtensionStubsInspection */
             return mb_strlen($contentClear);
         }
         return strlen($contentClear);
@@ -5270,17 +5295,20 @@ class CliOne
             $largo = $this->strlen($content);
         }
         // globals is used for phpunit.
-        if (self::$fakeReadLine!==null) {
+        if (self::$fakeReadLine !== null) {
             self::$fakeReadLine[0]++;
             if (self::$fakeReadLine[0] >= count(self::$fakeReadLine)) {
-                throw new RuntimeException('Test incorrect, it is waiting for read more CliOne::$fakeReadLine ' . json_encode(self::$fakeReadLine));
+                if (self::$throwNoInput) {
+                    throw new RuntimeException('Test incorrect, it is waiting for read more CliOne::$fakeReadLine ' . json_encode(self::$fakeReadLine));
+                }
+                self::$fakeReadLine = null; // end running ??load
+            } else {
+                $this->showLine('<green><underline>[' . self::$fakeReadLine[self::$fakeReadLine[0]] . ']</underline></green>');
+                if ($this->debug) {
+                    $this->debugHistory[] = self::$fakeReadLine[self::$fakeReadLine[0]];
+                }
+                return self::$fakeReadLine[self::$fakeReadLine[0]];
             }
-            $this->showLine('<green><underline>[' . self::$fakeReadLine[self::$fakeReadLine[0]] . ']</underline></green>');
-            if($this->debug) {
-
-                $this->debugHistory[]=self::$fakeReadLine[self::$fakeReadLine[0]];
-            }
-            return self::$fakeReadLine[self::$fakeReadLine[0]];
         }
         if (is_array($parameter->inputValue) && count($parameter->inputValue) > 0) {
             $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
@@ -5319,8 +5347,8 @@ class CliOne
             $r = readline(str_repeat(' ', $largo));
         }
         $r = $r === false ? false : trim($r);
-        if($this->debug) {
-            $this->debugHistory[]=$r;
+        if ($this->debug) {
+            $this->debugHistory[] = $r;
         }
         if (count($parameter->getHistory()) > 0) {
             // if we use a parameter history, then we return to the previous history
@@ -5552,17 +5580,45 @@ class CliOne
                 $txt = $this->showPattern($parameter, $parameter->key, $this->showParamValue($parameter), '', 9999, $prefix, $pattern);
                 while (true) {
                     $origInput = $this->readline($txt, $parameter);
-                    if(($origInput==='??history' || $origInput==='??clear')  && $this->debug) {
-                        echo "\n-------history-----\n";
-                        if($origInput==='??clear') {
-                            $this->debugHistory=[];
-                        } else {
-                            array_pop($this->debugHistory); // we remove '??history'
+                    if ($this->debug && strpos($origInput, '??') === 0) {
+                        switch ($origInput) {
+                            case strpos($origInput, '??save') === 0:
+                                $part = explode(':', $origInput, 2);
+                                $file = $part[1] ?? '_save';
+                                array_pop($this->debugHistory);
+                                $r = @file_put_contents($file . '.json', json_encode($this->debugHistory, JSON_PRETTY_PRINT));
+                                if ($r === false) {
+                                    $this->showCheck('error', 'red', 'unable to save file ' . $file . '.json');
+                                } else {
+                                    $this->showCheck('ok', 'green', 'file saved ' . $file . '.json');
+                                }
+                                break;
+                            case strpos($origInput, '??load') === 0:
+                                $part = explode(':', $origInput, 2);
+                                $file = $part[1] ?? '_save';
+                                array_pop($this->debugHistory);
+                                $r = @file_get_contents($file . '.json');
+                                if ($r === false) {
+                                    $this->showCheck('error', 'red', 'unable to load file ' . $file . '.json');
+                                }
+                                $r = json_decode($r, true);
+                                self::testUserInput(null);
+                                self::testUserInput($r, false);
+                                break;
+                            case '??history':
+                                echo "\n-------history-----\n";
+                                array_pop($this->debugHistory); // we remove '??history'
+                                var_export($this->debugHistory);
+                                echo "\n-------------------\n";
+                                break;
+                            case '??clear':
+                                echo "\n-------history-----\n";
+                                $this->debugHistory = [];
+                                var_export($this->debugHistory);
+                                echo "\n-------------------\n";
+                                break;
                         }
-                        /** @noinspection ForgottenDebugOutputInspection */
-                        var_export($this->debugHistory);
-                        echo "\n-------------------\n";
-                    } else if ($origInput === '?' || $origInput === '??')  {
+                    } else if ($origInput === '?' || $origInput === '??') {
                         $this->showHelp($parameter, $origInput === '??');
                     } else {
                         break;
@@ -5598,7 +5654,7 @@ class CliOne
                         $assoc = array_keys($parameter->inputValue) !== range(0, count($parameter->inputValue) - 1);
                         if (!$assoc) {
                             if ($parameter->value === 'a' || $parameter->value === 'n' || $parameter->value === '') {
-                                $parameter->value = $this->emptyValue . ($parameter->value ?? '');
+                                $parameter->value = $this->emptyValue . $parameter->value;
                                 $this->refreshParamValueKey($parameter);
                             } else if (is_numeric($parameter->value) && ($parameter->value <= count($parameter->inputValue))) {
                                 $parameter->valueKey = $parameter->value;

@@ -282,7 +282,7 @@ class CliOneTest extends TestCase
     {
         CliOne::testUserInput(null);
         CliOne::testArguments(['program.php', '-dosave', 'xxxx']); // this value must be ignored
-        CliOne::testUserInput(['bbb','??history','??clear','ccc', 'yes']);
+        CliOne::testUserInput(['bbb','??history','??save','??clear','ccc', 'yes']);
         $t = new CliOne();
         $t->debug=true;
         $this->assertEquals('yes'

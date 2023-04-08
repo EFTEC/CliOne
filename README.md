@@ -196,14 +196,14 @@ There are more operations available but the basic is there.
   * [Flow](#flow)
   * [Input as arguments](#input-as-arguments)
   * [Input interactive](#input-interactive)
-    * [User input (interactive)](#user-input--interactive-)
+    * [User input (interactive)](#user-input-interactive)
     * [Customize user input](#customize-user-input)
   * [menu](#menu)
-    * [addMenu()](#addmenu--)
-    * [addMenuItem()](#addmenuitem--)
-    * [addMenuItems()](#addmenuitems--)
-    * [evalMenu()](#evalmenu--)
-    * [clearMenu()](#clearmenu--)
+    * [addMenu()](#addmenu)
+    * [addMenuItem()](#addmenuitem)
+    * [addMenuItems()](#addmenuitems)
+    * [evalMenu()](#evalmenu)
+    * [clearMenu()](#clearmenu)
     * [example](#example)
   * [Examples](#examples)
     * [Example using arguments](#example-using-arguments)
@@ -214,6 +214,7 @@ There are more operations available but the basic is there.
   * [Types of user input](#types-of-user-input)
   * [Types of colors](#types-of-colors)
   * [Definitions](#definitions)
+  * [debug](#debug)
   * [Compatibility](#compatibility)
   * [Changelog](#changelog)
 <!-- TOC -->
@@ -626,6 +627,14 @@ And you can clear the history using the input ??clear
 
 The goal is we could store a session and replace it using testUserInput()
 
+You can also load and save the user input
+* **??history** it shows the history
+* **??clear** it clears the history
+* **??load** it load the user input and runs it.
+* **??save** it saves the user input in a file called _save.json
+* **??load:file** **??save:file** you can also specify the filename where it will be saved
+
+
 ```php
 $cli = new CliOne();
 CliOne::testUserInput([...]); // put your story here.
@@ -643,6 +652,10 @@ CliOne::testUserInput([...]); // put your story here.
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.29.1 (23-04-06)
+  * Fixed a bug with addMenuService() 
+* 1.29 (23-04-06)
+  * In the debug mode, you can ??load, ??save the operations. 
 * 1.28 (2023-04-05)
   * the $debug field, so you can debug and store the user input history.
   * PHP_FAKE_READLINE constant or global variable now is a static field $fakeReadLine
