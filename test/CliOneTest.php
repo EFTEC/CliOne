@@ -277,6 +277,16 @@ class CliOneTest extends TestCase
         $this->assertEquals('b', $v->value);
         //$this->assertEquals('b',$v->valueKey);
     }
+    public function testContainer() {
+        $t = new CliOne();
+        echo $t->createContainer(100,20)
+                ->addRow([],100,20)
+                    ->addCol(["123\nabc"],50,20)->close()
+                    ->addCol(['456'],50,20)->close()
+                ->close()
+            ->draw();
+
+    }
 
     public function testArgNone()
     {

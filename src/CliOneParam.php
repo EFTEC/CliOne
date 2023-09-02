@@ -1,4 +1,4 @@
-<?php
+<?php /** @noinspection UnknownInspectionInspection */
 
 namespace eftec\CliOne;
 /**
@@ -275,7 +275,7 @@ class CliOneParam
     }
 
     /**
-     * Return the if the parameter is valid (if the key is not null).
+     * Return if the parameter is valid (if the key is not null).
      * @return bool
      */
     public function isValid(): bool
@@ -346,7 +346,7 @@ class CliOneParam
      * <b>Example:</b><br>
      * <pre>
      * $this->createParam('test1')->setDefault('def')->setInput()->setCurrentAsDefault()->add();
-     * // the if the param has a value (not null), then the default is the value
+     * // if the param has a value (not null), then the default is the value
      * // otherwise, the default value is "def".
      * </pre>
      * @param bool $currentAsDefault

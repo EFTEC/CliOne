@@ -1,4 +1,6 @@
-<?php /** @noinspection DuplicatedCode */
+<?php /** @noinspection UnknownInspectionInspection */
+/** @noinspection ForgottenDebugOutputInspection */
+/** @noinspection DuplicatedCode */
 
 namespace eftec\CliOne;
 
@@ -131,11 +133,17 @@ class CliOne
             $this->noColor = true;
         }
         if (!$this->hasColorSupport()) {
-            if (PHP_OS_FAMILY === 'Windows') {
-                $this->noANSI = true;
-            }
             $this->noColor = true;
+            $this->noANSI = true;
+        } else if (PHP_OS_FAMILY === 'Windows') {
+            if ($this->getWindowsVersion()>=10.1607) {
+                // @getenv('PROMPT', true)
+                $this->noANSI = false; // its windows but it is a modern version
+            } else {
+                $this->noANSI = true; // its windows and it is an old version.
+            }
         }
+        //
         $this->colSize = $this->calculateColSize();
         $this->rowSize = $this->calculateRowSize();
         $t = floor($this->colSize / 6);
@@ -155,6 +163,42 @@ class CliOne
             }
             return $matches;
         });
+    }
+
+    /**
+     * It returns the current Windows version as a decimal number.<br>
+     * If no version is found then it returns 6.1 (Windows 7).<br>
+     * Windows 10 and Windows 11 versions are returned as 10.xxxx instead of 10.0.xxxx
+     *
+     * @return string
+     * @noinspection TypeUnsafeComparisonInspection
+     */
+    public function getWindowsVersion(): string
+    {
+        $version=trim(shell_exec('ver')??'');
+        if(strpos($version,'[')===false) {
+            return "6.1"; // no value found, returned: Windows 7
+        }
+        $parts=explode('[',$version);
+        if(strpos($parts[1],' ')===false) {
+            return "6.1"; // no value found, returned: Windows 7
+        }
+        $part2=explode(' ',$parts[1]); // Version 10.0.xxxx
+        if(strpos($part2[1],'.')===false) {
+            return "6.1"; // no value found, returned: Windows 7
+        }
+        $versions=explode('.',$part2[1].'.0.0.0.0');
+        if($versions[0]<10) { // example: Windows 7 6.1.7601
+            return $versions[0].'.'.$versions[1];
+        }
+        if($versions[0]>10) { // future use.
+            return $versions[0].'.'.$versions[1];
+        }
+        if(($versions[0] == 10) && $versions[1] == 0) {  // Windows 10 and 11 use the version 10.0.xxxx,
+                                                         // so we return 10.xxxx, omitting the 0 in between.
+            return $versions[0] . '.' . $versions[2];
+        }
+        return $versions[0] . '.' . $versions[1]; // in the case that it returns 10.xxx, then we returned it.
     }
 
     /**
@@ -532,7 +576,7 @@ class CliOne
      * <b>Example:</b><br/>
      * <pre>
      * $t->addVariableCallBack('call1', function(CliOne $cli) {
-     *          $cli->setVariable('v2', 'world',false); // the false is important if you don't want recursivity.
+     *          $cli->setVariable('v2', 'world',false); // the false is important if you don't want recursivity
      * });
      * </pre>
      * This function is called every setVariable() if the value is different as the defined.
@@ -755,7 +799,7 @@ class CliOne
      *                                         overridden, and they are used to "temporary" input such as validations
      *                                         (y/n).
      * @param string       $type               =['command','first','last','second','flag','longflag','onlyinput','none'][$i]<br/>
-     *                                         --)<br/> if the type is a flag, then the alias is a double flag
+     *                                         "-"<br/> if the type is a flag, then the alias is a double flag
      *                                         "--".<br/> if the type is a double flag, then the alias is a flag.
      * @param bool         $argumentIsValueKey <b>true</b> the argument is value-key<br/>
      *                                         <b>false</b> (default) the argument is a value
@@ -1196,6 +1240,7 @@ class CliOne
      * @param ?string $bit1 the visible character, if null then it will use a block code
      * @param string  $bit0 the invisible character
      * @return array
+     * @noinspection CallableParameterUseCaseInTypeContextInspection
      */
     public function makeBigWords(string $word, string $font = 'atr', bool $trim = false, ?string $bit1 = null, string $bit0 = ' '): array
     {
@@ -3525,7 +3570,7 @@ class CliOne
      * @param string $filename         the filename with or without extension.
      * @param string $defaultExtension the default extension.
      * @return array it returns an array of the type [bool,content,namevar]<br/>
-     *                                 In error, it returns [false,"error message",'']<br/>
+     *                                 In error, it returns[ [false,"error message",""]<br/>
      *                                 In success, it returns [true,[1,2,3],'$content']<br/>
      */
     public function readDataPHPFormat(string $filename, string $defaultExtension = '.config.php'): ?array
@@ -3860,6 +3905,11 @@ class CliOne
                 $this->setParam($k, $v, false, true);
             }
         }
+    }
+
+    public function createContainer($width, $height): CliOneContainer
+    {
+        return new CliOneContainer([], $width, $height, 'container', null);
     }
 
     /**
@@ -4512,7 +4562,7 @@ class CliOne
      */
     public function showProgressBar($currentValue, $max, int $columnWidth, ?string $currentValueText = null): void
     {
-        if (!$this->noANSI) {
+        if ($this->noANSI) {
             // progress bar is not compatible in old-cmd mode.
             return;
         }
@@ -4718,7 +4768,7 @@ class CliOne
      */
     public function showWaitCursor(bool $init = true, string $postfixValue = ''): void
     {
-        if (!$this->noANSI) {
+        if ($this->noANSI) {
             // progress bar is not compatible in old-cmd mode.
             return;
         }
@@ -5014,7 +5064,7 @@ class CliOne
                 /*
                  * Estado para dispositivo CON:
                  * ----------------------------
-                 * Líneas:              9001
+                 * Líneas: 9001
                  * Columnas: 85
                  * Ritmo del teclado: 31
                  * Retardo del teclado: 1
@@ -5451,7 +5501,7 @@ class CliOne
     }
 
     /**
-     * [full,light,soft,double], light usually it is an space.
+     * [full,light,soft,double], light usually it is a space.
      * <pre>
      * [$bf,$bl,$bm,$bd]=$this->shadow();
      * </pre>
