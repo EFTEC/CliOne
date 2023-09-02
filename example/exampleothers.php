@@ -21,12 +21,55 @@ include __DIR__.'/../src/CliOneParam.php';
 
 $cli=new CliOne(); // we create an instance
 
+// bar #1
 $cli->show('<yellow>loading: ');
+for($i=0; $i<=100; ++$i) {
+    $cli->setStyle('style')->showProgressBar($i,100,25," $i%");
+    usleep(25000);
+}
+$cli->showLine('</yellow>');
+// bar #mysql
+$cli->show('<yellow>loading: ')->hideCursor();
 for($i=0; $i<=100; ++$i) {
     $cli->setStyle('mysql')->showProgressBar($i,100,25," $i%");
     usleep(25000);
 }
-$cli->showLine('</yellow>');
+$cli->showCursor()->showLine('</yellow>');
+
+// wait #1
+$cli->show('<yellow>please wait: ');
+$cli->hideCursor()->setStyle('simple','bar3')->showWaitCursor(true);
+for($i=0;$i<=100;$i+=5) {
+    $cli->showWaitCursor(false,' '.$i.'%');
+    usleep(50000);
+}
+$cli->hideWaitCursor()->showCursor()->showLine('</yellow>');
+// wait #2
+$cli->show('<yellow>please wait: ');
+$cli->hideCursor()->setStyle('simple','pipe')->showWaitCursor();
+for($i=0;$i<=100;$i+=5) {
+    $cli->showWaitCursor(false,' '.$i.'%');
+    usleep(50000);
+}
+$cli->hideWaitCursor()->showCursor()->showLine('</yellow>');
+// wait #2
+$cli->show('<yellow>please wait: ');
+$cli->hideCursor()->setStyle('simple','triangle')->showWaitCursor();
+for($i=0;$i<=100;$i+=5) {
+    $cli->showWaitCursor(false,' '.$i.'%');
+    usleep(50000);
+}
+$cli->showCursor()->showLine('</yellow>');
+// wait #3
+$cli->show('<yellow>please wait: ');
+$cli->hideCursor()->setStyle('simple','braille')->showWaitCursor();
+for($i=0;$i<=100;$i+=5) {
+    $cli->showWaitCursor(false,' '.$i.'%');
+    usleep(50000);
+}
+$cli->showCursor()->showLine('</yellow>');
+
+
 
 $cli->show('<green>loading: ');
 for($i=0; $i<=100; ++$i) {
@@ -35,12 +78,6 @@ for($i=0; $i<=100; ++$i) {
 }
 $cli->showLine('</green>');
 
-$cli->show('<yellow>please wait: ');
-$cli->showWaitCursor(true);
-for($i=0;$i<=100;$i+=5) {
-    $cli->showWaitCursor(false,' '.$i.'%');
-    usleep(50000);
-}
-$cli->showLine('</yellow>');
+
 
 

@@ -652,8 +652,14 @@ CliOne::testUserInput([...]); // put your story here.
 * The screen size width is -1 column less in older version of Windows. C'mon, Microsoft!
 
 ## Changelog
+* 1.31 (23-09-02)
+  * new methods:
+    * hideCursor()
+    * showCursor()
+  * modified method:
+    * setStyle() now allows two arguments.
 * 1.30 (23-09-02)
-  * Best identification of the version of Windows.
+  * Best identification of the version of Windows. 10.1607 and higher is considered compatible.
   * Fixed: scroll and wait cursor now work correctly.
   * Preliminary Container.
 * 1.29.1 (23-04-06)

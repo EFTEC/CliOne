@@ -15,12 +15,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.28
+ * @version   1.31
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.28';
+    public const VERSION = '1.31';
     /**
      * @var bool if debug is true then:<br>
      *           1) every operation will be recorded in $this->debugHistory<br>
@@ -66,6 +66,7 @@ class CliOne
     /** @var bool if true then mb_string library is loaded, otherwise it is false. it is calculated in the constructor */
     protected $multibyte = false;
     protected $styleStack = 'simple';
+    protected $styleIconStack = 'line';
     /** @var string[] [$alignTitle, $alignContent, $alignContentNumeric] */
     protected $alignStack = ['middle', 'middle', 'middle'];
     protected $colorStack = [];
@@ -76,7 +77,9 @@ class CliOne
     /** @var array It is an associative array used to replace when the value displayed contains {{namevar}} */
     protected $variables = [];
     protected $variablesCallback = [];
+    /** @var int used internally for waiting cursor */
     protected $wait = 0;
+    protected $waitSize = 1;
     /** @var string=['silent','show','throw'][$i] */
     protected $errorType = 'show';
     /** @var CliOne */
@@ -136,7 +139,7 @@ class CliOne
             $this->noColor = true;
             $this->noANSI = true;
         } else if (PHP_OS_FAMILY === 'Windows') {
-            if ($this->getWindowsVersion()>=10.1607) {
+            if ($this->getWindowsVersion() >= 10.1607) {
                 // @getenv('PROMPT', true)
                 $this->noANSI = false; // its windows but it is a modern version
             } else {
@@ -175,27 +178,27 @@ class CliOne
      */
     public function getWindowsVersion(): string
     {
-        $version=trim(shell_exec('ver')??'');
-        if(strpos($version,'[')===false) {
+        $version = trim(shell_exec('ver') ?? '');
+        if (strpos($version, '[') === false) {
             return "6.1"; // no value found, returned: Windows 7
         }
-        $parts=explode('[',$version);
-        if(strpos($parts[1],' ')===false) {
+        $parts = explode('[', $version);
+        if (strpos($parts[1], ' ') === false) {
             return "6.1"; // no value found, returned: Windows 7
         }
-        $part2=explode(' ',$parts[1]); // Version 10.0.xxxx
-        if(strpos($part2[1],'.')===false) {
+        $part2 = explode(' ', $parts[1]); // Version 10.0.xxxx
+        if (strpos($part2[1], '.') === false) {
             return "6.1"; // no value found, returned: Windows 7
         }
-        $versions=explode('.',$part2[1].'.0.0.0.0');
-        if($versions[0]<10) { // example: Windows 7 6.1.7601
-            return $versions[0].'.'.$versions[1];
+        $versions = explode('.', $part2[1] . '.0.0.0.0');
+        if ($versions[0] < 10) { // example: Windows 7 6.1.7601
+            return $versions[0] . '.' . $versions[1];
         }
-        if($versions[0]>10) { // future use.
-            return $versions[0].'.'.$versions[1];
+        if ($versions[0] > 10) { // future use.
+            return $versions[0] . '.' . $versions[1];
         }
-        if(($versions[0] == 10) && $versions[1] == 0) {  // Windows 10 and 11 use the version 10.0.xxxx,
-                                                         // so we return 10.xxxx, omitting the 0 in between.
+        if (($versions[0] == 10) && $versions[1] == 0) {  // Windows 10 and 11 use the version 10.0.xxxx,
+            // so we return 10.xxxx, omitting the 0 in between.
             return $versions[0] . '.' . $versions[2];
         }
         return $versions[0] . '.' . $versions[1]; // in the case that it returns 10.xxx, then we returned it.
@@ -3989,12 +3992,17 @@ class CliOne
     }
 
     /**
-     * @param string $style =['mysql','simple','double','minimal'][$i]
+     * It sets the styles used by different elements
+     * @param string       $style            =['mysql','simple','double','minimal','style'][$i]
+     * @param string|array $waitingIconStyle =['triangle','braille','pipe','braille2','bar','bar2','bar3','arc','waiting'][$i]
+     *                                       <br>if is an array, then it uses the elements of array to show the waiting
+     *                                       icon
      * @return $this
      */
-    public function setStyle(string $style = 'simple'): self
+    public function setStyle(string $style = 'simple', $waitingIconStyle = 'line'): self
     {
         $this->styleStack = $style;
+        $this->styleIconStack = $waitingIconStyle;
         return $this;
     }
 
@@ -4003,10 +4011,10 @@ class CliOne
      *
      * @param string  $content
      * @param ?string $stream =['stdout','stderr','memory'][$i]
-     * @return void
+     * @return CliOne
      * @see CliOne::showLine
      */
-    public function show(string $content, ?string $stream = null): void
+    public function show(string $content, ?string $stream = null): CliOne
     {
         switch ($stream ?? $this->defaultStream) {
             case 'stderr':
@@ -4025,6 +4033,7 @@ class CliOne
         } else {
             fwrite($this->MEMORY, $r);
         }
+        return $this;
     }
 
     /**
@@ -4760,49 +4769,100 @@ class CliOne
     }
 
     /**
-     * It shows a waiting cursor.
-     * @param bool   $init         the first time this method is called, you must set this value as true. Then, every
-     *                             update must be false.
-     * @param string $postfixValue if you want to set a profix value such as percentage, advance, etc.
-     * @return void
+     * It shows a waiting cursor.<br>
+     * <b>Example:</b><br/>
+     * <pre>
+     * $this->hideCursor()->showWaitCursor(true);
+     * $this->showWaitCursor(); // inside a loop.
+     * $this->hideWaitCursor()->showCursor(); // at the end of the loop
+     * </pre>
+     * @param bool   $init               the first time this method is called, you must set this value as true. Then,
+     *                                   every update must be false.
+     * @param string $postfixValue       if you want to set a profix value such as percentage, advance, etc.
+     * @return CliOne
      */
-    public function showWaitCursor(bool $init = true, string $postfixValue = ''): void
+    public function showWaitCursor(bool $init = true, string $postfixValue = ''): CliOne
     {
         if ($this->noANSI) {
             // progress bar is not compatible in old-cmd mode.
-            return;
+            return $this;
         }
         if ($init) {
             $this->wait = 0;
         }
         $this->wait++;
-        switch ($this->wait) {
-            case 0:
-            case 4:
-                $c = '|';
+        switch ($this->styleIconStack) {
+            case 'arc':
+                $styleItem = ["◜", "◠", "◝", "◞", "◡", "◟"];
                 break;
-            case 1:
-                $c = '/';
+            case 'bar3':
+                $styleItem=["▰▱▱▱▱▱▱", "▰▰▱▱▱▱▱", "▰▰▰▱▱▱▱", "▰▰▰▰▱▱▱", "▰▰▰▰▰▱▱",
+                    "▰▰▰▰▰▰▱", "▰▰▰▰▰▰▰",];
                 break;
-            case 2:
-            case 5:
-                $c = '-';
+            case 'waiting':
+                $styleItem = ['wait...', 'wait.. ', 'wait.  ', 'wait   ', 'wait.  ', 'wait.. ', 'wait...'];
                 break;
-            case 3:
-            case 6:
-                $c = '\\';
+            case 'pipe':
+                $styleItem = ['┤', '┘', '┴', '└', '├', '┌', '┬', '┐'];
+                break;
+            case 'bar':
+                $styleItem = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃', '▁'];
+                break;
+            case 'bar2':
+                $styleItem = ['▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+                break;
+            case 'braille2':
+                $styleItem = ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'];
+                break;
+            case 'triangle':
+                $styleItem = ['◢', '◣', '◤', '◥'];
+                break;
+            case 'braille':
+                $styleItem = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
                 break;
             default:
-                $this->wait = 0;
-                $c = '|';
-                break;
+                $styleItem = ['|', '/', '-', '\\'];
         }
+        if ($this->wait >= count($styleItem)) {
+            $this->wait = 0;
+        }
+        $c = $styleItem[$this->wait];
+        $this->waitSize = $this->strlen($c);
         if ($init) {
             $this->show($c . $postfixValue);
         } else {
-            $this->show("\e[" . ($this->strlen($this->waitPrev) + 1) . "D" . $c . $postfixValue); // [2D 2 left, [C 1 right
+            $this->show("\e[" . ($this->strlen($this->waitPrev) + $this->waitSize) . "D" . $c . $postfixValue); // [2D 2 left, [C 1 right
         }
         $this->waitPrev = $postfixValue;
+        return $this;
+    }
+
+    public function hideWaitCursor(bool $init = false): CliOne
+    {
+        if ($init) {
+            $this->show(' ');
+        } else {
+            $this->show("\e[" . ($this->strlen($this->waitPrev) + $this->waitSize) . "D" . str_repeat(' ', $this->waitSize)); // [2D 2 left, [C 1 right
+        }
+        return $this;
+    }
+
+    public function hideCursor(): CliOne
+    {
+        if($this->noANSI) {
+            return $this;
+        }
+        $this->show("\e[?25l");
+        return $this;
+    }
+
+    public function showCursor(): CliOne
+    {
+        if($this->noANSI) {
+            return $this;
+        }
+        $this->show("\e[?25h");
+        return $this;
     }
 
     /**
@@ -4945,12 +5005,22 @@ class CliOne
      * // up left, up middle, up right, middle left, middle right, down left, down middle, down right.
      * [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv]=$this->border();
      * </pre>
-     * @param string $style =['mysql','simple','double']
+     * @param string $style =['mysql','simple','double','style']
      * @return string[]
      */
     protected function border(string $style): array
     {
         switch ($style) {
+            case 'style':
+                return $this->noANSI ? [
+                    'É', 'Í', '»',
+                    'º', 'Í', 'º',
+                    'È', 'Í', '¼', 'º'
+                ]
+                    : [
+                        '╒', '═', '╕',
+                        '│', '═', '│',
+                        '╘', '═', '╛', '│'];
             case 'mysql':
                 return [
                     '+', '-', '+',
@@ -5505,7 +5575,7 @@ class CliOne
      * <pre>
      * [$bf,$bl,$bm,$bd]=$this->shadow();
      * </pre>
-     * @param string $style       =['mysql','simple','double']
+     * @param string $style       =['mysql','simple','double','style']
      * @param string $returnValue =['full','light','soft','double'][$i]
      * @return string|array
      */
@@ -5514,6 +5584,11 @@ class CliOne
         switch ($style) {
             case 'mysql':
                 $r = ['#', ' ', '-', '='];
+                break;
+            case 'style':
+                $r = $this->noColor ?
+                    ['#', ' ', '-', '=']:
+                    ['▰', '▱', '▱', '▰'];
                 break;
             case 'simple':
                 $r = $this->noColor ?
