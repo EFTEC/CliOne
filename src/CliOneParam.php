@@ -1,6 +1,8 @@
 <?php /** @noinspection UnknownInspectionInspection */
 
 namespace eftec\CliOne;
+use JsonException;
+
 /**
  * CliOne - A simple creator of command line argument program.
  *
@@ -17,38 +19,38 @@ class CliOneParam
      * The key of the parameter. If null then the parameter is invalid.
      * @var string|null
      */
-    public $key;
+    public ?string $key = null;
     /** @var string=['command','first','last','second','flag','longflag','onlyinput','none'][$i] */
-    public $type;
-    public $alias = [];
+    public string $type;
+    public array $alias = [];
     /**
      * @var string|null
      */
-    public $question = '';
+    public ?string $question = '';
     /** @var mixed the default value */
     public $default = false;
-    public $currentAsDefault = false;
-    /** @var
-     * bool if true then it allows empty values as valid values.<br>
+    public bool $currentAsDefault = false;
+    /** @var bool
+     * if true then it allows empty values as valid values.<br>
      * However, "multiple" allows "empty" regardless of this option<br>
      * Also, if the default value is empty, then it is also allowed<br>
      */
-    public $allowEmpty = false;
-    public $description = '';
+    public bool $allowEmpty = false;
+    public string $description = '';
     /** @var bool if true then the field is required */
-    public $required = false;
+    public bool $required = false;
     /** @var bool if true then this parameter could be user-input */
-    public $input = false;
+    public bool $input = false;
     /** @var bool if true then the value is not entered, but it could have a value (default value) */
-    public $missing = true;
+    public bool $missing = true;
     /** @var string=['none','argument','input','set'][$i] indicates the origin of the value of the argument */
-    public $origin = 'none';
+    public string $origin = 'none';
     /**
      * @var string=['number','range','string','password','multiple','multiple2','multiple3','multiple4','option','option2','option3','option4','optionshort'][$i]
      */
-    public $inputType = 'string';
+    public string $inputType = 'string';
     /** @var array|null the values to select. It is used for option and multiple, but it is also used for auto-complete. */
-    public $inputValue = [];
+    public ?array $inputValue = [];
     /** @var mixed the current value of the parameter */
     public $value;
     /** @var mixed the current value-key of the parameter. If the parameter is an option or multiple, then this value is the key */
@@ -57,15 +59,15 @@ class CliOneParam
      * @var boolean <b>true</b> the argument is value-key<br>
      *                                 <b>false</b> (default) the argument is a value
      */
-    public $argumentIsValueKey = false;
-    protected $addHistory = false;
-    protected $helpSyntax = [];
-    protected $nameArg = '';
-    protected $patterColumns;
-    protected $patternQuestion;
-    protected $related = [];
-    protected $footer;
-    protected $history = [];
+    public bool $argumentIsValueKey = false;
+    protected bool $addHistory = false;
+    protected array $helpSyntax = [];
+    protected string $nameArg = '';
+    protected ?string $patterColumns = null;
+    protected ?string $patternQuestion=null;
+    protected array $related = [];
+    protected ?string $footer = null;
+    protected array $history = [];
 
 
     /**
@@ -186,6 +188,7 @@ class CliOneParam
      * @param bool $returnValue If true, then it returns the value obtained.<br>
      *                          If false (default value), it returns an instance of CliOneParam.
      * @return mixed
+     * @throws JsonException
      */
     public function evalParam(bool $forceInput = false, bool $returnValue = false)
     {

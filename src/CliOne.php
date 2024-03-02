@@ -6,6 +6,7 @@ namespace eftec\CliOne;
 
 use DateTime;
 use Exception;
+use JsonException;
 use RuntimeException;
 
 /**
@@ -15,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.31
+ * @version   1.32
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.31';
+    public const VERSION = '1.32';
     /**
      * @var bool if debug is true then:<br>
      *           1) every operation will be recorded in $this->debugHistory<br>
@@ -29,22 +30,22 @@ class CliOne
      *           4) if you input ??save then, it saves the history in a file called _save.json
      *           5) if you input ??load then, it loads the history and executes it.
      */
-    public $debug = false;
-    public $debugHistory = [];
+    public bool $debug = false;
+    public array $debugHistory = [];
     /** @var array|null this field is called by self::testUserInput() and It's used for debug purpose. */
-    public static $fakeReadLine;
-    public static $throwNoInput;
-    public static $autocomplete = [];
+    public static ?array $fakeReadLine;
+    public static bool $throwNoInput = false;
+    public static array $autocomplete = [];
     /**
      * @var string it is the empty value used for escape, but it is also used to mark values that aren't selected
      *             directly "a" all, "n" nothing, "" enter exit
      */
-    public $emptyValue = '__INPUT_';
-    public $origin;
+    public string $emptyValue = '__INPUT_';
+    public ?string $origin;
     /** @var string $error it stores the latest error */
-    public $error;
+    public string $error;
     /** @var CliOneParam[] */
-    public $parameters = [];
+    public array $parameters = [];
     /**
      * If <b>true</b> (default value), then the values are echo automatically on the screen.<br/>
      * If <b>false</b>, then the values are stored into the memory.<br/>
@@ -53,81 +54,82 @@ class CliOne
      * @see CliOne::getMemory
      * @see CliOne::setMemory
      */
-    public $echo = true;
+    public bool $echo = true;
     public $MEMORY;
-    public $menu = [];
-    public $menuServices = [];
-    public $menuEventItem = [];
-    public $menuEventMenu = [];
-    protected $defaultStream = 'stdout';
+    public array $menu = [];
+    public array $menuServices = [];
+    public array $menuEventItem = [];
+    public array $menuEventMenu = [];
+    protected string $defaultStream = 'stdout';
     protected $colSize = 80;
     protected $rowSize = 25;
-    protected $bread = [];
+    protected array $bread = [];
     /** @var bool if true then mb_string library is loaded, otherwise it is false. it is calculated in the constructor */
-    protected $multibyte = false;
-    protected $styleStack = 'simple';
-    protected $styleIconStack = 'line';
+    protected bool $multibyte = false;
+    protected string $styleStack = 'simple';
+    protected string $styleIconStack = 'line';
     /** @var string[] [$alignTitle, $alignContent, $alignContentNumeric] */
-    protected $alignStack = ['middle', 'middle', 'middle'];
-    protected $colorStack = [];
-    protected $patternTitleStack;
-    protected $patternCurrentStack;
-    protected $patternSeparatorStack;
-    protected $patternContentStack;
+    protected array $alignStack = ['middle', 'middle', 'middle'];
+    protected array $colorStack = [];
+    protected ?string $patternTitleStack = null;
+    protected ?string $patternCurrentStack = null ;
+    protected ? string $patternSeparatorStack= null;
+    protected ? string $patternContentStack = null;
     /** @var array It is an associative array used to replace when the value displayed contains {{namevar}} */
-    protected $variables = [];
-    protected $variablesCallback = [];
+    protected array $variables = [];
+    protected array $variablesCallback = [];
     /** @var int used internally for waiting cursor */
-    protected $wait = 0;
-    protected $waitSize = 1;
+    protected int $wait = 0;
+    protected int $waitSize = 1;
     /** @var string=['silent','show','throw'][$i] */
-    protected $errorType = 'show';
-    /** @var CliOne */
-    protected static $instance;
-    protected $waitPrev = '';
+    protected string $errorType = 'show';
+    /** @var CliOne|null */
+    protected static ?CliOne $instance = null;
+    protected string $waitPrev = '';
     /** @var string the original script file */
-    protected $phpOriginalFile = '';
+    protected string $phpOriginalFile = '';
     /**
      * the arguments as a couple key/value. If the value is missing, then it is ''
      * @var array
      */
-    protected $argv = [];
+    protected array $argv = [];
     /** @var bool if true then it will not show colors */
-    protected $noColor = false;
+    protected bool $noColor = false;
     /** @var bool if true then the console is in old-cmd mode (no colors, no utf-8 characters, etc.) */
-    protected $noANSI = false;
-    public $colorTags = ['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
+    protected bool $noANSI = false;
+    public array $colorTags = ['<red>', '</red>', '<yellow>', '</yellow>', '<green>', '</green>',
         '<white>', '</white>', '<blue>', '</blue>', '<black>', '</black>',
         '<cyan>', '</cyan>', '<magenta>', '</magenta>',
         '<bred>', '</bred>', '<byellow>', '</byellow>', '<bgreen>', '</bgreen>',
         '<bwhite>', '</bwhite>', '<bblue>', '</bblue>', '<bblack>', '</bblack>',
         '<bcyan>', '</bcyan>', '<bmagenta>', '</bmagenta>'];
-    public $styleTextTags = ['<italic>', '</italic>', '<bold>', '</bold>', '<dim>', '</dim>',
+    public array $styleTextTags = ['<italic>', '</italic>', '<bold>', '</bold>', '<dim>', '</dim>',
         '<underline>', '</underline>', '<strikethrough>', '</strikethrough>'];
-    public $columnTags = ['<col0/>', '<col1/>', '<col2/>',
+    public array $columnTags = ['<col0/>', '<col1/>', '<col2/>',
         '<col3/>', '<col4/>', '<col5/>',];
-    public $colorEscape = ["\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
+    public array $colorEscape = ["\e[31m", "\e[39m", "\e[33m", "\e[39m", "\e[32m", "\e[39m",
         "\e[37m", "\e[39m", "\e[34m", "\e[39m", "\e[30m", "\e[39m",
         "\e[36m", "\e[39m", "\e[35m", "\e[39m",
         "\e[41m", "\e[49m", "\e[43m", "\e[49m", "\e[42m", "\e[49m",
         "\e[47m", "\e[49m", "\e[44m", "\e[49m", "\e[40m", "\e[49m",
         "\e[46m", "\e[49m", "\e[45m", "\e[49m",];
     /** @var string[] note, it must be 2 digits */
-    public $styleTextEscape = ["\e[03m", "\e[23m", "\e[01m", "\e[22m", "\e[02m", "\e[22m",
+    public array $styleTextEscape = ["\e[03m", "\e[23m", "\e[01m", "\e[22m", "\e[02m", "\e[22m",
         "\e[04m", "\e[24m", "\e[09m", "\e[29m"];
-    public $columnEscape = [];
-    protected $columnEscapeCmd = [];
+    public array $columnEscape = [];
+    protected array $columnEscapeCmd = [];
 
     /**
      * The constructor. If there is an instance, then it replaces the instance.
      * @param string|null $origin you can specify the origin script file. If you specify the origin script
      *                            then, isCli will only return true if the file is called directly using its file.
+     * @param bool        $ignoreCli if true, then it will run no matter if it is running on cli or not.
      */
-    public function __construct(?string $origin = null)
+    public function __construct(?string $origin = null,bool $ignoreCli=false)
     {
         self::$instance = $this;
         $this->origin = $origin;
-        if (!$this->isCli()) {
+        if (!$ignoreCli && !$this->isCli()) {
             die("you are not running a CLI: " . $this->error);
         }
         $this->MEMORY = fopen('php://memory', 'rwb');
@@ -260,12 +262,12 @@ class CliOne
     /**
      * It adds a new menu that could be called by evalMenu()<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * //"fnheader" call to $this->menuHeader(CliOne $cli);
      * $this->addMenu('idmenu','fnheader',null,'What do you want to do?','option3');
      * // you can use a callable argument, the first argument is of type CliOne.
      * $this->addMenu('idmenu',function($cli) { echo "header";},function($cli) { echo "footer;"});
-     * </pre>
+     * ```
      * @param string               $idMenu         The unique name of the menu
      * @param string|null|callable $headerFunction Optional, the name of the method called every time the menu is
      *                                             displayed<br/>
@@ -295,7 +297,7 @@ class CliOne
     /**
      * It adds a menu item.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $this->addMenu('menu1');
      * // if op1 is selected then it calls method menufnop1(), the prefix is for protection.
      * $this->addMenuItem('menu1','op1','option #1','fnop1');
@@ -311,7 +313,7 @@ class CliOne
      *      return 'EXIT'; // if any function returns EXIT (uppercase), then the menu ends (simmilar to "empty to
      *      exit")
      * }
-     * </pre>
+     * ```
      *
      * @param string               $idMenu        The unique name of the menu
      * @param string               $indexMenuItem The unique index of the menu. It is used for selection and action
@@ -334,12 +336,12 @@ class CliOne
     /**
      * It adds multiples items to a menu<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $this->addMenu('menu1');
      * $this->addMenuItems('menu1',[
      *                'op1'=>['operation #1','action1'], // with description & action
      *                'op2'=>'operation #2']); // the action is "op2"
-     * </pre>
+     * ```
      * @param string     $idMenu The unique name of the menu
      * @param array|null $items  An associative array with the items to add. Examples:<br/>
      *                           [index=>[description,action]]<br/>
@@ -367,12 +369,12 @@ class CliOne
      * then it is only called by the first object.<br/>
      * If evalMenu() uses a service then, the services defined here are ignored.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $objService=new Class1();
      * $this->addMenuService('menu1',$objService);
      * // or:
      * $this->addMenuService('menu1',Class1:class);
-     * </pre>
+     * ```
      * @param string        $idMenu  The unique name of the menu
      * @param object|string $service The service object or the name of the class.<br/>
      *                               If it is a name of a class, then it creates an instance of it.
@@ -390,13 +392,13 @@ class CliOne
     /**
      * Eval (executes) a menu previously defined.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $this->addMenu('menu1');
      * // pending: add items to the menu
      * $this->evalMenu('menu1',$myService);
      * // or also
      * $this->>addMenu('menu1')->addMenuService('menu1',$myService)->evalMenu('menu1');
-     * </pre>
+     * ```
      * @param string            $idMenu The unique name of the menu
      * @param object|null|array $caller The caller object(s). It is used to the events and actions.<br/>
      *                                  If null, then it use the services defined by addMenuService();<br/>
@@ -404,6 +406,7 @@ class CliOne
      *                                  If this argument is used then addMenuService() is ignored
      *
      * @return CliOne
+     * @throws JsonException
      */
     public function evalMenu(string $idMenu, $caller = null): CliOne
     {
@@ -577,11 +580,11 @@ class CliOne
     /**
      * It adds a callback function.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $t->addVariableCallBack('call1', function(CliOne $cli) {
      *          $cli->setVariable('v2', 'world',false); // the false is important if you don't want recursivity
      * });
-     * </pre>
+     * ```
      * This function is called every setVariable() if the value is different as the defined.
      * @param string        $callbackName the name of the function. If the function exists, then it is replaced.
      * @param callable|null $function     If the function is null, then it deleted the function assigned.<br/>
@@ -776,11 +779,11 @@ class CliOne
     /**
      * It creates a new parameter to be read from the command line and/or to be input manually by the user<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $this->createParam('k1','first'); // php program.php thissubcommand
      * $this->createParam('k1','flag',['flag2','flag3']); // php program.php -k1 <val> or --flag2 <val> or --flag3
      * <val>
-     * </pre>
+     * ```
      * @param string       $key                The key or the parameter. It must be unique.
      * @param array|string $alias              A simple array with the name of the arguments to read (without - or
      *                                         <b>flag</b>: (default) it reads a flag "php program.php -thisflag
@@ -846,7 +849,7 @@ class CliOne
      * It evaluates the parameters obtained from the syntax of the command.<br/>
      * The parameters must be defined before call this method<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * // shell:
      * php mycode.php -argument1 hello -argument2 world
      *
@@ -854,13 +857,14 @@ class CliOne
      * $t=new CliOne('mycode.php');
      * $t->createParam('argument1')->add();
      * $result=$t->evalParam('argument1'); // an object ClieOneParam where value is "hello"
-     * </pre>
+     * ```
      * @param string $key         the key to read.<br/>
      *                            If $key='*' then it reads the first flag and returns its value (if any).
      * @param bool   $forceInput  it forces input no matter if the value is already inserted.
      * @param bool   $returnValue If true, then it returns the value obtained.<br/>
      *                            If false (default value), it returns an instance of CliOneParam.
      * @return mixed Returns false if not value is found.
+     * @throws JsonException
      */
     public function evalParam(string $key = '*', bool $forceInput = false, bool $returnValue = false)
     {
@@ -1073,12 +1077,12 @@ class CliOne
     /**
      * It reads a value of a parameter.
      * <b>Example:</b><bt>
-     * <pre>
+     * ```php
      * // [1] option1
      * // [2] option2
      * // select a value [] 2
      * $v=$this->getValueKey('idparam'); // it will return "option2".
-     * </pre>
+     * ```
      * @param string $key the key of the parameter to read the value
      * @return mixed|null It returns the value of the parameter or null if not found.
      */
@@ -1200,12 +1204,19 @@ class CliOne
         return [true, $value];
     }
 
+    /**
+     * It shows the help
+     * @param CliOneParam $parameter
+     * @param bool        $verbose
+     * @return void
+     * @throws JsonException
+     */
     public function showHelp(CliOneParam $parameter, bool $verbose): void
     {
         $this->showLine("<yellow>Help</yellow> [$parameter->key]");
         if ($verbose) {
             if (count($parameter->alias) > 0) {
-                $this->showLine("  <yellow>Aliases: </yellow> " . json_encode($parameter->alias));
+                $this->showLine("  <yellow>Aliases: </yellow> " . json_encode($parameter->alias, JSON_THROW_ON_ERROR));
             }
             $this->showLine("  <yellow>Can be called as argument?: </yellow>" .
                 (($parameter->type !== 'onlyinput' && $parameter->type !== 'none') ? 'yes' : 'no'));
@@ -3480,12 +3491,12 @@ class CliOne
     /**
      * It reads the value-key of a parameter selected. It is useful for a list of elements.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * // [1] option1
      * // [2] option2
      * // select a value [] 2
      * $v=$this->getValueKey('idparam'); // it will return 2 instead of "option2"
-     * </pre>
+     * ```
      * @param string $key the key of the parameter to read the value-key
      * @return mixed|null It returns the value of the parameter or null if not found.
      *
@@ -3503,13 +3514,13 @@ class CliOne
      * It will return true if the PHP is running on CLI<br/>
      * If the constructor specified a file, then it is also used for validation.
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * // page.php:
      * $inst=new CliOne('page.php'); // this security avoid calling the cli when this file is called by others.
      * if($inst->isCli()) {
      *    echo "Is CLI and the current page is page.php";
      * }
-     * </pre>
+     * ```
      * @return bool
      */
     public function isCli(): bool
@@ -3562,7 +3573,7 @@ class CliOne
                 throw new RuntimeException("Unable to read file $filename");
             }
             $content = substr($content, strpos($content, "\n") + 1); // remove the first line.
-            return [true, json_decode($content, true)];
+            return [true, json_decode($content, true, 512, JSON_THROW_ON_ERROR)];
         } catch (Exception $ex) {
             return [false, $ex->getMessage()];
         }
@@ -3697,6 +3708,7 @@ class CliOne
      * @param mixed  $content          The content to save. It will be serialized.
      * @param string $defaultExtension The default extension.
      * @return string empty string if the operation is correct, otherwise it will return a message with the error.
+     * @throws JsonException
      */
     public function saveData(string $filename, $content, string $defaultExtension = '.config.php'): string
     {
@@ -3704,7 +3716,7 @@ class CliOne
         $now = (new DateTime())->format('Y-m-d H:i');
         $contentData = "<?php http_response_code(404); die(1); " .
             "// eftec/CliOne(" . $this::VERSION . ") configuration file (date gen: $now)?>\n";
-        $contentData .= json_encode($content, JSON_PRETTY_PRINT);
+        $contentData .= json_encode($content, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
         try {
             $f = @file_put_contents($filename, $contentData);
             if ($f === false) {
@@ -3731,9 +3743,9 @@ class CliOne
     /**
      * It saves the information into a file. The content will be converted into a PHP file.<br/>
      * <b>example:</b><br/>
-     * <pre>
+     * ```php
      * $this->saveDataPHPFormat('file',[1,2,3]); // it will save a file with the next content: $config=[1,2,3];
-     * </pre>
+     * ```
      * @param string $filename         the filename (without extension) to where the value will be saved.
      * @param mixed  $content          The content to save. It will be serialized.
      * @param string $defaultExtension The default extension.
@@ -3763,9 +3775,9 @@ class CliOne
     /**
      * It sets the alignment.  This method is stackable.<br/>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $cli->setAlign('left','left','right')->setStyle('double')->showTable($values);
-     * </pre>>
+     * ```>
      * @param string $title          =['left','right','middle'][$i] the alignment of the title
      * @param string $content        =['left','right','middle'][$i] the alignment of the content
      * @param string $contentNumeric =['left','right','middle'][$i] the alignment of the content (numeric)
@@ -4041,12 +4053,12 @@ class CliOne
      * To add values you could use the method uplevel()<br/>
      * To remove a value (going down a level) you could use the method downlevel()<br/>
      * You can also change the style using setPattern1(),setPattern2(),setPattern3()<br/>
-     * <pre>
+     * ```php
      * $cli->setPattern1('{value}{type}') // the level
      *      ->setPattern2('<bred>{value}</bred>{type}') // the current level
      *      ->setPattern3(' -> ') // the separator
      *      ->showBread();
-     * </pre>
+     * ```
      * It shows the current BreadCrumb if any.
      * @param bool $showIfEmpty if true then it shows the breadcrumb even if it is empty (empty line)<br/>
      *                          if false (default) then it doesn't show the breadcrumb if it is empty.
@@ -4157,7 +4169,7 @@ class CliOne
 
     /**
      * It shows (echo) a colored line. The syntax of the color is similar to html as follows:<br/>
-     * <pre>
+     * ```php
      * &lt;red&gt;error&lt;/red&gt; (color red)
      * &lt;yellow&gt;warning&lt;/yellow&gt; (color yellow)
      * &lt;blue&gt;information&lt;/blue&gt; (blue)
@@ -4173,7 +4185,7 @@ class CliOne
      * &lt;col0/&gt;&lt;col1/&gt;&lt;col2/&gt;&lt;col3/&gt;&lt;col4/&gt;&lt;col5/&gt;  columns. col0=0
      * (left),col1--col5 every column of the page.
      * &lt;option/&gt; it shows all the options available (if the input has some options)
-     * </pre>
+     * ```
      *
      *
      * @param string|string[] $content content to display
@@ -4314,6 +4326,7 @@ class CliOne
      * @param int    $tab2       the second separation. Values are between 0 and 5.
      * @param array  $excludeKey the keys to exclude. It must be an indexed array with the keys to skip.
      * @return void
+     * @throws JsonException
      */
     public function showParamSyntax(string $key, int $tab = 0, int $tab2 = 1, array $excludeKey = []): void
     {
@@ -4358,6 +4371,7 @@ class CliOne
      *                                 use $param->setRelated() to set the relation.
      * @param ?int        $size        the minimum size of the first column
      * @return void
+     * @throws JsonException
      */
     public function showParamSyntax2(?string $title = '',
                                      array   $typeParam = ['flag', 'longflag', 'first', 'command'],
@@ -4758,6 +4772,7 @@ class CliOne
      * @param string  $type          ['multiple','multiple2','multiple3','multiple4','option','option2','option3','option4'][$i]
      * @param ?string $patternColumn the pattern to be used, example: "<cyan>[{key}]</cyan> {value}"
      * @return void
+     * @throws JsonException
      */
     public function showValuesColumn(array $values, string $type, ?string $patternColumn = null): void
     {
@@ -4771,11 +4786,11 @@ class CliOne
     /**
      * It shows a waiting cursor.<br>
      * <b>Example:</b><br/>
-     * <pre>
+     * ```php
      * $this->hideCursor()->showWaitCursor(true);
      * $this->showWaitCursor(); // inside a loop.
      * $this->hideWaitCursor()->showCursor(); // at the end of the loop
-     * </pre>
+     * ```
      * @param bool   $init               the first time this method is called, you must set this value as true. Then,
      *                                   every update must be false.
      * @param string $postfixValue       if you want to set a profix value such as percentage, advance, etc.
@@ -4875,7 +4890,7 @@ class CliOne
         foreach ($this->parameters as $parameter) {
             try {
                 $this->showLine("$parameter->key = [" .
-                    json_encode($parameter->default) . "] value:" .
+                    json_encode($parameter->default, JSON_THROW_ON_ERROR) . "] value:" .
                     $this->showParamValue($parameter));
             } catch (Exception $e) {
             }
@@ -4885,6 +4900,7 @@ class CliOne
     /**
      * @param CliOneParam $parameter
      * @return string
+     * @throws JsonException
      */
     public function showParamValue(CliOneParam $parameter): string
     {
@@ -4895,7 +4911,7 @@ class CliOne
             return '(null)';
         }
         if (is_array($parameter->value)) {
-            return json_encode($parameter->value);
+            return json_encode($parameter->value, JSON_THROW_ON_ERROR);
         }
         return $parameter->value;
     }
@@ -5001,10 +5017,10 @@ class CliOne
     //
 
     /**
-     * <pre>
+     * ```php
      * // up left, up middle, up right, middle left, middle right, down left, down middle, down right.
      * [$ul, $um, $ur, $ml, $mm, $mr, $dl, $dm, $dr, $mmv]=$this->border();
-     * </pre>
+     * ```
      * @param string $style =['mysql','simple','double','style']
      * @return string[]
      */
@@ -5077,10 +5093,10 @@ class CliOne
     }
 
     /**
-     * <pre>
+     * ```php
      * // cut left, cut top, cut right, cut bottom , cut middle
      * [$cutl, $cutt, $cutr, $cutd, $cutm] = $this->borderCut($style);
-     * </pre>
+     * ```
      * @param string $style =['mysql','simple','double']
      * @return string[]
      */
@@ -5228,6 +5244,7 @@ class CliOne
      * @param CliOneParam  $parameter
      * @param array|string $result used by multiple
      * @return void
+     * @throws JsonException
      */
     protected function internalShowOptions(CliOneParam $parameter, $result): void
     {
@@ -5341,6 +5358,7 @@ class CliOne
     /**
      * @param CliOneParam $parameter
      * @return array|?string
+     * @throws JsonException
      */
     protected function readParameterInput(CliOneParam $parameter)
     {
@@ -5405,6 +5423,7 @@ class CliOne
      * @param string      $content The prompt.
      * @param CliOneParam $parameter
      * @return false|mixed|string returns the user input.
+     * @throws JsonException
      */
     protected function readline(string $content, CliOneParam $parameter)
     {
@@ -5419,7 +5438,7 @@ class CliOne
             self::$fakeReadLine[0]++;
             if (self::$fakeReadLine[0] >= count(self::$fakeReadLine)) {
                 if (self::$throwNoInput) {
-                    throw new RuntimeException('Test incorrect, it is waiting for read more CliOne::$fakeReadLine ' . json_encode(self::$fakeReadLine));
+                    throw new RuntimeException('Test incorrect, it is waiting for read more CliOne::$fakeReadLine ' . json_encode(self::$fakeReadLine, JSON_THROW_ON_ERROR));
                 }
                 self::$fakeReadLine = null; // end running ??load
             } else {
@@ -5480,7 +5499,7 @@ class CliOne
 
     /**
      * It sets the color of the cli<br/>
-     * <pre>
+     * ```php
      * <red>error</red> (color red)
      * <yellow>warning</yellow> (color yellow)
      * <blue>information</blue> (blue)
@@ -5494,7 +5513,7 @@ class CliOne
      * <magenta>magenta</magenta> (color magenta)
      * <col0/><col1/><col2/><col3/><col4/><col5/>  columns. col0=0 (left),col1--col5 every column of the page.
      * <option/> it shows all the options available (if the input has some options)
-     * </pre>
+     * ```
      *
      * @param string       $content
      * @param ?CliOneParam $cliOneParam
@@ -5513,14 +5532,14 @@ class CliOne
             $content = str_replace(['<option/>', '<optionkey/>'], ['', ''], $content);
         }
         $content = $this->replaceCurlyVariable($content, true);
-        $content = str_replace($this->colorTags,
-            $this->noColor ? array_fill(0, count($this->colorTags), '') : $this->colorEscape,
-            $content);
-        $content = str_replace($this->styleTextTags,
-            $this->noColor ? array_fill(0, count($this->styleTextEscape), '') : $this->styleTextEscape, $content);
-        return str_replace($this->columnTags,
-            $this->noColor ? $this->columnEscapeCmd : $this->columnEscape,
-            $content);
+        return str_replace([...$this->colorTags, ...$this->styleTextTags, ...$this->columnTags],
+            [...$this->noColor ?
+                array_fill(0, count($this->colorTags), '')
+                : $this->colorEscape, ...$this->noColor
+            ? array_fill(0, count($this->styleTextEscape), '')
+                : $this->styleTextEscape, ...$this->noColor ? $this->columnEscapeCmd
+                : $this->columnEscape]
+            , $content);
     }
 
     /**
@@ -5530,9 +5549,12 @@ class CliOne
      */
     public function colorLess(string $content): string
     {
-        $content = str_replace($this->colorEscape, array_fill(0, count($this->colorEscape), ''), $content);
-        $content = str_replace($this->styleTextEscape, array_fill(0, count($this->styleTextEscape), ''), $content);
-        return str_replace($this->columnEscape, array_fill(0, count($this->columnEscape), ''), $content);
+        return str_replace(
+            [...$this->colorEscape, ...$this->styleTextEscape, ...$this->columnEscape],
+            [...array_fill(0, count($this->colorEscape), ''),
+                ...array_fill(0, count($this->styleTextEscape), ''),
+                ...array_fill(0, count($this->columnEscape), '')],
+            $content);
     }
 
     /**
@@ -5544,9 +5566,12 @@ class CliOne
     {
         $m5 = str_repeat(chr(250), 5); // colorescape and styletextescape uses \e[00m notation
         $m6 = str_repeat(chr(250), 6); // columnEscape uses \e[000m notation
-        $content = str_replace($this->colorEscape, array_fill(0, count($this->colorEscape), $m5), $content);
-        $content = str_replace($this->styleTextEscape, array_fill(0, count($this->styleTextEscape), $m5), $content);
-        return str_replace($this->columnEscape, array_fill(0, count($this->columnEscape), $m6), $content);
+        return str_replace(
+            [...$this->colorEscape, ...$this->styleTextEscape, ...$this->columnEscape],
+            [...array_fill(0, count($this->colorEscape), $m5),
+                ...array_fill(0, count($this->styleTextEscape), $m5),
+                ...array_fill(0, count($this->columnEscape), $m6)],
+            $content);
     }
 
     /**
@@ -5572,9 +5597,9 @@ class CliOne
 
     /**
      * [full,light,soft,double], light usually it is a space.
-     * <pre>
+     * ```php
      * [$bf,$bl,$bm,$bd]=$this->shadow();
-     * </pre>
+     * ```
      * @param string $style       =['mysql','simple','double','style']
      * @param string $returnValue =['full','light','soft','double'][$i]
      * @return string|array
@@ -5642,6 +5667,7 @@ class CliOne
      * @param string      $prefix    A prefix
      * @param string      $pattern   the pattern to use.
      * @return string
+     * @throws JsonException
      */
     protected function showPattern(CliOneParam $parameter, string $key, $value, string $selection, int $colW, string $prefix, string $pattern): string
     {
@@ -5650,7 +5676,7 @@ class CliOne
         if ($parameter->inputType === 'password') {
             $def = '*****';
         }
-        $valueToShow = (is_object($value) || is_array($value)) ? json_encode($value) : $value;
+        $valueToShow = (is_object($value) || is_array($value)) ? json_encode($value, JSON_THROW_ON_ERROR) : $value;
         if (is_array($value)) {
             $valueinit = reset($value);
             $valuenext = next($value);
@@ -5672,6 +5698,7 @@ class CliOne
      * @param CliOneParam $parameter
      * @param bool        $askInput
      * @return bool
+     * @throws JsonException
      */
     protected function validate(CliOneParam $parameter, bool $askInput = true): bool
     {
@@ -5711,7 +5738,7 @@ class CliOne
                                 $part = explode(':', $origInput, 2);
                                 $file = $part[1] ?? '_save';
                                 array_pop($this->debugHistory);
-                                $r = @file_put_contents($file . '.json', json_encode($this->debugHistory, JSON_PRETTY_PRINT));
+                                $r = @file_put_contents($file . '.json', json_encode($this->debugHistory, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
                                 if ($r === false) {
                                     $this->showCheck('error', 'red', 'unable to save file ' . $file . '.json');
                                 } else {
@@ -5726,7 +5753,7 @@ class CliOne
                                 if ($r === false) {
                                     $this->showCheck('error', 'red', 'unable to load file ' . $file . '.json');
                                 }
-                                $r = json_decode($r, true);
+                                $r = json_decode($r, true, 512, JSON_THROW_ON_ERROR);
                                 self::testUserInput(null);
                                 self::testUserInput($r, false);
                                 break;

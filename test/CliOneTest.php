@@ -279,13 +279,13 @@ class CliOneTest extends TestCase
     }
     public function testContainer() {
         $t = new CliOne();
-        echo $t->createContainer(100,20)
+        $r=$t->createContainer(100,20)
                 ->addRow([],100,20)
                     ->addCol(["123\nabc"],50,20)->close()
                     ->addCol(['456'],50,20)->close()
                 ->close()
             ->draw();
-
+        $this->assertContains("|123||abc||456|",$r);
     }
 
     public function testArgNone()
