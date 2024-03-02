@@ -1,6 +1,7 @@
 <?php /** @noinspection UnknownInspectionInspection */
 
 namespace eftec\CliOne;
+
 use JsonException;
 
 /**
@@ -21,7 +22,7 @@ class CliOneParam
      */
     public ?string $key = null;
     /** @var string=['command','first','last','second','flag','longflag','onlyinput','none'][$i] */
-    public string $type;
+    public string $type = 'none';
     public array $alias = [];
     /**
      * @var string|null
@@ -64,11 +65,10 @@ class CliOneParam
     protected array $helpSyntax = [];
     protected string $nameArg = '';
     protected ?string $patterColumns = null;
-    protected ?string $patternQuestion=null;
+    protected ?string $patternQuestion = null;
     protected array $related = [];
     protected ?string $footer = null;
     protected array $history = [];
-
 
     /**
      * The constructor. It is used internally
@@ -369,8 +369,8 @@ class CliOneParam
      */
     public function setDefault($default): CliOneParam
     {
-        if($default instanceof self) {
-            $default= $default->value;
+        if ($default instanceof self) {
+            $default = $default->value;
         }
         $this->default = $default;
         return $this;
@@ -464,7 +464,7 @@ class CliOneParam
             $inputType = Clione::instance()->getColSize() > 80 ? 'option2' : 'option';
         }
         if ($inputType === 'wide-option2') {
-            $colsize=Clione::instance()->getColSize() ;
+            $colsize = Clione::instance()->getColSize();
             if ($colsize < 60) {
                 $inputType = 'option';
             } else {
@@ -557,9 +557,9 @@ class CliOneParam
                 $this->valueKey = str_replace(Clione::instance()->emptyValue, '', $this->value);
                 return $this;
             }
-            $lower=[];
-            foreach($this->inputValue as $k=>$v) {
-                $lower[$k]=$v===null?null:strtolower($v);
+            $lower = [];
+            foreach ($this->inputValue as $k => $v) {
+                $lower[$k] = $v === null ? null : strtolower($v);
             }
             $k = array_search(strtolower($this->value ?? '')
                 , $lower, true);
@@ -574,6 +574,4 @@ class CliOneParam
         }
         return $this;
     }
-
-
 }

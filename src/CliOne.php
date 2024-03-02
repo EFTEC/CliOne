@@ -16,12 +16,12 @@ use RuntimeException;
  * @author    Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  * @copyright Copyright (c) 2022 Jorge Patricio Castro Castillo. Dual Licence: MIT License and Commercial.
  *            Don't delete this comment, its part of the license.
- * @version   1.32
+ * @version   1.32.1
  * @link      https://github.com/EFTEC/CliOne
  */
 class CliOne
 {
-    public const VERSION = '1.32';
+    public const VERSION = '1.32.1';
     /**
      * @var bool if debug is true then:<br>
      *           1) every operation will be recorded in $this->debugHistory<br>
@@ -33,7 +33,7 @@ class CliOne
     public bool $debug = false;
     public array $debugHistory = [];
     /** @var array|null this field is called by self::testUserInput() and It's used for debug purpose. */
-    public static ?array $fakeReadLine;
+    public static ?array $fakeReadLine =null;
     public static bool $throwNoInput = false;
     public static array $autocomplete = [];
     /**
@@ -41,9 +41,9 @@ class CliOne
      *             directly "a" all, "n" nothing, "" enter exit
      */
     public string $emptyValue = '__INPUT_';
-    public ?string $origin;
+    public ?string $origin = null;
     /** @var string $error it stores the latest error */
-    public string $error;
+    public string $error = '';
     /** @var CliOneParam[] */
     public array $parameters = [];
     /**
@@ -55,6 +55,7 @@ class CliOne
      * @see CliOne::setMemory
      */
     public bool $echo = true;
+    /** @var false|resource|null  */
     public $MEMORY;
     public array $menu = [];
     public array $menuServices = [];
@@ -5536,7 +5537,7 @@ class CliOne
             [...$this->noColor ?
                 array_fill(0, count($this->colorTags), '')
                 : $this->colorEscape, ...$this->noColor
-            ? array_fill(0, count($this->styleTextEscape), '')
+                ? array_fill(0, count($this->styleTextEscape), '')
                 : $this->styleTextEscape, ...$this->noColor ? $this->columnEscapeCmd
                 : $this->columnEscape]
             , $content);
